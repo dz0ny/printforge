@@ -1,0 +1,282 @@
+"""Slide-in sleeve for the Behringer Xenyx 1002SFX, made with CadQuery.
+
+X is the slide axis along the mixer depth. The short side stays open.
+Y is the mixer width. Z is the height, with the base plate at the bottom.
+Run `uv run mixer_sleeve.py` to write the STEP and the STL.
+"""
+import cadquery as cq
+from cadquery.selectors import BoxSelector
+
+# Mixer body size in mm. Measure your mixer.
+MIX_W = 191.0   # Width, left to right, on the open short side.
+MIX_D = 248.0   # Depth, front to back, along the slide axis.
+MIX_H = 25.0    # Body thickness with feet, without knobs.
+
+# Printer settings. The part prints flat on its back, so X and Y use lines and Z uses layers.
+NOZZLE = 0.4
+LINE = 0.45        # Line width, about 1.1 x the nozzle.
+LAYER = 0.28
+
+# Sleeve settings in mm.
+CLEAR = 0.5       # Gap on each side and at the end stop.
+CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
+
+SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge.
+WALL = 6 * LINE   # Side wall thickness, 6 lines.
+BASE = 11 * LAYER  # Base plate thickness, 11 layers.
+
+END = 6 * LINE    # End stop thickness, 6 lines: 3 wall loops on each side, no infill.
+END_H = 16.0      # End stop height, low for the curved mixer edge.
+
+LIP = 8.0         # Lip reach over the mixer edge.
+LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
+LIP_FREE = 60.0   # No lip on this length at the open end.
+LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
+# A 45 degree fill under each lip lets the part print flat on its back.
+
+FILLET = 4.0      # Fillet between the side walls and the base.
+END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
+ROUND = 1.0       # Radius on the outer edges and lip tips.
+
+# Mount points on the back. Each one gets a small mark in a solid pad.
+HOLE_PATTERN = (80.0, 80.0)  # Spacing in X and Y of the back mount.
+MARK_D = 3.0       # Mark diameter.
+MARK_DEPTH = 3 * LAYER  # Mark depth into the back face, 3 layers.
+PAD_R = 17.0       # Radius of the solid pad around each mark.
+
+# Hex vents on all walls, with the hex points along the print Z axis.
+VENT_HEX = 11.5     # Back vent hex size across the corners.
+SIDE_HEX = 9.0      # Side vent hex size for the low side walls.
+VENT_WEB = 6 * LINE  # Material between two hexes, 6 lines.
+VENT_MARGIN = 8.0   # Solid border around each vent area.
+SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
+
+IN_D = MIX_W + 2 * CLEAR
+assert min(WALL, END, VENT_WEB) >= 2 * LINE, "a wall is thinner than two lines"
+assert MARK_D >= 2.5 * NOZZLE and ROUND >= NOZZLE, "a feature is too small for the nozzle"
+IN_H = MIX_H + CLEAR_TOP
+OUT_D = IN_D + 2 * WALL
+OUT_H = BASE + IN_H + LIP_T
+LEN = SLEEVE_H - END
+assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
+TOTAL_LEN = LEN + END
+E = 0.5  # Selector box margin.
+
+
+def box(x0, y0, z0, x1, y1, z1):
+    return cq.Workplane("XY").box(x1 - x0, y1 - y0, z1 - z0, centered=False) \
+        .translate((x0, y0, z0))
+
+
+def sel(x0, y0, z0, x1, y1, z1):
+    return BoxSelector((x0 - E, y0 - E, z0 - E), (x1 + E, y1 + E, z1 + E))
+
+
+def hole_points():
+    cx, cy = TOTAL_LEN / 2, OUT_D / 2
+    px, py = HOLE_PATTERN
+    return [(cx + sx * px / 2, cy + sy * py / 2) for sx in (-1, 1) for sy in (-1, 1)]
+
+
+def hex_grid(x0, x1, v0, v1, keep=(), size=VENT_HEX):
+    """Return hex centres that fit fully in the area and stay clear of the keep circles."""
+    import math
+    flat = size * math.sqrt(3) / 2
+    p = flat + VENT_WEB
+    dx = p * math.sqrt(3) / 2
+    pts = []
+    i = 0
+    while x0 + size / 2 + i * dx + size / 2 <= x1:
+        x = x0 + size / 2 + i * dx
+        j = 0
+        while True:
+            v = v0 + flat / 2 + j * p + (p / 2 if i % 2 else 0)
+            if v + flat / 2 > v1:
+                break
+            if all(math.hypot(x - kx, v - kv) > kr + size / 2 for kx, kv, kr in keep):
+                pts.append((x, v))
+            j += 1
+        i += 1
+    return pts
+
+
+def vents():
+    m = VENT_MARGIN
+    keep = [(x, y, PAD_R) for x, y in hole_points()]
+    back = hex_grid(m, LEN - m, WALL + FILLET + m, OUT_D - WALL - FILLET - m, keep)
+    cut = cq.Workplane("XY").workplane(offset=-1).pushPoints(back) \
+        .polygon(6, VENT_HEX).extrude(BASE + 2)
+    # Side and end vents stay between the floor fillet and the lip fill.
+    # Their hex points go along Z, so they print without supports on the back.
+    zs = (BASE + FILLET + SIDE_MARGIN, BASE + IN_H - LIP - SIDE_MARGIN)
+    side = hex_grid(*zs, m, LEN - m, size=SIDE_HEX)
+    # An empty pushPoints() list puts one shape at the origin, so skip empty grids.
+    for y in (WALL / 2, OUT_D - WALL / 2) if side else ():
+        plane = cq.Plane(origin=(0, y, 0), xDir=(0, 0, 1), normal=(0, 1, 0))
+        wp = cq.Workplane(plane).pushPoints(side)
+        cut = cut.union(wp.polygon(6, SIDE_HEX).extrude(WALL / 2 + 1, both=True))
+    ys = (WALL + END_FILLET + m, OUT_D - WALL - END_FILLET - m)
+    end = hex_grid(zs[0], min(zs[1], END_H - SIDE_MARGIN), *ys, size=SIDE_HEX)
+    if end:
+        plane = cq.Plane(origin=(LEN + END / 2, 0, 0), xDir=(0, 0, 1), normal=(1, 0, 0))
+        wp = cq.Workplane(plane).pushPoints([(z, -y) for z, y in end])
+        cut = cut.union(wp.polygon(6, SIDE_HEX).extrude(END / 2 + 1, both=True))
+    print(f"vents: back {len(back)}, each side {len(side)}, end stop {len(end)}")
+    return cut
+
+
+def on(v, x=None, z=None, tol=0.05):
+    return (x is None or abs(v.x - x) < tol) and (z is None or abs(v.z - z) < tol)
+
+
+def build():
+    y0, y1 = WALL, WALL + IN_D
+    zf, zt = BASE, BASE + IN_H
+
+    part = box(0, 0, 0, TOTAL_LEN, OUT_D, OUT_H)
+    part = part.cut(box(-1, y0, zf, LEN, y1, zt))
+    part = part.cut(box(-1, y0 + LIP, zt - 1, LEN, y1 - LIP, OUT_H + 1))
+
+    # Remove the lips near the open end and before the bottom slope.
+    lip_end = TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
+    part = part.cut(box(-1, y0, zt, LIP_FREE, y1, OUT_H + 1))
+    part = part.cut(box(lip_end, y0, zt, LEN, y1, OUT_H + 1))
+
+    # Fill under each lip at 45 degrees.
+    for y, s in ((y0, 1), (y1, -1)):
+        tri = [(y, zt), (y + s * LIP, zt), (y, zt - LIP)]
+        fill = cq.Workplane("YZ", origin=(LIP_FREE, 0, 0)).polyline(tri).close() \
+            .extrude(lip_end - LIP_FREE)
+        part = part.union(fill)
+
+    # Lower the end stop. The walls and lips run down to it at 45 degrees.
+    top = OUT_H + 10
+    wedge = [(TOTAL_LEN + 1, END_H - 1), (TOTAL_LEN + 1, top), (TOTAL_LEN - (top - END_H), top)]
+    cutter = cq.Workplane("XZ", origin=(0, OUT_D / 2, 0)).polyline(wedge).close() \
+        .extrude(OUT_D / 2 + 1, both=True)
+    part = part.cut(cutter)
+
+    # Inner fillets: long floor edges, then the end stop edges.
+    part = part.edges(sel(0, y0, zf, LEN, y0, zf) + sel(0, y1, zf, LEN, y1, zf)) \
+        .fillet(FILLET)
+    part = part.edges(sel(LEN, y0, zf, LEN, y0, zf + 5) + sel(LEN, y1, zf, LEN, y1, zf + 5)
+                      + sel(LEN, y0, zf, LEN, y1, zf)).fillet(END_FILLET)
+
+    # Round every other sharp edge in one fillet.
+    def all_pts(e, test):
+        return all(test(p) for p in (e.startPoint(), e.endPoint(), e.Center()))
+
+    def outer(p):
+        return p.z < 0.05 or p.y < 0.05 or p.y > OUT_D - 0.05 or p.x > TOTAL_LEN - 0.05
+
+    def slope(p):
+        return abs(p.z - (END_H + TOTAL_LEN - p.x)) < 0.05
+
+    def wall_top(p):
+        return abs(p.z - OUT_H) < 0.05
+
+    def lip_ends(p):
+        return (on(p, x=LIP_FREE) or on(p, x=lip_end)) and p.z > zt - LIP - 0.1
+
+    def open_end(p):
+        return on(p, x=0)
+
+    # Start with the groups that always round together.
+    # Then add the slope edges one by one and keep those that still work.
+    base = [e for e in part.edges().vals()
+            if e.geomType() == "LINE"
+            and any(all_pts(e, t) for t in (outer, wall_top, lip_ends, open_end))]
+    extra = [e for e in part.edges().vals()
+             if all_pts(e, slope) and not any(e.isSame(b) for b in base)]
+    keep, skipped = list(base), 0
+    for e in sorted(extra, key=lambda e: -e.Length()):
+        try:
+            part.newObject(keep + [e]).fillet(ROUND)
+            keep.append(e)
+        except Exception:
+            skipped += 1
+    part = part.newObject(keep).fillet(ROUND)
+    print(f"rounded {len(keep)} edges, {skipped} slope edges stay sharp")
+
+    marks = cq.Workplane("XY").pushPoints(hole_points()).circle(MARK_D / 2).extrude(MARK_DEPTH)
+    return part.cut(marks).cut(vents())
+
+
+def labels(rb):
+    """Return named anchors in the upright frame for render_views.py."""
+    pts = hole_points()
+    design = {
+        "Back plate": ((TOTAL_LEN / 2, OUT_D / 2, -0.5), (0, 0, -1)),
+        "Mount mark M1": ((pts[0][0], pts[0][1], -0.5), (0, 0, -1)),
+        "Left wall": ((TOTAL_LEN / 2, -0.5, OUT_H / 2), (0, -1, 0)),
+        "Right wall": ((TOTAL_LEN / 2, OUT_D + 0.5, OUT_H / 2), (0, 1, 0)),
+        "Open end": ((-0.5, WALL / 2, OUT_H / 2), (-1, 0, 0)),
+        "End stop": ((TOTAL_LEN + 0.5, OUT_D / 2, END_H / 2), (1, 0, 0)),
+        "Left lip": (((LIP_FREE + LEN) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1)),
+        "Right lip": (((LIP_FREE + LEN) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1)),
+        "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1)),
+        "Bottom slope": ((TOTAL_LEN - 7.6, WALL / 2, END_H + 8.4), (0.7, 0, 0.7)),
+        "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1)),
+    }
+    # The upright export turns (x, y, z) into (z, y, -x) and then moves it to the origin.
+    out = {"_views": {"left": "Mount face", "right": "Knob side", "top": "Open end",
+                      "bottom": "End stop", "front": "Left wall", "back": "Right wall"}}
+    for name, ((x, y, z), (nx, ny, nz)) in design.items():
+        out[name] = {"at": [z - rb.xmin, y - rb.ymin, -x - rb.zmin], "normal": [nz, ny, -nx]}
+    return out
+
+
+def plot_sections(part, path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    def draw(ax, shape, ix, iy, title, lim=None):
+        for e in shape.Edges():
+            p = np.array([tuple(v) for v in e.positions(np.linspace(0, 1, 40))])
+            ax.plot(p[:, ix], p[:, iy], "k", lw=0.8)
+        ax.set_aspect("equal"); ax.grid(alpha=0.3); ax.set_title(title)
+        if lim:
+            ax.set_xlim(*lim[:2]); ax.set_ylim(*lim[2:])
+
+    x = (LIP_FREE + LEN) / 2
+    solid = part.val()
+    yz = solid.intersect(cq.Solid.makeBox(0.01, 400, 200, cq.Vector(x, -50, -50)))
+    xy = solid.intersect(cq.Solid.makeBox(400, 400, 0.01, cq.Vector(-50, -50, 2)))
+    xz = solid.intersect(cq.Solid.makeBox(400, 0.01, 200, cq.Vector(-50, OUT_D / 2, -50)))
+    fig, axs = plt.subplots(2, 2, figsize=(16, 10))
+    draw(axs[0, 0], yz, 1, 2, f"Cross-section at x={x:.0f}")
+    draw(axs[0, 1], yz, 1, 2, "Zoom: wall fillet, lip with 45 degree fill", (-2, 40, -8, 62))
+    draw(axs[1, 0], xy, 0, 1, "Plan at z=2 (back vents and pads)")
+    draw(axs[1, 1], xz, 0, 2, "Zoom: end stop fillet", (TOTAL_LEN - 25, TOTAL_LEN + 2, -2, 62))
+    plt.tight_layout()
+    plt.savefig(path, dpi=80)
+
+
+if __name__ == "__main__":
+    part = build()
+    solid = part.val()
+    assert solid.isValid(), "invalid solid"
+    bb = solid.BoundingBox()
+    print(f"design size {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, "
+          f"volume {solid.Volume() / 1000:.0f} cm3")
+    # The STEP stands upright, as mounted, with the open end up.
+    upright = part.rotate((0, 0, 0), (0, 1, 0), 90)
+    ub = upright.val().BoundingBox()
+    import json
+    with open("labels.json", "w") as f:
+        json.dump(labels(ub), f, indent=1)
+    upright = upright.translate((-ub.xmin, -ub.ymin, -ub.zmin))
+    ub = upright.val().BoundingBox()
+    slab = lambda z: upright.val().intersect(cq.Solid.makeBox(400, 400, 1, cq.Vector(-50, -50, z))).Volume()
+    assert slab(1) > 3 * slab(ub.zmax - 2), "the end stop must be at the bottom"
+    cq.exporters.export(upright, "mixer_sleeve.step")
+    # The STL lies flat on its back, which is the print orientation.
+    flat = part.translate((-bb.xmin, -bb.ymin, -bb.zmin))
+    cq.exporters.export(flat, "mixer_sleeve.stl", tolerance=0.02, angularTolerance=0.1)
+    print(f"upright size {ub.xlen:.1f} x {ub.ylen:.1f} x {ub.zlen:.1f} mm")
+    cq.exporters.export(upright, "view.svg", opt={
+        "projectionDir": (1.2, -1.0, 0.9), "showHidden": False, "width": 900, "height": 700})
+    plot_sections(part, "sections.png")
+    print("wrote mixer_sleeve.step, mixer_sleeve.stl, view.svg, sections.png")

@@ -1,0 +1,118 @@
+---
+name: cad-print-design
+description: Design 3D-printable parts (holders, sleeves, mounts, brackets, enclosures, adapters, clips) as parametric CadQuery models run with uv, exporting STEP and STL and rendering labeled side views the user can inspect. Use this whenever the user asks for an STL, a 3D print, a printable holder/case/mount for a device, or wants to change dimensions, walls, lips, holes, vents or fillets on a part — even if they never say "CAD" or "CadQuery".
+---
+
+# Printable part design with CadQuery
+
+The user iterates on a physical part by looking at pictures and saying things like "make the left wall thinner" or "remove the lip from the top 6 cm". That loop only works when both of you use the same names for the same places, the pictures are trustworthy, and every number is one clear parameter. Everything below serves that loop.
+
+## 1. Before modelling: pin down the inputs
+
+Ask in one round (AskUserQuestion works well), and say which defaults you will use if they skip a question:
+
+- **The object's real body size.** Spec sheets often include knobs, feet or packaging. In one session a mixer listed as 50 mm thick was really 25 mm. Ask for a ruler measurement of the body alone, and treat spec values as placeholders you flag.
+- **How it is mounted and used.** Which side faces the wall or desk, which way is up, and where the object goes in. Draw a quick sketch (an inline SVG with named sides) before writing code if the request is at all ambiguous. Users often say "draw it first".
+- **Printer, nozzle, layer height and wall loops.** Ask which nozzle they print with (0.4 mm is common; 0.6 mm and 0.2 mm exist), the layer height (0.2 mm, or 0.28 mm for draft/fast), how many wall loops their profile uses (often 2–3), and the bed size. These set wall thicknesses, the smallest holes and webs, fillet sizes and fit clearances. See "Nozzle-aware sizes" below.
+- **Material** (PLA, PETG or ASA) if the part carries load or sits near heat.
+- **Fasteners.** Heat-set inserts, screws or magnets, with sizes and hole spacing.
+
+When a later message uses a vague word ("height", "thickness", "side", "top"), don't guess. Reply with the named dimensions and their current values ("Length along the slide: 213.5 mm, Width: 198 mm, Depth off the wall: 32.5 mm. Which one?"). In one session "height" meant thickness, and a wrong guess cost two rebuilds.
+
+## 2. Project setup: always uv + CadQuery
+
+Work in a real folder the user can reach, not a hidden scratch folder, so they can run the script themselves. If the session sits in a temporary workspace, offer to move it first.
+
+```bash
+uv init --bare --name <part-name>
+uv add cadquery
+uv run <part>.py
+```
+
+Copy `scripts/render_views.py` from this skill into the project. It declares its own dependencies inline, so `uv run render_views.py ...` works.
+
+## 3. The model script
+
+Use `assets/example_mixer_sleeve.py` as a working reference. It's a complete sleeve with lips, 45° lip fills, hex vents, a low end stop, a slope and mount marks. The shape of a good script:
+
+1. **A printer block first:** `NOZZLE`, `LINE` (about 1.1 × nozzle) and `LAYER`. Then express every thickness as a count of those: `WALL = 6 * LINE`, `BASE = 11 * LAYER`. Use lines for thicknesses that lie across the bed in the print orientation, and layers for thicknesses that stack upward. When the user changes nozzle or layer height, the whole part re-tunes. Assert that no wall is thinner than two lines.
+2. **Parameters at the top, in mm, named after the features.** For example `WALL`, `BASE`, `LIP`, `LIP_FREE`, `END_H`, `HOLE_PATTERN`, with a one-line comment each. A user request should map to changing one or two of these. Derived values (`IN_D`, `OUT_H`, ...) come next.
+3. **One `build()` in a design frame** that is easy to reason about, for example X along the slide, Y across, Z off the back plate.
+4. **Exports:**
+   - `<part>.step` in the *use* orientation (as mounted), for CAD viewing.
+   - `<part>.stl` in the *print* orientation, positioned at z = 0.
+   - `labels.json` with the named features, in the same frame as the STEP.
+5. **Asserts that catch silly mistakes.** A rotation sign error once put the end stop on top and the opening on the build plate. Check orientation with a slab test, by comparing material volume near z = 0 with material near the top. Also check minimum floor thickness above holes, and that the part fits the bed.
+6. **A section plot** (`sections.png`) through the trickiest profile helps you verify fillets, lips and holes quickly.
+
+Read `references/cadquery-pitfalls.md` before writing fillets, rotations or vent patterns. It records what failed and what worked.
+
+## 4. Name every side and feature
+
+Give each side and each distinctive feature a short, stable name, and use those names everywhere: parameter comments, `labels.json`, replies to the user. Sides are things like *Back plate (mount face)*, *Left wall*, *Right wall*, *Open end*, *End stop*. Features are things like *Left lip*, *Lip fill (45°)*, *Lip-free zone*, *Bottom slope*, *Mount mark M1–M4*, *Side vents*, *Back vents*, *Floor fillet*.
+
+Unique or easy-to-miss features especially need names, because those are what the user will want to tweak. Keep names stable across iterations. If a feature is renamed or removed, say so.
+
+`labels.json` format (anchor 0.5 mm outside the surface, normal pointing out of it):
+
+```json
+{
+  "_views": {"left": "Mount face", "right": "Inside / knob side", "top": "Open end", "bottom": "End stop"},
+  "Back plate": {"at": [-0.5, 99, 106], "normal": [-1, 0, 0]},
+  "Left lip":   {"at": [33, 7, 83.5],   "normal": [1, 0, 0]}
+}
+```
+
+Compute anchors from the parameters in the model script, so they move when the part changes.
+
+## 5. Views the user can inspect
+
+After every build:
+
+```bash
+uv run render_views.py <part>.step --labels labels.json --out views
+```
+
+This writes shaded orthographic views (front, back, left, right, top, bottom) and two isometric views, all with feature edges and red name tags, plus `views/sheet.png`. A tag appears only where its surface faces the camera and isn't hidden. Use `_views` to title each view by its side name, so "left" becomes "Mount face - Left (from -X)".
+
+Look at `sheet.png` yourself (Read it) before sending anything. You're checking that the change actually happened, the orientation is right, and no tag sits in the wrong place. Then send the sheet, plus a close-up view if the change was local, along with the STL and STEP.
+
+## 6. Each iteration
+
+- Change the fewest parameters that do what was asked, rebuild, re-render and look.
+- Reply with what changed in feature names and numbers ("Lip: 3 → 8 mm with a 45° fill; Lip-free zone stays 60 mm"), the new outside size, and anything you could not do (for example "two slope edges stay sharp, the fillet fails there").
+- If a request will cause a fit or print problem, say so concretely and offer the choice. For example, a 45° lip fill eats into the corner where a square mixer edge sits.
+- Never claim the part fits until the user test-prints. Say "rebuilt, not printed".
+- **Check corners and cut ends after every change.** When a cut (a slope, a lowered wall, a shortened lip) meets another feature, leftovers appear: stubs of a lip sliced by a slope, or a notch from a stray cutter. Confirm the part is one solid (`len(part.solids().vals()) == 1`). Then render a close-up by intersecting the part with a box around each changed corner and running `render_views.py` on that crop. End features such as lips a few mm *before* a slope instead of letting the slope slice them.
+- **Name your reading of terse requests.** "Revert again" or "go in between" can mean more than one thing. Make the most likely change, then say in one line what you took it to mean and what the other reading would be.
+
+## Nozzle-aware sizes
+
+Line width is about 1.1 × nozzle (0.45 mm for a 0.4 nozzle). Scale with the nozzle the user named:
+
+| Thing | 0.4 mm nozzle | 0.6 mm nozzle | Why |
+|---|---|---|---|
+| Wall thickness | multiples of ~0.45: 1.2, 1.6, 2.0, 2.4, 3.0 | multiples of ~0.65: 2.0, 2.6, 3.2 | whole perimeters, no gap fill |
+| Smallest hole or slot | ≥ 1.0 mm | ≥ 1.5 mm | smaller ones close up |
+| Web between vent holes | ≥ 2 lines (≥ 1.0 mm), 2.5–3 for strength | ≥ 1.4 mm, 3+ for strength | thin webs break |
+| Fillet radius | ≥ 0.5 mm, 1 mm reads well | ≥ 0.8 mm, 1.5 mm reads well | smaller rounds print as corners |
+| Sliding fit clearance per side | 0.2–0.3 mm (0.5 loose) | 0.3–0.4 mm | wider lines grow parts |
+| Engraved marks | ≥ 0.6 mm deep and ≥ 2 mm wide | ≥ 0.8 mm deep and ≥ 3 mm wide | must survive a few layers |
+| Heat-set insert holes | follow the insert maker's size; boss ≈ 2.5 × insert diameter; hole depth = insert + 1–2 mm; ≥ 2–3 mm solid floor beyond | same | the melt needs somewhere to go |
+
+## Faster prints
+
+When the user shares a slicer screenshot and asks for a faster print:
+
+- **Slicer first.** A coarser layer height (0.28 mm) usually saves 25–35%. With wall loops set so thin walls are pure perimeters, and 10–15% sparse infill, the walls print faster and stronger.
+- **Walls that are exactly 2 × loops × line** (for example 6 lines for 3 loops) print without infill between the perimeters.
+- **Fewer, larger holes on big flat areas.** Every vent hole adds perimeters and travel moves on every layer it passes through. Keep a separate, smaller hole size for low walls where large holes do not fit.
+- **Thinner base plates and lower walls** remove whole layers. Keep solid pads where screws or mounts go.
+- Expect the user to try sizes and go back and forth. Keep each choice as one parameter so switching is a one-line change.
+
+## Printability rules of thumb
+
+- Overhangs up to 45° print without support. Replace 90° undercuts (like a lip underside) with a 45° fill, or choose a print orientation where they become vertical walls.
+- Holes in walls that print vertically: use hexagons or teardrops with a point facing up (+Z of the print). Round holes under 8 mm are fine.
+- Put the largest flat face on the bed when you can. State the print orientation in your reply, and export the STL already in it.
+- Check the part fits the bed (Bambu X1/P1/A1: 256 mm; A1 mini: 180 mm). Rotating it diagonally gains room.

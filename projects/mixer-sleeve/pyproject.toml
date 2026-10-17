@@ -1,0 +1,9 @@
+[project]
+name = "mixer-sleeve"
+description = "Slide-in wall sleeve for the Behringer Xenyx 1002SFX, made with CadQuery"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cadquery>=2.8.0",
+    "matplotlib>=3.11.2",
+]
