@@ -44,6 +44,7 @@ charge of the design, and you can rebuild it yourself with one command.
 - Labeled orthographic and isometric renders after every rebuild, so you inspect the part before you slice it
 - Printer-aware sizes: walls and plates are whole numbers of extrusion lines and layers for your nozzle and layer height
 - Print-ready STL in the print orientation, plus an editable STEP for Fusion, FreeCAD or Onshape
+- A Bambu Studio / OrcaSlicer 3MF with the recommended layer height, walls and infill already set, checked by slicing it headless
 - Always `uv` and CadQuery: no conda, no global installs, reproducible builds
 - A growing list of CadQuery pitfalls the skill already knows how to avoid
 
@@ -73,6 +74,7 @@ How it evolved, one plain-language request at a time:
 | "Make the end stop lower, the mixer is curved there" | End stop 16 mm with a 45° slope to the walls |
 | "Optimize for a 0.4 nozzle, 0.28 layers" | Thicknesses tied to `LINE` and `LAYER` counts |
 | "Faster print time?" | Thinner back plate, lower walls, 11.5 mm back vents |
+| "Generate a 3MF with recommended parameters" | Print-ready 3MF, sliced headless to check: 110 layers, ~3 h, 127 g |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.
 
@@ -82,7 +84,8 @@ Every row was rebuilt, rendered and checked as a single solid before it was sent
 2. Claude asks for the real measurements, mount, nozzle, layer height and wall loops.
 3. It writes a parametric CadQuery script and builds it with `uv`.
 4. It renders labeled views, checks them, and sends you the views, STL and STEP.
-5. You ask for changes by name. Claude edits one or two parameters and repeats.
+5. It writes a 3MF with the recommended print settings for your printer, slices it to check, and tells you the time and grams.
+6. You ask for changes by name. Claude edits one or two parameters and repeats.
 
 ## Install
 
@@ -115,7 +118,13 @@ add it to your skills in Claude.
 cd printforge/projects/mixer-sleeve
 uv run mixer_sleeve.py
 uv run render_views.py mixer_sleeve.step --labels labels.json --out views
+uv run make_3mf.py mixer_sleeve.stl --settings print_settings.json \
+  --template bambu_p1s_0.4.config --out mixer_sleeve.3mf
 ```
+
+Or skip the build and open [`mixer_sleeve.3mf`](./projects/mixer-sleeve/mixer_sleeve.3mf) in Bambu Studio:
+it is set up for a P1S with a 0.4 mm nozzle, 0.28 mm layers and 3 wall loops,
+and slices to about 3 hours and 127 g of PLA.
 
 Change any number at the top of `mixer_sleeve.py` and run the two commands
 again. See the [project README](./projects/mixer-sleeve/README.md) for the

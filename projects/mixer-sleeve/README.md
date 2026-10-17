@@ -16,6 +16,10 @@ reachable through the open front, and the rear jacks stay free at the top.
 | `mixer_sleeve.py` | The parametric CadQuery model. Every size is a named setting at the top |
 | `mixer_sleeve.stl` | Print-ready mesh, already lying flat on its back |
 | `mixer_sleeve.step` | Editable CAD file, standing upright as mounted |
+| `mixer_sleeve.3mf` | Bambu Studio project with the recommended print settings, ready to slice |
+| `print_settings.json` | The recommended slicer settings that go into the 3MF |
+| `bambu_p1s_0.4.config` | Printer and filament template: Bambu Lab P1S, 0.4 mm nozzle, Bambu PLA Basic |
+| `make_3mf.py` | Builds the 3MF from the STL, the settings and the template |
 | `labels.json` | Named anchor points that `render_views.py` draws as tags |
 | `render_views.py` | Renders the labeled views in `views/` |
 | `sections.png` | Cross-sections through the lip and the end stop |
@@ -25,7 +29,12 @@ reachable through the open front, and the rear jacks stay free at the top.
 ```bash
 uv run mixer_sleeve.py
 uv run render_views.py mixer_sleeve.step --labels labels.json --out views
+uv run make_3mf.py mixer_sleeve.stl --settings print_settings.json \
+  --template bambu_p1s_0.4.config --out mixer_sleeve.3mf
 ```
+
+For another printer, save any project in Bambu Studio or OrcaSlicer with your
+printer and filament, and pass that `.3mf` as `--template`.
 
 ## Named sides and features
 
@@ -64,6 +73,11 @@ Outside size: 197.4 × 30.6 × 213.5 mm.
 
 ## Print settings
 
+`mixer_sleeve.3mf` already has these set on the object:
+
 - Orientation: flat on the back plate, as the STL is exported. No supports are needed.
-- 0.4 mm nozzle, 0.28 mm layers, 3 wall loops, 10–15% sparse infill
-- PETG or ASA for a part that holds weight on a wall for years
+- 0.4 mm nozzle, 0.28 mm layers (0.2 mm first layer), 3 wall loops
+- 15% gyroid sparse infill, 4 top and 3 bottom shell layers, aligned seam, auto brim
+
+On a P1S this slices to 110 layers, about 3 h 06 min and 127 g of PLA. The template uses PLA;
+for a part that holds weight on a wall for years, switch the filament to PETG or ASA.

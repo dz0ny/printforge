@@ -1,6 +1,6 @@
 ---
 name: cad-print-design
-description: Design 3D-printable parts (holders, sleeves, mounts, brackets, enclosures, adapters, clips) as parametric CadQuery models run with uv, exporting STEP and STL and rendering labeled side views the user can inspect. Use this whenever the user asks for an STL, a 3D print, a printable holder/case/mount for a device, or wants to change dimensions, walls, lips, holes, vents or fillets on a part — even if they never say "CAD" or "CadQuery".
+description: Design 3D-printable parts (holders, sleeves, mounts, brackets, enclosures, adapters, clips) as parametric CadQuery models run with uv, exporting STEP, STL and a print-ready Bambu Studio/OrcaSlicer 3MF with recommended settings, and rendering labeled side views the user can inspect. Use this whenever the user asks for an STL, a 3D print, a printable holder/case/mount for a device, or wants to change dimensions, walls, lips, holes, vents or fillets on a part — even if they never say "CAD" or "CadQuery".
 ---
 
 # Printable part design with CadQuery
@@ -77,7 +77,18 @@ This writes shaded orthographic views (front, back, left, right, top, bottom) an
 
 Look at `sheet.png` yourself (Read it) before sending anything. You're checking that the change actually happened, the orientation is right, and no tag sits in the wrong place. Then send the sheet, plus a close-up view if the change was local, along with the STL and STEP.
 
-## 6. Each iteration
+## 6. Print-ready 3MF with recommended settings
+
+An STL carries no settings. Also write a 3MF that opens in Bambu Studio or OrcaSlicer with the recommended settings already set:
+
+1. Write `print_settings.json` next to the model, using slicer keys: `layer_height`, `initial_layer_print_height`, `wall_loops`, `top_shell_layers`, `bottom_shell_layers`, `sparse_infill_density`, `sparse_infill_pattern`, `enable_support`, `brim_type`, `seam_position`. Add a `"_why"` key with one line of reasoning. Keys that start with `_` are skipped. Match the settings to the model: wall loops so that walls are pure perimeters, a layer height the layer counts in the script assume, and supports off if the print orientation needs none.
+2. Ask the user for one project they have saved in Bambu Studio with their printer and filament. Pass it, or its `Metadata/project_settings.config`, as the template.
+3. Run `uv run make_3mf.py part.stl --settings print_settings.json --template <template> --out part.3mf`.
+4. If Bambu Studio is installed, verify by slicing headless: `/Applications/BambuStudio.app/Contents/MacOS/BambuStudio --slice 1 --outputdir out part.3mf`. Then check `out/result.json` and the layer count (`grep -c "^; CHANGE_LAYER" out/plate_1.gcode`). Report the estimated time and grams from the G-code to the user.
+
+The script stores the settings on the object, and object settings override the template's process (verified: 110 layers at 0.28 mm on a project set to 0.20 mm). The G-code header still prints the project values, so count layers instead of trusting the header. Without a template, the 3MF still has the geometry and the object settings. Bambu's command line cannot slice it with the stock presets, and the behaviour in the app is not verified, so prefer a template.
+
+## 7. Each iteration
 
 - Change the fewest parameters that do what was asked, rebuild, re-render and look.
 - Reply with what changed in feature names and numbers ("Lip: 3 → 8 mm with a 45° fill; Lip-free zone stays 60 mm"), the new outside size, and anything you could not do (for example "two slope edges stay sharp, the fillet fails there").

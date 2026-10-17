@@ -1,0 +1,13 @@
+{
+  "_why": "0.28 mm layers and 3 wall loops: the 2.7 mm walls print as pure perimeters. Flat on the back, no supports.",
+  "layer_height": "0.28",
+  "initial_layer_print_height": "0.2",
+  "wall_loops": "3",
+  "top_shell_layers": "4",
+  "bottom_shell_layers": "3",
+  "sparse_infill_density": "15%",
+  "sparse_infill_pattern": "gyroid",
+  "enable_support": "0",
+  "brim_type": "auto_brim",
+  "seam_position": "aligned"
+}

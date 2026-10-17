@@ -38,3 +38,10 @@ These are things that went wrong while building a real part, and what fixed them
 - `uv init --bare --python 3.12` may still use a newer Python. CadQuery 2.8 works on 3.14.
 - `vtk`, `OCP` and `cadquery` install from wheels on macOS arm64 through `uv add cadquery`. No conda is needed.
 - STEP import for later rendering: `cq.importers.importStep(path).val()`.
+
+## 3MF for Bambu Studio and OrcaSlicer
+
+- Bambu Studio re-centres each mesh on its bounding box. Put vertices around the centre, and set the build item and `assemble_item` z to half the part height. With z = 0 the part loads half below the bed, and slicing fails with "Nothing to be sliced".
+- A file tagged `Application = BambuStudio-...` without `Metadata/project_settings.config` crashes the command-line slicer (exit code 139).
+- Object settings in `Metadata/model_settings.config` (`<metadata key="layer_height" value="0.28"/>` under `<object>`) override the project process. The G-code header shows the project value, so verify with the layer count.
+- The command line `--load-settings` with stock profiles from the app bundle fails, because those profiles inherit from others it does not resolve. Use a project saved by the app as the template.
