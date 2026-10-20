@@ -8,7 +8,7 @@ import cadquery as cq
 from cadquery.selectors import BoxSelector
 
 # Mixer body size in mm. Measure your mixer.
-MIX_W = 191.0   # Width, left to right, on the open short side.
+MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play.
 MIX_D = 248.0   # Depth, front to back, along the slide axis.
 MIX_H = 25.0    # Body thickness with feet, without knobs.
 
@@ -22,7 +22,8 @@ CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge.
-WALL = 6 * LINE   # Side wall thickness, 6 lines.
+WALL_H = 50.0     # Outer side wall height, floor to lip top.
+WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 
 END = 6 * LINE    # End stop thickness, 6 lines: 3 wall loops on each side, no infill.
@@ -34,9 +35,17 @@ LIP_FREE = 60.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
 # A 45 degree fill under each lip lets the part print flat on its back.
 
-FILLET = 4.0      # Fillet between the side walls and the base.
+FILLET = 6.0      # Fillet between the side walls and the base.
 END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 ROUND = 1.0       # Radius on the outer edges and lip tips.
+
+# Gussets on the outside of each wall. The part prints flat, so the wall to
+# floor joint is only layer adhesion. A 45 degree rib spreads a side knock
+# over many layers and still prints without supports.
+GUSSET = 10.0      # Gusset reach out from the wall and height up the wall.
+GUSSET_T = 6 * LINE  # Gusset thickness along the slide axis, 6 lines.
+GUSSET_PITCH = 40.0  # Distance between gussets.
+GUSSET_FIRST = 20.0  # First gusset, measured from the open end.
 
 # Mount points on the back. Each one gets a small mark in a solid pad.
 HOLE_PATTERN = (80.0, 80.0)  # Spacing in X and Y of the back mount.
@@ -46,7 +55,8 @@ PAD_R = 17.0       # Radius of the solid pad around each mark.
 
 # Hex vents on all walls, with the hex points along the print Z axis.
 VENT_HEX = 11.5     # Back vent hex size across the corners.
-SIDE_HEX = 9.0      # Side vent hex size for the low side walls.
+SIDE_HEX = 9.0      # Side vent hex size.
+SIDE_VENTS = False  # The side vents weakened the walls. The back vents are enough.
 VENT_WEB = 6 * LINE  # Material between two hexes, 6 lines.
 VENT_MARGIN = 8.0   # Solid border around each vent area.
 SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
@@ -54,9 +64,10 @@ SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
 IN_D = MIX_W + 2 * CLEAR
 assert min(WALL, END, VENT_WEB) >= 2 * LINE, "a wall is thinner than two lines"
 assert MARK_D >= 2.5 * NOZZLE and ROUND >= NOZZLE, "a feature is too small for the nozzle"
-IN_H = MIX_H + CLEAR_TOP
 OUT_D = IN_D + 2 * WALL
-OUT_H = BASE + IN_H + LIP_T
+OUT_H = WALL_H
+IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
+assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
 LEN = SLEEVE_H - END
 assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 TOTAL_LEN = LEN + END
@@ -76,6 +87,15 @@ def hole_points():
     cx, cy = TOTAL_LEN / 2, OUT_D / 2
     px, py = HOLE_PATTERN
     return [(cx + sx * px / 2, cy + sy * py / 2) for sx in (-1, 1) for sy in (-1, 1)]
+
+
+def gusset_points(lip_end):
+    """Return the X centres of the gussets, from the open end up to the lips' end."""
+    pts, x = [], GUSSET_FIRST
+    while x + GUSSET_T / 2 <= lip_end:
+        pts.append(x)
+        x += GUSSET_PITCH
+    return pts
 
 
 def hex_grid(x0, x1, v0, v1, keep=(), size=VENT_HEX):
@@ -109,7 +129,7 @@ def vents():
     # Side and end vents stay between the floor fillet and the lip fill.
     # Their hex points go along Z, so they print without supports on the back.
     zs = (BASE + FILLET + SIDE_MARGIN, BASE + IN_H - LIP - SIDE_MARGIN)
-    side = hex_grid(*zs, m, LEN - m, size=SIDE_HEX)
+    side = hex_grid(*zs, m, LEN - m, size=SIDE_HEX) if SIDE_VENTS else []
     # An empty pushPoints() list puts one shape at the origin, so skip empty grids.
     for y in (WALL / 2, OUT_D - WALL / 2) if side else ():
         plane = cq.Plane(origin=(0, y, 0), xDir=(0, 0, 1), normal=(0, 1, 0))
@@ -199,7 +219,19 @@ def build():
     print(f"rounded {len(keep)} edges, {skipped} slope edges stay sharp")
 
     marks = cq.Workplane("XY").pushPoints(hole_points()).circle(MARK_D / 2).extrude(MARK_DEPTH)
-    return part.cut(marks).cut(vents())
+    part = part.cut(marks).cut(vents())
+
+    # Gussets go on last, after the rounding, and reach 1.5 mm into the wall
+    # so the rounded outer edge leaves no gap behind them.
+    t = 1.5
+    for y, s in ((0, -1), (OUT_D, 1)):
+        tri = [(y + s * GUSSET, 0), (y - s * t, 0), (y - s * t, GUSSET + t)]
+        for x in gusset_points(lip_end):
+            rib = cq.Workplane("YZ", origin=(x - GUSSET_T / 2, 0, 0)).polyline(tri).close() \
+                .extrude(GUSSET_T)
+            part = part.union(rib)
+    print(f"gussets: {len(gusset_points(lip_end))} per side")
+    return part
 
 
 def labels(rb):
@@ -215,8 +247,9 @@ def labels(rb):
         "Left lip": (((LIP_FREE + LEN) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1)),
         "Right lip": (((LIP_FREE + LEN) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1)),
         "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1)),
-        "Bottom slope": ((TOTAL_LEN - 7.6, WALL / 2, END_H + 8.4), (0.7, 0, 0.7)),
+        "Bottom slope": ((TOTAL_LEN - (OUT_H - END_H) / 2, WALL / 2, (OUT_H + END_H) / 2), (0.7, 0, 0.7)),
         "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1)),
+        "Gusset": ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7)),
     }
     # The upright export turns (x, y, z) into (z, y, -x) and then moves it to the origin.
     out = {"_views": {"left": "Mount face", "right": "Knob side", "top": "Open end",
@@ -249,7 +282,7 @@ def plot_sections(part, path):
     draw(axs[0, 0], yz, 1, 2, f"Cross-section at x={x:.0f}")
     draw(axs[0, 1], yz, 1, 2, "Zoom: wall fillet, lip with 45 degree fill", (-2, 40, -8, 62))
     draw(axs[1, 0], xy, 0, 1, "Plan at z=2 (back vents and pads)")
-    draw(axs[1, 1], xz, 0, 2, "Zoom: end stop fillet", (TOTAL_LEN - 25, TOTAL_LEN + 2, -2, 62))
+    draw(axs[1, 1], xz, 0, 2, "Zoom: end stop fillet", (TOTAL_LEN - 45, TOTAL_LEN + 2, -2, 62))
     plt.tight_layout()
     plt.savefig(path, dpi=80)
 

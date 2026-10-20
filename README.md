@@ -75,6 +75,9 @@ How it evolved, one plain-language request at a time:
 | "Optimize for a 0.4 nozzle, 0.28 layers" | Thicknesses tied to `LINE` and `LAYER` counts |
 | "Faster print time?" | Thinner back plate, lower walls, 11.5 mm back vents |
 | "Generate a 3MF with recommended parameters" | Print-ready 3MF, sliced headless to check: 110 layers, ~3 h, 127 g |
+| "The wall is not high enough, needs to be 5 cm" | Walls 50 mm, a named `WALL_H` setting |
+| "Narrow it, the mixer slides left and right" | Inside width 192 → 190 mm |
+| "After printing the side broke off" | Side vents removed, 3.6 mm walls, 6 mm floor fillet, 45° gussets outside each wall |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.
 
