@@ -57,3 +57,7 @@ A loft between two 128-point polygons gives 128 ruled faces, and every boolean a
 ## A cut that changes nothing
 
 `part.cut(tool)` can return the part unchanged, with no error, when a face of the tool lies exactly on a face of the part (here the inner loft ended on the collar's face). Check the volume after a cut you rely on. Fix it by cutting before the union that creates the coincidence, or by moving the tool face a little past the boundary.
+
+## A lip that reaches down prints in air
+
+A lip whose tip hangs lower than its root, to rest on the device's edge, has its lowest point at the tip with nothing under it: the first layers of the wedge print in air. For a flat print the fill under a lip must grow out of the wall, lowest at the wall and highest at the tip, which is why the mixer sleeve's lips hover above the mixer instead of touching it. A touching lip needs supports or a different print orientation.
