@@ -45,3 +45,7 @@ These are things that went wrong while building a real part, and what fixed them
 - A file tagged `Application = BambuStudio-...` without `Metadata/project_settings.config` crashes the command-line slicer (exit code 139).
 - Object settings in `Metadata/model_settings.config` (`<metadata key="layer_height" value="0.28"/>` under `<object>`) override the project process. The G-code header shows the project value, so verify with the layer count.
 - The command line `--load-settings` with stock profiles from the app bundle fails, because those profiles inherit from others it does not resolve. Use a project saved by the app as the template.
+
+## Fillet trial loops are the slow part
+
+Adding risky edges to a fillet one at a time, with a full `fillet()` as the test for each, multiplies the cost: 8 fillet operations for one result. Try the complete set once and fall back to the one-by-one loop only when that raises. Classify edges with the three points of each edge computed once and compare edges by `hashCode()` in a set, not with nested `isSame()` loops. On the mixer sleeve this took a warm build from 2.5 s to 1.1 s with identical geometry.

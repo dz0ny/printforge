@@ -186,9 +186,6 @@ def build():
                       + sel(LEN, y0, zf, LEN, y1, zf)).fillet(END_FILLET)
 
     # Round every other sharp edge in one fillet.
-    def all_pts(e, test):
-        return all(test(p) for p in (e.startPoint(), e.endPoint(), e.Center()))
-
     def outer(p):
         return p.z < 0.05 or p.y < 0.05 or p.y > OUT_D - 0.05 or p.x > TOTAL_LEN - 0.05
 
@@ -204,21 +201,32 @@ def build():
     def open_end(p):
         return on(p, x=0)
 
-    # Start with the groups that always round together.
-    # Then add the slope edges one by one and keep those that still work.
-    base = [e for e in part.edges().vals()
-            if e.geomType() == "LINE"
+    # Classify every edge once. The three points per edge are the only
+    # geometry calls, and the hash set replaces pairwise isSame checks.
+    edges = part.edges().vals()
+    pts = {e.hashCode(): (e.startPoint(), e.endPoint(), e.Center()) for e in edges}
+
+    def all_pts(e, test):
+        return all(test(p) for p in pts[e.hashCode()])
+
+    base = [e for e in edges if e.geomType() == "LINE"
             and any(all_pts(e, t) for t in (outer, wall_top, lip_ends, open_end))]
-    extra = [e for e in part.edges().vals()
-             if all_pts(e, slope) and not any(e.isSame(b) for b in base)]
-    keep, skipped = list(base), 0
-    for e in sorted(extra, key=lambda e: -e.Length()):
-        try:
-            part.newObject(keep + [e]).fillet(ROUND)
-            keep.append(e)
-        except Exception:
-            skipped += 1
-    part = part.newObject(keep).fillet(ROUND)
+    base_ids = {e.hashCode() for e in base}
+    extra = [e for e in edges if e.hashCode() not in base_ids and all_pts(e, slope)]
+    # Try the whole set in one fillet. Only when that fails, add the slope
+    # edges one by one and keep those that still work.
+    keep, skipped = base + sorted(extra, key=lambda e: -e.Length()), 0
+    try:
+        part = part.newObject(keep).fillet(ROUND)
+    except Exception:
+        keep = list(base)
+        for e in sorted(extra, key=lambda e: -e.Length()):
+            try:
+                part.newObject(keep + [e]).fillet(ROUND)
+                keep.append(e)
+            except Exception:
+                skipped += 1
+        part = part.newObject(keep).fillet(ROUND)
     print(f"rounded {len(keep)} edges, {skipped} slope edges stay sharp")
 
     marks = cq.Workplane("XY").pushPoints(hole_points()).circle(MARK_D / 2).extrude(MARK_DEPTH)

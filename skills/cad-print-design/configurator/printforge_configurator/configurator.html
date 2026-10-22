@@ -589,7 +589,7 @@ function makeViewer(T, STLLoader, OrbitControls) {
   const root = new T.Group();
   scene.add(root);
   const loader = new STLLoader();
-  let shell = null, device = null, grid = null, fitted = false, devOn = true;
+  let shell = null, device = null, grid = null, fitted = false, devOn = true, shownKey = null;
   let center = new T.Vector3(), radius = 50;
 
   const resize = () => {
@@ -793,6 +793,9 @@ function makeViewer(T, STLLoader, OrbitControls) {
     },
     async show(b) {
       features = b.features || [];
+      // The same key means the same meshes: a cache hit needs no download or re-parse.
+      if (b.key && b.key === shownKey && shell) return;
+      shownKey = b.key || null;
       const [sg, dg] = await Promise.all([load(b.shell), b.device ? load(b.device) : null]);
       drop(shell); drop(device);
       shell = mesh(sg, shellMat); root.add(shell);

@@ -351,7 +351,7 @@ def run_build(srv, values):
         srv.last = entry
         cached = entry.get("served", False)
         entry["served"] = True
-        return {"ok": True, "build": n, "seconds": 0.0 if cached else entry["seconds"], "cached": cached,
+        return {"ok": True, "build": n, "key": key, "seconds": 0.0 if cached else entry["seconds"], "cached": cached,
                 "log": entry["log"], "bbox": entry["info"]["bbox"], "volume_cm3": entry["info"]["volume_cm3"],
                 "features": entry["info"].get("features", []),
                 "shell": f"/api/mesh/shell.stl?build={n}",

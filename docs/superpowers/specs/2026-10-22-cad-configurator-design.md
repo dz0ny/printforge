@@ -34,6 +34,8 @@ see it inside the shell and change its size.
   is a button, with an optional auto-rebuild.
 - Builds are cached in memory, keyed on the model source and the values, so the
   same input never builds twice. The last eight stay in memory; nothing goes to disk.
+  The reply carries the key, and the page skips the mesh download when it already
+  shows that key.
 - Groups: a heading comment's leading emoji is the group icon, and the page shows
   each group as a collapsible card, MakerWorld style, in a light theme only.
 - "Save to script" writes the values back into the Python file. The committed

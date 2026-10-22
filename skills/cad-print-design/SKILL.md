@@ -135,7 +135,7 @@ For a part built around a device, give the user a page where they can adjust the
     "port": 8765}
    ```
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Download menu with the shell STL, the shell STEP and the device STL, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Download menu with the shell STL, the shell STEP and the device STL, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
 
 ## 7. Each iteration
 
