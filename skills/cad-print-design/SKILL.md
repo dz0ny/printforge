@@ -155,7 +155,19 @@ For a part built around a device, give the user a page where they can adjust the
     "port": 8765}
    ```
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view with top, front, right and isometric projections, hidden lines dashed and overall sizes, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+
+### The drawing sheet
+
+The Drawing view is a technical drawing of the part, made from the model, not drawn by hand. Its rules, so a user can read it:
+
+- **One view per page.** Top, Front, Right and Iso each get a landscape page with a pager; the download is the current page or all pages stacked.
+- **The view uses the maximum space and sits in the middle.** The view together with its dimension rows is one block, scaled to the largest size that fits the page above the title block, then centred. Nothing else competes for the page: the title top-left, the title block a thin strip at the bottom.
+- **Dimensions are traced from the geometry.** Every straight visible edge in a projection gives a level, and the chain of gaps between levels is the dimension set. Hidden lines are drawn dashed and never dimensioned.
+- **Dimensions show on hover, not all at once.** By default a page shows only the overall size on each axis and a tick at every level. Hovering an edge shows its gaps to both neighbours and its distance from the datum, with the extension line drawn through the part so it is clear what is measured. A click pins a set; Escape clears pins; a Show all switch brings back every chain, staggered over rows so labels never overprint.
+- **Vector, zoomable.** Wheel and pinch zoom around the cursor, drag pans, double-click fits a view, and Fit, −, +, 1:1 are on the sheet. Text keeps its size in sheet pixels, so zooming in makes it readable.
+
+When a part's projections have arcs, the chains measure the straight edges only; diameters are read from the settings on the left.
 
 ## 7. Each iteration
 

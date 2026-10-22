@@ -206,7 +206,8 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 #tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
 /* Drawing sheet, shown in place of the 3D view */
 #sheet { position: absolute; inset: 0; overflow: hidden; }
-#sheetVp { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+#sheetVp { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+#pager { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; }
 #sheetVp.panning { cursor: grabbing; }
 #sheetPaper { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 #zoomBar {
@@ -215,9 +216,10 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 #zoomBar button { height: 30px; min-width: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; font-size: 13px; }
 #zoomBar button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
+#zoomBar .check { height: 30px; padding: 0 8px; font-size: 13px; }
 #sheetPaper svg { display: block; width: 960px; height: 680px; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
 #sheetMsg {
-  position: absolute; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
 }
 #sheetMsg.err { color: var(--err); }
@@ -276,6 +278,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
       <a id="dlSleeve" href="/api/mesh/shell.stl" download="part.stl">Sleeve STL</a>
       <a id="dlStep" href="/api/step" download="part.step">Sleeve STEP</a>
       <a id="dlDrawing" href="#">Drawing SVG</a>
+      <a id="dlAll" href="#">Drawing, all views SVG</a>
       <a id="dlDev" href="/api/mesh/device.stl" download="device.stl" hidden>Device STL</a>
     </div>
   </div>
@@ -302,6 +305,12 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
       <div id="hint">Click a feature to see its settings</div>
     </div>
     <section id="sheet" hidden>
+      <div class="seg pager" id="pager" role="group" aria-label="Drawing page">
+        <button type="button" data-page="top">Top</button>
+        <button type="button" data-page="front">Front</button>
+        <button type="button" data-page="right">Right</button>
+        <button type="button" data-page="iso">Iso</button>
+      </div>
       <div id="sheetVp"><div id="sheetPaper"></div></div>
       <div id="sheetMsg" hidden></div>
       <div id="zoomBar">
@@ -309,6 +318,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
         <button type="button" id="zOut" aria-label="Zoom out">−</button>
         <button type="button" id="zIn" aria-label="Zoom in">+</button>
         <button type="button" id="z1">1:1</button>
+        <label class="check" id="allWrap"><input type="checkbox" id="showAll"> Show all</label>
       </div>
     </section>
   </section>
@@ -873,10 +883,10 @@ const DIM_HEX = getComputedStyle(document.documentElement).getPropertyValue('--d
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 const SHEET = { W: 960, H: 680, M: 12, TB: 40 };
 const SHEET_VIEWS = [
-  { key: 'top', title: 'Top (from +Z)', annotate: true },
-  { key: 'front', title: 'Front (from −Y)', annotate: true },
-  { key: 'right', title: 'Right (from +X)', annotate: true },
-  { key: 'iso', title: 'Isometric', annotate: false },
+  { key: 'top', title: 'Top (from +Z)', annotate: true, axes: [0, 1] },
+  { key: 'front', title: 'Front (from −Y)', annotate: true, axes: [0, 2] },
+  { key: 'right', title: 'Right (from +X)', annotate: true, axes: [1, 2] },
+  { key: 'iso', title: 'Isometric', annotate: false, axes: [0, 1, 2] },
 ];
 const f1 = (v) => Number(v).toFixed(1);
 const sv = (tag, attrs = {}, text) => {
@@ -1045,25 +1055,30 @@ function chainLayout(pos, mm, s) {
     placed.push({ i, row, c, text });
     top = Math.max(top, row);
   }
-  const overall = placed.length ? top + 1 : 1;
+  const overall = Math.max(2, placed.length ? top + 1 : 1);
   const skip = skipped.length ? overall + 1 : -1;
   return { placed, skipped, overall, skip, reach: (skip >= 0 ? skip : overall) * ROW_PX + 20 };
 }
 function chainLayouts(a, s) {
   return { X: chainLayout(a.xs.map(a.pX), a.xs, s), Y: chainLayout(a.ys.map(a.pY), a.ys, s) };
 }
-function dimOverlay(a, s, L) {
+function dimOverlay(a, s, L, full = true) {
   const { pb, pX, pY, xs, ys } = a;
   const u = (px) => px / s;
   const gap = u(3), tk = u(4), ar = u(6);
   const dim = [], ext = [], txt = [];
   const xp = xs.map(pX), yp = ys.map(pY);
+  const LX = full ? L.X : { ...L.X, placed: [], skipped: [], skip: -1 };
+  const LY = full ? L.Y : { ...L.Y, placed: [], skipped: [], skip: -1 };
   const xl = Math.min(...xp), xr = Math.max(...xp), yt = Math.min(...yp), yb = Math.max(...yp);
   // X chain, below the drawing
   const yB = pb.y1 + u(L.X.reach), yL = (r) => yB - u(r * ROW_PX);
-  for (const x of xp) { ext.push(`M${x} ${pb.y1 + gap}V${yB}`); dim.push(`M${x - tk} ${yB + tk}L${x + tk} ${yB - tk}`); }
+  for (const x of xp) {
+    if (full || x === xl || x === xr) ext.push(`M${x} ${pb.y1 + gap}V${yB}`);
+    dim.push(`M${x - tk} ${yB + tk}L${x + tk} ${yB - tk}`);
+  }
   dim.push(`M${xl} ${yB}H${xr}`);
-  for (const p of L.X.placed) {
+  for (const p of LX.placed) {
     const ty = yL(p.row) - u(3);
     if (p.row > 0) dim.push(`M${p.c} ${yB}V${ty}`);
     txt.push({ x: p.c, y: ty, t: p.text });
@@ -1072,16 +1087,19 @@ function dimOverlay(a, s, L) {
   ext.push(`M${xl} ${pb.y1 + gap}V${yO}`, `M${xr} ${pb.y1 + gap}V${yO}`);
   dim.push(`M${xl} ${yO}H${xr}`, `M${xl + ar} ${yO - ar / 2}L${xl} ${yO}L${xl + ar} ${yO + ar / 2}`, `M${xr - ar} ${yO - ar / 2}L${xr} ${yO}L${xr - ar} ${yO + ar / 2}`);
   txt.push({ x: (xl + xr) / 2, y: yO - u(3), t: fmtMm(xs[xs.length - 1] - xs[0]) });
-  if (L.X.skip >= 0) {
-    const yS = yL(L.X.skip);
-    for (const k of L.X.skipped) dim.push(`M${(xp[k] + xp[k + 1]) / 2} ${yB}V${yS}`);
-    txt.push({ x: (xl + xr) / 2, y: yS - u(3), t: L.X.skipped.map((k) => fmtMm(xs[k + 1] - xs[k])).join(' · ') });
+  if (LX.skip >= 0) {
+    const yS = yL(LX.skip);
+    for (const k of LX.skipped) dim.push(`M${(xp[k] + xp[k + 1]) / 2} ${yB}V${yS}`);
+    txt.push({ x: (xl + xr) / 2, y: yS - u(3), t: LX.skipped.map((k) => fmtMm(xs[k + 1] - xs[k])).join(' · ') });
   }
   // Y chain, right of the drawing (labels rotated -90)
   const xB = pb.x1 + u(L.Y.reach), xL = (r) => xB - u(r * ROW_PX);
-  for (const y of yp) { ext.push(`M${pb.x1 + gap} ${y}H${xB}`); dim.push(`M${xB - tk} ${y + tk}L${xB + tk} ${y - tk}`); }
+  for (const y of yp) {
+    if (full || y === yt || y === yb) ext.push(`M${pb.x1 + gap} ${y}H${xB}`);
+    dim.push(`M${xB - tk} ${y + tk}L${xB + tk} ${y - tk}`);
+  }
   dim.push(`M${xB} ${yt}V${yb}`);
-  for (const p of L.Y.placed) {
+  for (const p of LY.placed) {
     const tx = xL(p.row) - u(3);
     if (p.row > 0) dim.push(`M${xB} ${p.c}H${tx}`);
     txt.push({ x: tx, y: p.c, t: p.text, rot: true });
@@ -1090,10 +1108,10 @@ function dimOverlay(a, s, L) {
   ext.push(`M${pb.x1 + gap} ${yt}H${xO}`, `M${pb.x1 + gap} ${yb}H${xO}`);
   dim.push(`M${xO} ${yt}V${yb}`, `M${xO - ar / 2} ${yt + ar}L${xO} ${yt}L${xO + ar / 2} ${yt + ar}`, `M${xO - ar / 2} ${yb - ar}L${xO} ${yb}L${xO + ar / 2} ${yb - ar}`);
   txt.push({ x: xO - u(3), y: (yt + yb) / 2, t: fmtMm(ys[ys.length - 1] - ys[0]), rot: true });
-  if (L.Y.skip >= 0) {
-    const xS = xL(L.Y.skip);
-    for (const k of L.Y.skipped) dim.push(`M${xB} ${(yp[k] + yp[k + 1]) / 2}H${xS}`);
-    txt.push({ x: xS - u(3), y: (yt + yb) / 2, t: L.Y.skipped.map((k) => fmtMm(ys[k + 1] - ys[k])).join(' · '), rot: true });
+  if (LY.skip >= 0) {
+    const xS = xL(LY.skip);
+    for (const k of LY.skipped) dim.push(`M${xB} ${(yp[k] + yp[k + 1]) / 2}H${xS}`);
+    txt.push({ x: xS - u(3), y: (yt + yb) / 2, t: LY.skipped.map((k) => fmtMm(ys[k + 1] - ys[k])).join(' · '), rot: true });
   }
   const g = sv('g', { class: 'dimchain' });
   g.append(sv('path', { d: ext.join(''), stroke: '#aab2bd', 'stroke-width': u(0.75), fill: 'none' }));
@@ -1101,6 +1119,56 @@ function dimOverlay(a, s, L) {
   for (const t of txt) {
     const at = {
       x: t.x, y: t.y, 'text-anchor': 'middle', 'font-size': u(LABEL_FS), fill: DIM_HEX, 'font-family': MONO,
+      stroke: '#ffffff', 'stroke-width': u(3), 'paint-order': 'stroke',
+    };
+    if (t.rot) at.transform = `rotate(-90 ${t.x} ${t.y})`;
+    g.append(sv('text', at, t.t));
+  }
+  return g;
+}
+
+// Hovered or pinned level selection: full-height/width lines to the edges they measure, gaps to both
+// neighbours on the baseline row and the distance from the minimum on the row above.
+function selectionOverlay(a, s, L, sel, alpha) {
+  const { pb, pX, pY, xs, ys } = a;
+  const u = (px) => px / s;
+  const xp = xs.map(pX), yp = ys.map(pY);
+  const xB = pb.x1 + u(L.Y.reach), yB = pb.y1 + u(L.X.reach);
+  const xL = (r) => xB - u(r * ROW_PX), yL = (r) => yB - u(r * ROW_PX);
+  const gap = u(3), faint = [], strong = [], txt = [];
+  const involved = (k, n) => [...new Set([k - 1, k, k + 1, 0])].filter((i) => i >= 0 && i < n);
+  if (sel.x != null) {
+    const k = sel.x;
+    for (const i of involved(k, xp.length)) {
+      faint.push(`M${xp[i]} ${pb.y0}V${yB}`);
+      strong.push(`M${xp[i]} ${pb.y1 + gap}V${yB}`);
+    }
+    if (k > 0) txt.push({ x: (xp[k - 1] + xp[k]) / 2, y: yB - u(3), t: fmtMm(xs[k] - xs[k - 1]) });
+    if (k + 1 < xp.length) txt.push({ x: (xp[k] + xp[k + 1]) / 2, y: yB - u(3), t: fmtMm(xs[k + 1] - xs[k]) });
+    if (k > 0) {
+      strong.push(`M${xp[k]} ${yB}V${yL(1) - u(1)}`);
+      txt.push({ x: xp[k], y: yL(1) - u(3), t: `← ${fmtMm(xs[k] - xs[0])}` });
+    }
+  }
+  if (sel.y != null) {
+    const j = sel.y;
+    for (const i of involved(j, yp.length)) {
+      faint.push(`M${pb.x0} ${yp[i]}H${xB}`);
+      strong.push(`M${pb.x1 + gap} ${yp[i]}H${xB}`);
+    }
+    if (j > 0) txt.push({ x: xB - u(3), y: (yp[j - 1] + yp[j]) / 2, t: fmtMm(ys[j] - ys[j - 1]), rot: true });
+    if (j + 1 < yp.length) txt.push({ x: xB - u(3), y: (yp[j] + yp[j + 1]) / 2, t: fmtMm(ys[j + 1] - ys[j]), rot: true });
+    if (j > 0) {
+      strong.push(`M${xB} ${yp[j]}H${xL(1) - u(3)}`);
+      txt.push({ x: xL(1) - u(3), y: yp[j], t: fmtMm(ys[j] - ys[0]), rot: true });
+    }
+  }
+  const g = sv('g', { class: 'sel', opacity: alpha });
+  g.append(sv('path', { d: faint.join(''), stroke: DIM_HEX, 'stroke-opacity': 0.5, 'stroke-width': u(1), fill: 'none' }));
+  g.append(sv('path', { d: strong.join(''), stroke: DIM_HEX, 'stroke-width': u(1.6), fill: 'none' }));
+  for (const t of txt) {
+    const at = {
+      x: t.x, y: t.y, 'text-anchor': 'middle', 'font-size': u(12), 'font-weight': 700, fill: DIM_HEX, 'font-family': MONO,
       stroke: '#ffffff', 'stroke-width': u(3), 'paint-order': 'stroke',
     };
     if (t.rot) at.transform = `rotate(-90 ${t.x} ${t.y})`;
@@ -1123,58 +1191,115 @@ function analyzeAll(data) {
   return out;
 }
 
-// Standalone SVG: four cells; annotated views fit the page in the top-left 78% of the cell, leaving room for chains.
-function buildSheet(data) {
-  const { W, H, M, TB } = SHEET;
-  const x0 = M, y0 = M, x1 = W - M, y1 = H - M;
-  const cw = (x1 - x0) / 2, ch = (y1 - TB - 8 - y0) / 2;
-  const b = data.bbox;
-  const an = analyzeAll(data);
-  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'font-family': 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif' });
-  svg.append(sv('rect', { x: 0.5, y: 0.5, width: W - 1, height: H - 1, fill: '#ffffff', stroke: '#1c2330' }));
-  SHEET_VIEWS.forEach((v, i) => {
-    const cx = x0 + (i % 2) * cw, cy = y0 + Math.floor(i / 2) * ch;
-    svg.append(sv('rect', { x: cx + 0.5, y: cy + 0.5, width: cw - 1, height: ch - 1, fill: 'none', stroke: '#e1e5eb' }));
-    svg.append(sv('text', { x: cx + 12, y: cy + 22, 'font-size': 14, 'font-weight': 600, fill: '#1c2330' }, v.title));
-    const A = an[v.key];
-    let root = null, vb = null;
-    if (A) { root = A.root; vb = A.vb; } else {
-      try { const p = parseView(data.views[v.key]); root = p.root; vb = p.vb; } catch (e) { root = null; }
+// ---- One page per view: the view fills the page, the title sits top-left, a thin title strip at the bottom.
+const FONT = 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif';
+const PAGE = { W: 960, H: 680, M: 16, TOP: 44, TB: 24 };
+const SHEET_W = PAGE.W, SHEET_H = PAGE.H;
+const PAGE_KEYS = SHEET_VIEWS.map((v) => v.key);
+const sheetUI = { pins: new Map(), hover: null, pinKey: '', showAll: false, page: 'top' };
+try {
+  sheetUI.showAll = localStorage.getItem('cfg.drawing.showAll') === '1';
+  const pg = localStorage.getItem('cfg.drawing.page');
+  if (PAGE_KEYS.includes(pg)) sheetUI.page = pg;
+} catch (e) { /* storage unavailable */ }
+let pages = {}, pagesKey = '', curKey = null, liveSvg = null;
+const zooms = {};
+
+// Chain layout for the mode: full staggered chains, or the default (overall totals; hover rows at 1 and 2).
+function modeLayouts(A, s, full) {
+  const base = chainLayouts(A, s);
+  if (full) return base;
+  return { X: { ...base.X, reach: 48, overall: 2 }, Y: { ...base.Y, reach: 48, overall: 2 } };
+}
+// Fit the view to the page area, leaving only the rows in use reserved on the right and below.
+function fitPage(svg, full) {
+  const { W, H, M, TOP, TB } = PAGE;
+  const ax = M, ay = TOP, aw = W - 2 * M, ah = H - TB - ay - 16;
+  const A = svg.A;
+  let s, L = null, px, py, vx, vy;
+  if (A) {
+    // Annotated views fit their own drawing extent (plus the rows reserved right and below).
+    const { x0, y0, x1, y1 } = A.pb;
+    vx = x0; vy = y0;
+    const bw = x1 - x0, bh = y1 - y0;
+    s = Math.min(aw / bw, ah / bh);
+    for (let it = 0; it < 3; it++) {
+      L = modeLayouts(A, s, full);
+      s = Math.min((aw - L.Y.reach) / bw, (ah - L.X.reach) / bh);
     }
-    if (!root) {
-      svg.append(sv('text', { x: cx + cw / 2, y: cy + ch / 2, 'text-anchor': 'middle', 'font-size': 13, fill: '#b42318' }, `${v.title}: view unavailable`));
-      return;
-    }
-    const [vx, vy, vw, vh] = vb;
-    const dx = cx + 12, dy = cy + 28, dw = cw - 24, dh = ch - 40;
-    // Annotated views reserve room for their chains, from the rows actually used.
-    let s = Math.min((dw * 0.9) / vw, (dh * 0.9) / vh), L = null;
-    if (A) {
-      for (let it = 0; it < 2; it++) {
-        L = chainLayouts(A, s);
-        s = Math.min((dw - L.Y.reach - 8) / vw, (dh - L.X.reach - 8) / vh);
-      }
-      L = chainLayouts(A, s);
-    }
-    const px = A ? dx : dx + (dw - vw * s) / 2, py = A ? dy : dy + (dh - vh * s) / 2;
-    const g = sv('g', { transform: `translate(${px} ${py}) scale(${s}) translate(${-vx} ${-vy})` });
-    for (const node of root.childNodes) g.append(document.importNode(node, true));
-    if (A) g.append(dimOverlay(A, s, L));
-    svg.append(g);
-  });
-  // Title block
-  const ty = y1 - TB, tw = x1 - x0;
-  svg.append(sv('rect', { x: x0, y: ty, width: tw, height: TB, fill: '#f6f7f9', stroke: '#1c2330' }));
-  for (const fx of [0.3, 0.6, 0.8]) {
-    svg.append(sv('path', { d: `M${x0 + tw * fx} ${ty}V${y1}`, stroke: '#1c2330', fill: 'none' }));
+    L = modeLayouts(A, s, full);
+    // Centre the block: the drawing plus the rows reserved right and below.
+    const blockW = bw * s + L.Y.reach, blockH = bh * s + L.X.reach;
+    px = ax + (aw - blockW) / 2; py = ay + (ah - blockH) / 2;
+  } else {
+    [vx, vy] = svg.vb;
+    const vw = svg.vb[2], vh = svg.vb[3];
+    s = Math.min(aw / vw, ah / vh);
+    px = ax + (aw - vw * s) / 2; py = ay + (ah - vh * s) / 2;
   }
-  svg.append(sv('text', { x: x0 + 12, y: ty + 25, 'font-size': 13, 'font-weight': 600, fill: '#1c2330' }, state.model));
-  svg.append(sv('text', { x: x0 + tw * 0.3 + 12, y: ty + 25, 'font-size': 12, fill: DIM_HEX }, `Overall ${b.map(f1).join(' × ')} mm`));
-  svg.append(sv('text', { x: x0 + tw * 0.6 + 12, y: ty + 25, 'font-size': 12, fill: '#1c2330' }, `Date ${new Date().toISOString().slice(0, 10)}`));
-  svg.append(sv('text', { x: x0 + tw * 0.8 + 12, y: ty + 25, 'font-size': 12, fill: '#1c2330' }, 'scale: fit'));
+  svg.viewG.setAttribute('transform', `translate(${px} ${py}) scale(${s}) translate(${-vx} ${-vy})`);
+  svg.cell = A ? { A, s, L, px, py, vx, vy, layer: svg.layer } : null;
+  svg.full = full;
+}
+// One page: the view (imported once), its overlay layer, and the title strip.
+function buildPage(data, v, A) {
+  const { W, H, TB } = PAGE;
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'font-family': FONT });
+  svg.key = v.key; svg.A = A;
+  svg.append(sv('rect', { x: 0.5, y: 0.5, width: W - 1, height: H - 1, fill: '#ffffff', stroke: '#1c2330' }));
+  svg.append(sv('text', { x: 20, y: 28, 'font-size': 14, 'font-weight': 600, fill: '#1c2330' }, v.title));
+  let root = null;
+  try {
+    const p = A ? { root: A.root, vb: A.vb } : parseView(data.views[v.key]);
+    root = p.root; svg.vb = p.vb;
+  } catch (e) { root = null; }
+  if (root) {
+    svg.viewG = sv('g');
+    for (const node of root.childNodes) svg.viewG.append(document.importNode(node, true));
+    svg.layer = sv('g', { class: 'layer' });
+    svg.viewG.append(svg.layer);
+    svg.append(svg.viewG);
+    fitPage(svg, true);
+  } else {
+    svg.append(sv('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', 'font-size': 14, fill: '#b42318' }, `${v.title}: view unavailable`));
+  }
+  const ty = H - TB, b = data.bbox;
+  const overall = `${v.axes.map((i) => f1(b[i])).join(' × ')} mm`;
+  svg.append(sv('rect', { x: 0.5, y: ty + 0.5, width: W - 1, height: TB - 1, fill: '#f6f7f9', stroke: '#1c2330' }));
+  for (const fx of [0.3, 0.5, 0.75, 0.88]) svg.append(sv('path', { d: `M${W * fx} ${ty}V${H}`, stroke: '#1c2330', fill: 'none' }));
+  const cols = [
+    [20, state.model, 600, '#1c2330'], [W * 0.3 + 10, v.title, 400, '#1c2330'], [W * 0.5 + 10, overall, 400, DIM_HEX],
+    [W * 0.75 + 10, `Date ${new Date().toISOString().slice(0, 10)}`, 400, '#1c2330'], [W * 0.88 + 10, 'scale: fit', 400, '#1c2330'],
+  ];
+  for (const [x, t, w, fill] of cols) svg.append(sv('text', { x, y: ty + 16, 'font-size': 11, 'font-weight': w, fill }, t));
   return svg;
 }
-
+function buildPages(data) {
+  const an = analyzeAll(data), out = {};
+  for (const v of SHEET_VIEWS) out[v.key] = buildPage(data, v, an[v.key] || null);
+  return out;
+}
+// Stacked pages for the all-views download, each with its own frame and title strip.
+function stackPages(list) {
+  const { W, H } = PAGE, gap = 16, n = list.length, h = n * H + (n - 1) * gap;
+  const out = sv('svg', { viewBox: `0 0 ${W} ${h}`, width: W, height: h, 'font-family': FONT });
+  list.forEach((p, i) => {
+    const g = sv('g', { transform: `translate(0 ${i * (H + gap)})` });
+    for (const c of Array.from(p.childNodes)) g.append(c.cloneNode(true));
+    out.append(g);
+  });
+  return out;
+}
+function renderPage(svg, opts) {
+  if (!svg || !svg.cell) return;
+  if (svg.full !== !!opts.full) fitPage(svg, !!opts.full);
+  const c = svg.cell;
+  const kids = [dimOverlay(c.A, c.s, c.L, !!opts.full)];
+  for (const p of opts.pins.get(svg.key) || []) kids.push(selectionOverlay(c.A, c.s, c.L, p, 0.45));
+  if (opts.hover && opts.hover.key === svg.key) kids.push(selectionOverlay(c.A, c.s, c.L, opts.hover, 1));
+  c.layer.replaceChildren(...kids);
+}
+const liveOpts = () => ({ full: sheetUI.showAll, pins: sheetUI.pins, hover: sheetUI.hover });
 function showSheetMsg(text, bad) {
   const m = $('sheetMsg');
   m.hidden = !text;
@@ -1185,7 +1310,24 @@ function showSheetMsg(text, bad) {
 }
 function showSheet(data) {
   showSheetMsg('', false);
-  $('sheetPaper').replaceChildren(buildSheet(data));
+  if (data.key !== sheetUI.pinKey) { sheetUI.pins.clear(); sheetUI.hover = null; sheetUI.pinKey = data.key; }
+  if (data.key !== pagesKey) { pages = buildPages(data); pagesKey = data.key; }
+  showPage(sheetUI.page);
+}
+function showPage(key) {
+  if (!pages[key]) return;
+  if (curKey && curKey !== key) zooms[curKey] = { ...zoom };
+  curKey = key;
+  sheetUI.page = key;
+  sheetUI.hover = null;
+  try { localStorage.setItem('cfg.drawing.page', key); } catch (e) { /* storage unavailable */ }
+  liveSvg = pages[key];
+  Object.assign(zoom, zooms[key] || { z: 1, tx: 0, ty: 0, fitted: false });
+  paper.replaceChildren(liveSvg);
+  for (const b of document.querySelectorAll('#pager button')) b.setAttribute('aria-pressed', String(b.dataset.page === key));
+  renderPage(liveSvg, liveOpts());
+  applyZoom();
+  if (!zoom.fitted) fitSheet();
 }
 async function fetchDrawing() {
   const r = await fetch('/api/drawing');
@@ -1193,7 +1335,7 @@ async function fetchDrawing() {
   if (data.ok && data.key) drawCache.set(data.key, data);
   return data;
 }
-// Draw the sheet for the current build key, fetching only when that key is not cached.
+// Draw the pages for the current build key, fetching only when that key is not cached.
 async function ensureDrawing(retry = true) {
   const want = state.buildKey;
   if (want && drawCache.has(want)) { showSheet(drawCache.get(want)); return; }
@@ -1201,13 +1343,13 @@ async function ensureDrawing(retry = true) {
   showSheetMsg('Drawing…', false);
   let data;
   try { data = await fetchDrawing(); } catch (e) { data = { ok: false, log: String(e) }; }
-  if (seq !== drawSeq) return; // superseded by a newer request
+  if (seq !== drawSeq) return;
   if (!data.ok) { if (drawingMode) showSheetMsg(data.log || 'Drawing failed', true); return; }
   if (drawingMode) showSheet(data);
   if (retry && state.buildKey && state.buildKey !== data.key) ensureDrawing(false);
 }
-// Sheet zoom: the sheet is one vector SVG; zoom/pan are a CSS transform, so nothing is re-rendered.
-const SHEET_W = 960, SHEET_H = 680;
+
+// ---- Zoom and pan (zoom state is per page)
 const zoom = { z: 1, tx: 0, ty: 0, fitted: false };
 const vp = $('sheetVp'), paper = $('sheetPaper');
 const applyZoom = () => { paper.style.transform = `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.z})`; };
@@ -1227,17 +1369,6 @@ function zoomAt(cx, cy, z) {
   zoom.z = z; zoom.tx = cx - wx * z; zoom.ty = cy - wy * z;
   applyZoom();
 }
-const cellBox = (i) => {
-  const { W, H, M, TB } = SHEET;
-  const cw = (W - 2 * M) / 2, ch = (H - M - TB - 8 - M) / 2;
-  return { x: M + (i % 2) * cw, y: M + Math.floor(i / 2) * ch, w: cw, h: ch };
-};
-function zoomToCell(i) {
-  const b = cellBox(i), w = vp.clientWidth, h = vp.clientHeight;
-  zoom.z = clampZ(Math.min(w / b.w, h / b.h) * 0.95);
-  zoom.tx = w / 2 - (b.x + b.w / 2) * zoom.z; zoom.ty = h / 2 - (b.y + b.h / 2) * zoom.z;
-  applyZoom();
-}
 function zoomActual() {
   zoom.z = 1;
   zoom.tx = (vp.clientWidth - SHEET_W) / 2; zoom.ty = (vp.clientHeight - SHEET_H) / 2;
@@ -1255,27 +1386,90 @@ vp.addEventListener('pointerdown', (e) => {
   vp.setPointerCapture(e.pointerId);
   vp.classList.add('panning');
 });
+
+// ---- Hover and pins: hit tests use sheet px (zoom and pan converted out)
+const sheetPoint = (cx, cy) => {
+  const r = vp.getBoundingClientRect();
+  return [(cx - r.left - zoom.tx) / zoom.z, (cy - r.top - zoom.ty) / zoom.z];
+};
+// Nearest level per axis within 24 px of the cursor, on the current page.
+function selectAt(sx, sy) {
+  const c = liveSvg && liveSvg.cell;
+  if (!c) return null;
+  const nearest = (levels, toPx, p) => {
+    let best = null, bd = 24;
+    levels.forEach((v, k) => { const d = Math.abs(toPx(v) - p); if (d <= bd) { bd = d; best = k; } });
+    return best;
+  };
+  const x = nearest(c.A.xs, (v) => c.px + (c.A.pX(v) - c.vx) * c.s, sx);
+  const y = nearest(c.A.ys, (v) => c.py + (c.A.pY(v) - c.vy) * c.s, sy);
+  return x == null && y == null ? null : { key: liveSvg.key, x, y };
+}
+const hoverAtClient = (cx, cy) => selectAt(...sheetPoint(cx, cy));
+function setHover(h) {
+  const old = sheetUI.hover;
+  if (old === h || (old && h && old.key === h.key && old.x === h.x && old.y === h.y)) return;
+  sheetUI.hover = h;
+  renderPage(liveSvg, liveOpts());
+}
+function togglePin(h) {
+  const arr = sheetUI.pins.get(h.key) || [];
+  const k = arr.findIndex((p) => p.x === h.x && p.y === h.y);
+  if (k >= 0) arr.splice(k, 1);
+  else { arr.push({ x: h.x, y: h.y }); if (arr.length > 6) arr.shift(); }
+  sheetUI.pins.set(h.key, arr);
+  renderPage(liveSvg, liveOpts());
+}
+let hoverRaf = 0, hoverPt = null;
 vp.addEventListener('pointermove', (e) => {
-  if (!pan) return;
-  zoom.tx = pan.tx + e.clientX - pan.x; zoom.ty = pan.ty + e.clientY - pan.y;
-  applyZoom();
+  if (pan) {
+    zoom.tx = pan.tx + e.clientX - pan.x; zoom.ty = pan.ty + e.clientY - pan.y;
+    applyZoom();
+    return;
+  }
+  hoverPt = { x: e.clientX, y: e.clientY };
+  if (!hoverRaf) hoverRaf = requestAnimationFrame(() => {
+    hoverRaf = 0;
+    if (hoverPt && !pan) setHover(hoverAtClient(hoverPt.x, hoverPt.y));
+  });
 });
-const endPan = () => { pan = null; vp.classList.remove('panning'); };
+vp.addEventListener('pointerleave', () => { hoverPt = null; if (!pan) setHover(null); });
+// A click without a drag pins or unpins the hovered set.
+const endPan = (e) => {
+  if (pan && e && e.type === 'pointerup' && Math.hypot(e.clientX - pan.x, e.clientY - pan.y) < 4) {
+    const h = hoverAtClient(e.clientX, e.clientY);
+    if (h) togglePin(h);
+  }
+  pan = null;
+  vp.classList.remove('panning');
+};
 vp.addEventListener('pointerup', endPan);
 vp.addEventListener('pointercancel', endPan);
 vp.addEventListener('dblclick', (e) => {
   const r = vp.getBoundingClientRect();
-  const sx = (e.clientX - r.left - zoom.tx) / zoom.z, sy = (e.clientY - r.top - zoom.ty) / zoom.z;
-  if (sx < 0 || sy < 0 || sx > SHEET_W || sy > SHEET_H) return;
-  const { M, W, H, TB } = SHEET;
-  const cw = (W - 2 * M) / 2, ch = (H - M - TB - 8 - M) / 2;
-  zoomToCell((sx >= M + cw ? 1 : 0) + (sy >= M + ch ? 2 : 0));
+  zoomAt(e.clientX - r.left, e.clientY - r.top, zoom.z * 2);
 });
 new ResizeObserver(() => { if (drawingMode) fitSheet(); }).observe(vp);
 $('zFit').addEventListener('click', fitSheet);
 $('zIn').addEventListener('click', () => zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, zoom.z * 1.25));
 $('zOut').addEventListener('click', () => zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, zoom.z / 1.25));
 $('z1').addEventListener('click', zoomActual);
+$('showAll').checked = sheetUI.showAll;
+$('showAll').addEventListener('change', () => {
+  sheetUI.showAll = $('showAll').checked;
+  try { localStorage.setItem('cfg.drawing.showAll', sheetUI.showAll ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+  renderPage(liveSvg, liveOpts());
+});
+document.addEventListener('keydown', (e) => {
+  if (!drawingMode) return;
+  if (e.key === 'Escape' && sheetUI.pins.size) { sheetUI.pins.clear(); renderPage(liveSvg, liveOpts()); }
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) {
+    const i = PAGE_KEYS.indexOf(curKey), n = PAGE_KEYS.length;
+    showPage(PAGE_KEYS[(i + (e.key === 'ArrowRight' ? 1 : n - 1)) % n]);
+    e.preventDefault();
+  }
+});
+document.querySelectorAll('#pager button').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
 
 function setMode(mode) {
   drawingMode = mode === 'drawing';
@@ -1288,20 +1482,36 @@ function setMode(mode) {
   }
 }
 document.querySelectorAll('#modeSeg button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
-$('dlDrawing').addEventListener('click', async (e) => {
-  e.preventDefault();
-  try {
-    const data = drawCache.get(state.buildKey) ?? await fetchDrawing();
-    if (!data.ok) throw new Error(data.log || 'Drawing failed');
-    const xml = new XMLSerializer().serializeToString(buildSheet(data));
-    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
-    const a = el('a'); a.href = url; a.download = `${state.stem}_drawing.svg`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (err) {
-    showLog(`Drawing download failed: ${err.message}`, true);
+
+// ---- Downloads: the unzoomed page(s), always with the full chains and the pinned sets
+function downloadSvg(svg, name) {
+  const xml = new XMLSerializer().serializeToString(svg);
+  const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+  const a = el('a'); a.href = url; a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function downloadDrawing(all) {
+  const data = drawCache.get(state.buildKey) ?? await fetchDrawing();
+  if (!data.ok) throw new Error(data.log || 'Drawing failed');
+  const an = analyzeAll(data);
+  const opts = { full: true, pins: sheetUI.pins, hover: null };
+  if (all) {
+    const list = SHEET_VIEWS.map((v) => { const p = buildPage(data, v, an[v.key] || null); renderPage(p, opts); return p; });
+    downloadSvg(stackPages(list), `${state.stem}_drawing_all.svg`);
+  } else {
+    const v = SHEET_VIEWS.find((x) => x.key === curKey) || SHEET_VIEWS[0];
+    const p = buildPage(data, v, an[v.key] || null);
+    renderPage(p, opts);
+    downloadSvg(p, `${state.stem}_drawing.svg`);
   }
-});
+}
+for (const [id, all] of [['dlDrawing', false], ['dlAll', true]]) {
+  $(id).addEventListener('click', async (e) => {
+    e.preventDefault();
+    try { await downloadDrawing(all); } catch (err) { showLog(`Drawing download failed: ${err.message}`, true); }
+  });
+}
 
 const viewerReady = loadViewer().then((v) => (viewer = v, window.__viewer = v));
 init();
