@@ -38,7 +38,7 @@ END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 # 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
 LIP = 8.0         # Lip reach over the mixer edge.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
-LIP_FREE = 60.0   # No lip on this length at the open end.
+LIP_FREE = 80.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
 
 # 🧱 Gussets. Ribs on the outside of each wall. The part prints flat, so the wall to

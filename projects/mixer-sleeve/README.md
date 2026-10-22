@@ -59,7 +59,7 @@ Use these names when you ask for a change.
 | Mount marks M1–M4 | Small marks for the mount screws, 80 × 80 mm apart, each in a solid pad |
 | Left wall, Right wall | The long sides that grip the mixer |
 | Left lip, Right lip | 8 mm lips over the mixer's front edge, with a 45° fill underneath |
-| Lip-free zone | The top 60 mm, where the lips stop so the mixer goes in easily |
+| Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily |
 | Open end | The top, where the mixer slides in |
 | End stop | The low 16 mm stop at the bottom that carries the mixer |
 | Bottom slope | The 45° run from the walls down to the end stop |
@@ -82,7 +82,7 @@ Use these names when you ask for a change.
 | `GUSSETS` | off | Ribs on the outside of each wall, 10 mm at 45°, 40 mm apart, for a stiffer wall joint |
 | `BASE` | 3.08 mm | 11 layers at 0.28 mm |
 | `LIP`, `LIP_T` | 8 mm, 1.96 mm | Lip reach and thickness |
-| `LIP_FREE` | 60 mm | No lip on this length at the open end |
+| `LIP_FREE` | 80 mm | No lip on this length at the open end |
 | `END_H` | 16 mm | End stop height, low for the mixer's curved edge |
 | `HOLE_PATTERN` | 80 × 80 mm | Mount screw spacing |
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |

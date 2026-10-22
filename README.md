@@ -140,6 +140,7 @@ How it evolved, one plain-language request at a time:
 | "Make the viewer interactive" | Click a feature in the configurator and its settings light up on the left |
 | "MakerWorld has this toggle that shows dimensions" | Dimensions toggle: bounding box with the three sizes on the part |
 | "Can we have a technical drawing in the viewer?" | Drawing view: top, front, right and iso with hidden lines and sizes, downloadable as SVG |
+| "Both sides 22 mm shorter, so lip-free" | Lip-free zone 60 → 80 mm |
 | "See if we can have a script that spots these" | `check_part.py`: thin walls, knife edges, device overlap, keep-clear volumes, overhangs. It found a funnel outlet blocked by its own collar, and a mixer that could not pass under its own lips |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.
