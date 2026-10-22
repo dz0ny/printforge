@@ -141,18 +141,32 @@ script as a slider, shows the mixer as a translucent ghost inside the sleeve,
 and rebuilds the part on demand:
 
 ```bash
-uv run skills/cad-print-design/scripts/serve.py projects/mixer-sleeve/mixer_sleeve.py --port 8765
+cd printforge/projects/mixer-sleeve
+uv run mixer_sleeve.py --serve --open
 ```
 
-Then open <http://127.0.0.1:8765/>. "Save to script" writes your values back
-into `mixer_sleeve.py`. In Claude Code the same server is the `mixer-sleeve`
-entry in `.claude/launch.json`.
+"Save to script" writes your values back into `mixer_sleeve.py`. In Claude
+Code the same server is the `mixer-sleeve` entry in `.claude/launch.json`.
+
+The configurator is its own package, `printforge-configurator`, with no
+dependencies of its own. Any CadQuery project can use it:
+
+```bash
+uv add "printforge-configurator @ git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator"
+```
+
+Or run it on any script without installing anything:
+
+```bash
+uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator" printforge-configurator model.py --open
+```
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, live configurator, example |
+| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, example |
+| `skills/cad-print-design/configurator/` | The `printforge-configurator` package: the live configurator server and page |
 | `.claude/launch.json` | Launchers that open each project's configurator in the Claude browser pane |
 | `projects/` | Parts designed with the skill, each one rebuildable with `uv run` |
 | `dist/` | The packaged `.skill` file for Claude apps |

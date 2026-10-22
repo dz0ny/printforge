@@ -37,11 +37,11 @@ uv run make_3mf.py mixer_sleeve.stl --settings print_settings.json \
 For another printer, save any project in Bambu Studio or OrcaSlicer with your
 printer and filament, and pass that `.3mf` as `--template`.
 
-To adjust the sleeve with sliders instead, run the configurator from the repo
-root and open <http://127.0.0.1:8765/>:
+To adjust the sleeve with sliders instead, serve the configurator from the
+script itself. It opens at <http://127.0.0.1:8765/>:
 
 ```bash
-uv run skills/cad-print-design/scripts/serve.py projects/mixer-sleeve/mixer_sleeve.py --port 8765
+uv run mixer_sleeve.py --serve --open
 ```
 
 ## Named sides and features

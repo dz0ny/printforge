@@ -103,22 +103,39 @@ The script stores the settings on the object, and object settings override the t
 
 ## 6b. Interactive configurator
 
-For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. `serve.py` runs the model locally and `configurator.html` is the page.
+For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. The `printforge-configurator` package in `configurator/` is the server and the page; it needs no CadQuery itself.
 
 1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A comment line above a block of settings is the group: its leading emoji is the group's icon and the first sentence its title, and the group runs until the next heading. The page shows each group as a collapsible section, the first one open. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
 2. Add a `device()` function that returns the device as a CadQuery shape in its resting position. The page draws it as a translucent ghost inside the shell. It is never exported.
 2b. Describe the features in a `features()` function: `{"Left lip": {"at": (x, y, z), "normal": (0, 0, 1), "params": ["LIP", "LIP_T"]}, ...}` in the model's own frame. Build `labels()` for the views from it, so the tags and the page share one table. In the page, clicking a feature highlights its settings on the left and clicking a setting's name shows its feature on the part.
-3. Add a launcher for the project in `.claude/launch.json` at the repo root, so the page opens in the Claude browser pane:
+3. Plug the configurator into the project. Add the package as a dependency, from git (any project) or by path (a project inside this repo):
 
-```json
-{"name": "mixer-sleeve", "runtimeExecutable": "uv",
- "runtimeArgs": ["run", "skills/cad-print-design/scripts/serve.py", "projects/mixer-sleeve/mixer_sleeve.py", "--port", "8765"],
- "port": 8765}
-```
+   ```bash
+   uv add "printforge-configurator @ git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator"
+   ```
 
-Then start it with the browser `preview_start` tool by name, or by hand with `uv run skills/cad-print-design/scripts/serve.py <model>.py --port 8765`.
+   Then end the script's `__main__` block with a `--serve` flag:
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, Download STL and STEP, and Save to script, which writes the values back into the Python file and keeps every comment. The server needs no CadQuery itself: it keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+   ```python
+   if __name__ == "__main__":
+       import sys
+       if "--serve" in sys.argv:
+           from printforge_configurator import serve
+           serve(__file__, open_browser="--open" in sys.argv)
+           sys.exit()
+       ...  # the usual exports
+   ```
+
+   `uv run model.py --serve` then serves the page at <http://127.0.0.1:8765/>. For a script with nothing added, `uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator" printforge-configurator model.py` works too.
+4. Add a launcher for the project in `.claude/launch.json` at the repo root, so the page opens in the Claude browser pane with the browser `preview_start` tool:
+
+   ```json
+   {"name": "mixer-sleeve", "runtimeExecutable": "uv",
+    "runtimeArgs": ["run", "--project", "projects/mixer-sleeve", "projects/mixer-sleeve/mixer_sleeve.py", "--serve"],
+    "port": 8765}
+   ```
+
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Download menu with the shell STL, the shell STEP and the device STL, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
 
 ## 7. Each iteration
 

@@ -4,7 +4,7 @@
     {
       "name": "mixer-sleeve",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "skills/cad-print-design/scripts/serve.py", "projects/mixer-sleeve/mixer_sleeve.py", "--port", "8765"],
+      "runtimeArgs": ["run", "--project", "projects/mixer-sleeve", "projects/mixer-sleeve/mixer_sleeve.py", "--serve"],
       "port": 8765
     }
   ]

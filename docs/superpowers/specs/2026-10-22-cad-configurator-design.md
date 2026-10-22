@@ -41,8 +41,14 @@ see it inside the shell and change its size.
 - Each project gets an entry in `.claude/launch.json`, so the page opens in the
   Claude browser pane with one command.
 
+- The configurator is an installable package, `printforge-configurator`, with
+  no dependencies. A project adds it from git (or by path inside this repo) and
+  its script calls `serve(__file__)` behind a `--serve` flag; `python -m
+  printforge_configurator model.py` and `uvx --from <git> printforge-configurator`
+  serve any script with nothing added. Publishing to PyPI is left to the owner.
+
 ## Parts
 
-- `skills/cad-print-design/scripts/serve.py`: the server and build worker.
-- `skills/cad-print-design/scripts/configurator.html`: the page.
+- `skills/cad-print-design/configurator/`: the `printforge-configurator` package,
+  with `server.py` (server, build worker, cache) and `configurator.html` (the page).
 - A `device()` function and `[min:max]` ranges in each model script.

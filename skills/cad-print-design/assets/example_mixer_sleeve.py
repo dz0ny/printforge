@@ -2,7 +2,8 @@
 
 X is the slide axis along the mixer depth. The short side stays open.
 Y is the mixer width. Z is the height, with the base plate at the bottom.
-Run `uv run mixer_sleeve.py` to write the STEP and the STL.
+Run `uv run mixer_sleeve.py` to write the STEP and the STL, or
+`uv run mixer_sleeve.py --serve` to adjust it in the browser.
 """
 import cadquery as cq
 from cadquery.selectors import BoxSelector
@@ -321,6 +322,11 @@ def plot_sections(part, path):
 
 
 if __name__ == "__main__":
+    import sys
+    if "--serve" in sys.argv:
+        from printforge_configurator import serve
+        serve(__file__, open_browser="--open" in sys.argv)
+        sys.exit()
     part = build()
     solid = part.val()
     assert solid.isValid(), "invalid solid"

@@ -6,4 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "cadquery>=2.8.0",
     "matplotlib>=3.11.2",
+    "printforge-configurator",
 ]
+
+# The configurator lives in this repo. Other projects take it from git:
+# uv add "printforge-configurator @ git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator"
+[tool.uv.sources]
+printforge-configurator = { path = "../../skills/cad-print-design/configurator", editable = true }

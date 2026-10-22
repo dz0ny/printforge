@@ -1,10 +1,9 @@
-# /// script
-# requires-python = ">=3.11"
-# dependencies = []
-# ///
 """Serve a live parameter configurator for a CadQuery model script on 127.0.0.1.
 
-Usage: `uv run serve.py path/to/model.py [--port 8765] [--page configurator.html]`.
+Two ways in:
+- `python -m printforge_configurator path/to/model.py [--port 8765]` for any script.
+- `from printforge_configurator import serve; serve(__file__)` from the script itself,
+  for example behind a `--serve` flag in its `__main__` block.
 The page lists the top-level constants of the model, rebuilds the model with new
 values in a worker process, and serves the shell and device meshes. Save writes the
 values back into the model file and keeps each line's comment.
@@ -516,19 +515,24 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"ok": False, "error": str(e)})
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Serve a parameter configurator for a CadQuery model.")
-    ap.add_argument("model", help="the model script, for example mixer_sleeve.py")
-    ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--page", default=str(Path(__file__).resolve().parent / "configurator.html"),
-                    help="the HTML page to serve at /")
-    a = ap.parse_args()
+PAGE = Path(__file__).resolve().parent / "configurator.html"
 
-    model = Path(a.model).resolve()
+
+def serve(model, port=8765, page=None, open_browser=False):
+    """Serve the configurator for a model script until Ctrl-C.
+
+    `model` is the script's path, usually `__file__`. The call blocks.
+    """
+    model = Path(model).resolve()
     if not model.is_file():
-        ap.error(f"no such model: {model}")
-    srv = Server(("127.0.0.1", a.port), Handler, model, Path(a.page).resolve())
-    print(f"serving {model.name} at http://127.0.0.1:{a.port}/", flush=True)
+        raise FileNotFoundError(f"no such model: {model}")
+    page = Path(page).resolve() if page else PAGE
+    srv = Server(("127.0.0.1", port), Handler, model, page)
+    url = f"http://127.0.0.1:{port}/"
+    print(f"serving {model.name} at {url}", flush=True)
+    if open_browser:
+        import webbrowser
+        webbrowser.open(url)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -538,8 +542,23 @@ def main():
         srv.worker.stop()
 
 
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if len(argv) == 2 and argv[0] == "--worker":
+        worker(argv[1])
+        return
+    ap = argparse.ArgumentParser(prog="printforge_configurator",
+                                 description="Serve a parameter configurator for a CadQuery model.")
+    ap.add_argument("model", help="the model script, for example mixer_sleeve.py")
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--page", default=None, help="an HTML page to serve at / instead of the built-in one")
+    ap.add_argument("--open", action="store_true", help="open the page in the default browser")
+    a = ap.parse_args(argv)
+    try:
+        serve(a.model, port=a.port, page=a.page, open_browser=a.open)
+    except FileNotFoundError as e:
+        ap.error(str(e))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) == 3 and sys.argv[1] == "--worker":
-        worker(sys.argv[2])
-    else:
-        main()
+    main()
