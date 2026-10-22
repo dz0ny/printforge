@@ -54,6 +54,21 @@ charge of the design, and you can rebuild it yourself with one command.
 - Always `uv` and CadQuery: no conda, no global installs, reproducible builds
 - A growing list of CadQuery pitfalls the skill already knows how to avoid
 
+## Examples
+
+| Project | What it is | Device it fits | Live |
+|---|---|---|---|
+| [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 189 × 248 × 31 mm | `uv run mixer_sleeve.py --serve` |
+| [`projects/gutter-outlet`](./projects/gutter-outlet) | Outlet funnel from a half-round gutter to a round downpipe, no inner lip anywhere | NW 280 gutter, 127 mm inside, to a 58 mm pipe | `uv run gutter_outlet.py --serve` |
+
+Each project is a folder with the model script, the STEP, the print-ready STL
+and 3MF, labeled views and a README. Every one has a launcher in
+`.claude/launch.json` that opens its configurator in the Claude browser pane.
+
+<p align="center">
+  <img src="./projects/gutter-outlet/views/sheet.png" alt="Labeled views of the gutter outlet funnel" width="900" />
+</p>
+
 ## Showcase: mixer sleeve
 
 [`projects/mixer-sleeve`](./projects/mixer-sleeve) was designed in one

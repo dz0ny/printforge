@@ -1,0 +1,67 @@
+# Gutter outlet funnel, NW 280 half-round to a 58 mm downpipe
+
+An outlet that slides over the cut end of a half-round gutter and funnels it
+into a round downpipe. No joint has an inner lip: the gutter goes into the
+skirt, the funnel floor only ever goes down, and the pipe goes over the
+spigot, so water never has a step to climb.
+
+<p align="center">
+  <img src="./views/sheet.png" alt="Labeled views of the gutter outlet" width="900" />
+</p>
+
+## Files
+
+| File | What it is |
+|---|---|
+| `gutter_outlet.py` | The parametric CadQuery model. Every size is a named setting at the top, in groups |
+| `gutter_outlet.stl` | Print-ready mesh, standing on the spigot tip |
+| `gutter_outlet.step` | Editable CAD file in the use orientation, gutter axis along X |
+| `gutter_outlet.3mf` | Bambu Studio project with the recommended print settings |
+| `print_settings.json` | The recommended slicer settings that go into the 3MF |
+| `bambu_p1s_0.4.config` | Printer and filament template: Bambu Lab P1S, 0.4 mm nozzle, Bambu PLA Basic |
+| `labels.json` | Named anchor points that `render_views.py` draws as tags |
+| `device()`, `features()` in `gutter_outlet.py` | The gutter end and the pipe as a ghost for the configurator, and the named features with the settings behind each |
+
+## Rebuild
+
+```bash
+uv run gutter_outlet.py
+uv run render_views.py gutter_outlet.step --labels labels.json --out views
+uv run make_3mf.py gutter_outlet.stl --settings print_settings.json \
+  --template bambu_p1s_0.4.config --out gutter_outlet.3mf
+```
+
+To adjust it with sliders, with the gutter and the pipe drawn as ghosts:
+
+```bash
+uv run gutter_outlet.py --serve --open
+```
+
+## Named features
+
+| Name | Where it is |
+|---|---|
+| Skirt | The half ring that sits over the outside of the gutter end, stopped below the bead and the hook |
+| Funnel | The loft from the gutter's D profile down to the round spigot, floor always descending |
+| Stop collar | The ring the pipe end rests against, with a 45° cone under it so it prints without support |
+| Spigot | The round stub the downpipe slides over |
+
+## Main settings
+
+| Setting | Value | Meaning |
+|---|---|---|
+| `GUTTER_ID`, `SHEET`, `FIT` | 127, 0.6, 0.4 mm | Gutter inside diameter, sheet thickness, clearance per side |
+| `WALL` | 2.4 mm | 5 lines at 0.48 mm, pure perimeters |
+| `SKIRT_L`, `SKIRT_TOP` | 25, -8 mm | Skirt length, and how far below the gutter top it stops |
+| `FUNNEL_L`, `DROP` | 50, 3 mm | Funnel length and the floor drop along it |
+| `PIPE_OD`, `PIPE_WALL`, `PIPE_FIT` | 58, 1, 0.3 mm | Downpipe outside diameter and wall, clearance per side |
+| `SPIGOT_L`, `COLLAR` | 40, 2.5 mm | Spigot length into the pipe, collar size beyond the pipe |
+
+Use size: 115 × 134 × 76 mm. Prints standing on the spigot tip, 115 mm tall,
+with an outer brim.
+
+## Print settings
+
+- 0.4 mm nozzle, 0.2 mm layers, 6 wall loops, 15 % gyroid infill, no supports
+- Bambu PLA Basic is fine indoors; outside in the sun and rain, print it in
+  PETG or ASA

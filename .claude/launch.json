@@ -4,8 +4,28 @@
     {
       "name": "mixer-sleeve",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "--project", "projects/mixer-sleeve", "projects/mixer-sleeve/mixer_sleeve.py", "--serve"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "projects/mixer-sleeve",
+        "projects/mixer-sleeve/mixer_sleeve.py",
+        "--serve"
+      ],
       "port": 8765
+    },
+    {
+      "name": "gutter-outlet",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "projects/gutter-outlet",
+        "projects/gutter-outlet/gutter_outlet.py",
+        "--serve",
+        "--port",
+        "8766"
+      ],
+      "port": 8766
     }
   ]
 }

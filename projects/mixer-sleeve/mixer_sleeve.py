@@ -333,7 +333,8 @@ if __name__ == "__main__":
     import sys
     if "--serve" in sys.argv:
         from printforge_configurator import serve
-        serve(__file__, open_browser="--open" in sys.argv)
+        port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8765
+        serve(__file__, port=port, open_browser="--open" in sys.argv)
         sys.exit()
     part = build()
     solid = part.val()

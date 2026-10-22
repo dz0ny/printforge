@@ -121,12 +121,13 @@ For a part built around a device, give the user a page where they can adjust the
        import sys
        if "--serve" in sys.argv:
            from printforge_configurator import serve
-           serve(__file__, open_browser="--open" in sys.argv)
+           port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8765
+           serve(__file__, port=port, open_browser="--open" in sys.argv)
            sys.exit()
        ...  # the usual exports
    ```
 
-   `uv run model.py --serve` then serves the page at <http://127.0.0.1:8765/>. For a script with nothing added, `uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator" printforge-configurator model.py` works too.
+   `uv run model.py --serve` then serves the page at <http://127.0.0.1:8765/>; give each project its own `--port` so two can run at once. For a script with nothing added, `uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator" printforge-configurator model.py` works too.
 4. Add a launcher for the project in `.claude/launch.json` at the repo root, so the page opens in the Claude browser pane with the browser `preview_start` tool:
 
    ```json

@@ -49,11 +49,20 @@ def head_nodes(tree):
     return out
 
 
+def literal(node):
+    """The number or bool literal an assignment holds, or None. `-8.0` counts as a literal."""
+    v = node.value
+    if isinstance(v, ast.UnaryOp) and isinstance(v.op, ast.USub) and isinstance(v.operand, ast.Constant) \
+            and type(v.operand.value) in (int, float):
+        return -v.operand.value
+    if isinstance(v, ast.Constant) and type(v.value) in (bool, int, float):
+        return v.value
+    return None
+
+
 def is_param(node):
     return (isinstance(node, ast.Assign) and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and isinstance(node.value, ast.Constant)
-            and type(node.value.value) in (bool, int, float))
+            and isinstance(node.targets[0], ast.Name) and literal(node) is not None)
 
 
 def clean_title(line):
@@ -76,7 +85,7 @@ def num(text):
 
 
 def param_of(node, lines):
-    value = node.value.value
+    value = literal(node)
     raw = lines[node.end_lineno - 1].encode("utf-8")
     rest = raw[node.end_col_offset:].decode("utf-8", "replace")
     desc = rest.split("#", 1)[1].strip() if "#" in rest else ""
@@ -185,7 +194,7 @@ def build_once(cq, model, overrides, out):
     for node in head_nodes(tree):
         if is_param(node) and node.targets[0].id in overrides:
             name = node.targets[0].id
-            node.value.value = coerce(node.value.value, overrides[name])
+            node.value = ast.Constant(coerce(literal(node), overrides[name]))
     code = compile(ast.fix_missing_locations(tree), str(model), "exec")
     ns = {"__name__": "model", "__file__": str(model)}
     exec(code, ns)
@@ -413,7 +422,7 @@ def save_values(srv, values):
                 table[node.targets[0].id] = node
                 if node.targets[0].id in values:
                     targets.append(node)
-        check_values(values, {k: {"type": "bool" if type(n.value.value) is bool else "number"}
+        check_values(values, {k: {"type": "bool" if type(literal(n)) is bool else "number"}
                               for k, n in table.items()})
         changed = []
         # Edit later columns first so earlier offsets on the same line stay valid.
@@ -424,7 +433,7 @@ def save_values(srv, values):
                 raise BadRequest(f"{name} spans several lines")
             raw = lines[c.lineno - 1].encode("utf-8")
             old_text = raw[c.col_offset:c.end_col_offset].decode("utf-8")
-            new_text = fmt(c.value, values[name])
+            new_text = fmt(literal(node), values[name])
             if new_text != old_text:
                 changed.append(name)
             lines[c.lineno - 1] = (raw[:c.col_offset] + new_text.encode("utf-8")
