@@ -95,7 +95,7 @@ collar and a mixer that could not pass under its own lips.
 
 | Project | What it is | Device it fits | Live |
 |---|---|---|---|
-| [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 189 × 248 × 31 mm | `uv run mixer_sleeve.py --serve` |
+| [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 195 × 248 × 26 mm | `uv run mixer_sleeve.py --serve` |
 | [`projects/gutter-outlet`](./projects/gutter-outlet) | Outlet funnel from a half-round gutter to a round downpipe, no inner lip anywhere | NW 280 gutter, 127 mm inside, to a 58 mm pipe | `uv run gutter_outlet.py --serve` |
 
 Each project is a folder with the model script, the STEP, the print-ready STL
@@ -142,6 +142,7 @@ How it evolved, one plain-language request at a time:
 | "Can we have a technical drawing in the viewer?" | Drawing view: top, front, right and iso with hidden lines and sizes, downloadable as SVG |
 | "Both sides 22 mm shorter, so lip-free" | Lip-free zone 60 → 80 mm |
 | "Walls 4 mm lower" | Wall 36 mm, lip 4.4 mm so the fill under it stays at 45° |
+| "The width is now too narrow, this is the correct mixer" | Width from the spec sheet: 195 mm, inside width 190 → 196 mm |
 | "See if we can have a script that spots these" | `check_part.py`: thin walls, knife edges, device overlap, keep-clear volumes, overhangs. It found a funnel outlet blocked by its own collar, and a mixer that could not pass under its own lips |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.

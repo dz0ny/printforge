@@ -24,7 +24,7 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 36.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
+WALL_H = 34.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 FILLET = 6.0      # Fillet between the side walls and the base.
@@ -36,7 +36,7 @@ END_H = 16.0      # End stop height, low for the curved mixer edge.
 END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 
 # 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
-LIP = 4.4         # Lip reach over the mixer edge. At a 36 mm wall this is the room for a 45 degree fill.
+LIP = 3.4         # Lip reach over the mixer edge. At a 36 mm wall this is the room for a 45 degree fill.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
 LIP_FREE = 80.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
