@@ -11,8 +11,8 @@ from cadquery.selectors import BoxSelector
 # 🎛️ Mixer body size in mm. Measure your mixer.
 MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
 MIX_D = 248.0   # Depth, front to back, along the slide axis. [100:400]
-MIX_H = 31.0    # Body thickness with feet, without knobs. [10:80]
-FOOT_H = 4.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
+MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80]
+FOOT_H = 3.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
 EDGE_R = 3.0    # Radius of the body's bottom edges. Measure it: the floor fillet must clear it. [0:10]
 
 # 🖨️ Printer. The part prints flat on its back, so X and Y use lines and Z uses layers.
@@ -24,7 +24,7 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 45.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
+WALL_H = 35.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 FILLET = 6.0      # Fillet between the side walls and the base.

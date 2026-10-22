@@ -205,8 +205,17 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 }
 #tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
 /* Drawing sheet, shown in place of the 3D view */
-#sheet { position: absolute; inset: 0; overflow: auto; padding: 16px; }
-#sheetPaper svg { display: block; width: 100%; min-width: 720px; height: auto; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
+#sheet { position: absolute; inset: 0; overflow: hidden; }
+#sheetVp { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; }
+#sheetVp.panning { cursor: grabbing; }
+#sheetPaper { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#zoomBar {
+  position: absolute; right: 12px; bottom: 12px; display: flex; gap: 2px; padding: 3px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+}
+#zoomBar button { height: 30px; min-width: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; font-size: 13px; }
+#zoomBar button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
+#sheetPaper svg { display: block; width: 960px; height: 680px; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
 #sheetMsg {
   position: absolute; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
@@ -293,8 +302,14 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
       <div id="hint">Click a feature to see its settings</div>
     </div>
     <section id="sheet" hidden>
-      <div id="sheetPaper"></div>
+      <div id="sheetVp"><div id="sheetPaper"></div></div>
       <div id="sheetMsg" hidden></div>
+      <div id="zoomBar">
+        <button type="button" id="zFit">Fit</button>
+        <button type="button" id="zOut" aria-label="Zoom out">−</button>
+        <button type="button" id="zIn" aria-label="Zoom in">+</button>
+        <button type="button" id="z1">1:1</button>
+      </div>
     </section>
   </section>
 </main>
@@ -1009,42 +1024,85 @@ function analyzeView(str) {
   return { root, vb, E, x0, x1, y0, y1, xs: levels(true, x0, x1), ys: levels(false, y0, y1), pX, pY, pb };
 }
 
-// Ordinate chains in view (page) coordinates: X levels below the drawing, Y levels to its right.
-// Overlay sizes are given in sheet px and divided by the fit scale s, so text and ticks keep their size.
-function dimOverlay(a, s) {
-  const { pb, pX, pY, xs, ys, E: mmE } = a;
-  const E = Math.max(pb.x1 - pb.x0, pb.y1 - pb.y0);
-  const gap = 3 / s, tk = 4 / s, ar = 6 / s, fsv = 10 / s;
-  const f = (v) => v.toFixed(1).replace(/\.0$/, '');
-  const d = [], txt = [];
-  // X chain
-  const yb1 = pb.y1 + 0.08 * E, yb2 = yb1 + 0.06 * E;
-  const xp = xs.map(pX);
-  for (const x of xp) d.push(`M${x} ${pb.y1 + gap}V${yb1 + gap}`, `M${x - tk} ${yb1 + tk}L${x + tk} ${yb1 - tk}`);
-  d.push(`M${Math.min(...xp)} ${yb1}H${Math.max(...xp)}`);
-  for (let i = 0; i + 1 < xs.length; i++) {
-    if ((xs[i + 1] - xs[i]) / mmE >= 0.025) txt.push({ x: (xp[i] + xp[i + 1]) / 2, y: yb1 - 4 / s, t: f(xs[i + 1] - xs[i]) });
+// Ordinate chains (view coordinates). Labels sit on stagger rows between the drawing and the baseline:
+// row 0 is the baseline, a label on a higher row gets a leader from the baseline. Overlay sizes are sheet px / s.
+const fmtMm = (v) => Math.abs(v).toFixed(1).replace(/\.0$/, '');
+const ROW_PX = 14, LABEL_FS = 11;
+function chainLayout(pos, mm, s) {
+  const rows = [], placed = [], skipped = [];
+  let top = 0;
+  for (let i = 0; i + 1 < pos.length; i++) {
+    const text = fmtMm(mm[i + 1] - mm[i]);
+    if (Math.abs(pos[i + 1] - pos[i]) * s < 6) { skipped.push(i); continue; }
+    const c = (pos[i] + pos[i + 1]) / 2, half = (text.length * 0.62 * LABEL_FS) / 2, cp = c * s;
+    let row = -1;
+    for (let r = 0; r <= 4 && row < 0; r++) {
+      const clash = (rows[r] || []).some(([l, rr]) => cp - half < rr + 2 && cp + half > l - 2);
+      if (!clash) row = r;
+    }
+    if (row < 0) { skipped.push(i); continue; }
+    (rows[row] = rows[row] || []).push([cp - half, cp + half]);
+    placed.push({ i, row, c, text });
+    top = Math.max(top, row);
   }
-  const xl = Math.min(...xp), xr = Math.max(...xp);
-  d.push(`M${xl} ${pb.y1 + gap}V${yb2 + gap}`, `M${xr} ${pb.y1 + gap}V${yb2 + gap}`, `M${xl} ${yb2}H${xr}`);
-  d.push(`M${xl + ar} ${yb2 - ar / 2}L${xl} ${yb2}L${xl + ar} ${yb2 + ar / 2}`, `M${xr - ar} ${yb2 - ar / 2}L${xr} ${yb2}L${xr - ar} ${yb2 + ar / 2}`);
-  txt.push({ x: (xl + xr) / 2, y: yb2 - 4 / s, t: f(xs[xs.length - 1] - xs[0]) });
-  // Y chain
-  const xr1 = pb.x1 + 0.08 * E, xr2 = xr1 + 0.06 * E;
-  const yp = ys.map(pY);
-  for (const y of yp) d.push(`M${pb.x1 + gap} ${y}H${xr1 + gap}`, `M${xr1 - tk} ${y + tk}L${xr1 + tk} ${y - tk}`);
-  d.push(`M${xr1} ${Math.min(...yp)}V${Math.max(...yp)}`);
-  for (let i = 0; i + 1 < ys.length; i++) {
-    if ((ys[i + 1] - ys[i]) / mmE >= 0.025) txt.push({ x: xr1 - 4 / s, y: (yp[i] + yp[i + 1]) / 2, t: f(ys[i + 1] - ys[i]), rot: true });
+  const overall = placed.length ? top + 1 : 1;
+  const skip = skipped.length ? overall + 1 : -1;
+  return { placed, skipped, overall, skip, reach: (skip >= 0 ? skip : overall) * ROW_PX + 20 };
+}
+function chainLayouts(a, s) {
+  return { X: chainLayout(a.xs.map(a.pX), a.xs, s), Y: chainLayout(a.ys.map(a.pY), a.ys, s) };
+}
+function dimOverlay(a, s, L) {
+  const { pb, pX, pY, xs, ys } = a;
+  const u = (px) => px / s;
+  const gap = u(3), tk = u(4), ar = u(6);
+  const dim = [], ext = [], txt = [];
+  const xp = xs.map(pX), yp = ys.map(pY);
+  const xl = Math.min(...xp), xr = Math.max(...xp), yt = Math.min(...yp), yb = Math.max(...yp);
+  // X chain, below the drawing
+  const yB = pb.y1 + u(L.X.reach), yL = (r) => yB - u(r * ROW_PX);
+  for (const x of xp) { ext.push(`M${x} ${pb.y1 + gap}V${yB}`); dim.push(`M${x - tk} ${yB + tk}L${x + tk} ${yB - tk}`); }
+  dim.push(`M${xl} ${yB}H${xr}`);
+  for (const p of L.X.placed) {
+    const ty = yL(p.row) - u(3);
+    if (p.row > 0) dim.push(`M${p.c} ${yB}V${ty}`);
+    txt.push({ x: p.c, y: ty, t: p.text });
   }
-  const yt = Math.min(...yp), yb = Math.max(...yp);
-  d.push(`M${pb.x1 + gap} ${yt}H${xr2 + gap}`, `M${pb.x1 + gap} ${yb}H${xr2 + gap}`, `M${xr2} ${yt}V${yb}`);
-  d.push(`M${xr2 - ar / 2} ${yt + ar}L${xr2} ${yt}L${xr2 + ar / 2} ${yt + ar}`, `M${xr2 - ar / 2} ${yb - ar}L${xr2} ${yb}L${xr2 + ar / 2} ${yb - ar}`);
-  txt.push({ x: xr2 - 4 / s, y: (yt + yb) / 2, t: f(ys[ys.length - 1] - ys[0]), rot: true });
+  const yO = yL(L.X.overall);
+  ext.push(`M${xl} ${pb.y1 + gap}V${yO}`, `M${xr} ${pb.y1 + gap}V${yO}`);
+  dim.push(`M${xl} ${yO}H${xr}`, `M${xl + ar} ${yO - ar / 2}L${xl} ${yO}L${xl + ar} ${yO + ar / 2}`, `M${xr - ar} ${yO - ar / 2}L${xr} ${yO}L${xr - ar} ${yO + ar / 2}`);
+  txt.push({ x: (xl + xr) / 2, y: yO - u(3), t: fmtMm(xs[xs.length - 1] - xs[0]) });
+  if (L.X.skip >= 0) {
+    const yS = yL(L.X.skip);
+    for (const k of L.X.skipped) dim.push(`M${(xp[k] + xp[k + 1]) / 2} ${yB}V${yS}`);
+    txt.push({ x: (xl + xr) / 2, y: yS - u(3), t: L.X.skipped.map((k) => fmtMm(xs[k + 1] - xs[k])).join(' · ') });
+  }
+  // Y chain, right of the drawing (labels rotated -90)
+  const xB = pb.x1 + u(L.Y.reach), xL = (r) => xB - u(r * ROW_PX);
+  for (const y of yp) { ext.push(`M${pb.x1 + gap} ${y}H${xB}`); dim.push(`M${xB - tk} ${y + tk}L${xB + tk} ${y - tk}`); }
+  dim.push(`M${xB} ${yt}V${yb}`);
+  for (const p of L.Y.placed) {
+    const tx = xL(p.row) - u(3);
+    if (p.row > 0) dim.push(`M${xB} ${p.c}H${tx}`);
+    txt.push({ x: tx, y: p.c, t: p.text, rot: true });
+  }
+  const xO = xL(L.Y.overall);
+  ext.push(`M${pb.x1 + gap} ${yt}H${xO}`, `M${pb.x1 + gap} ${yb}H${xO}`);
+  dim.push(`M${xO} ${yt}V${yb}`, `M${xO - ar / 2} ${yt + ar}L${xO} ${yt}L${xO + ar / 2} ${yt + ar}`, `M${xO - ar / 2} ${yb - ar}L${xO} ${yb}L${xO + ar / 2} ${yb - ar}`);
+  txt.push({ x: xO - u(3), y: (yt + yb) / 2, t: fmtMm(ys[ys.length - 1] - ys[0]), rot: true });
+  if (L.Y.skip >= 0) {
+    const xS = xL(L.Y.skip);
+    for (const k of L.Y.skipped) dim.push(`M${xB} ${(yp[k] + yp[k + 1]) / 2}H${xS}`);
+    txt.push({ x: xS - u(3), y: (yt + yb) / 2, t: L.Y.skipped.map((k) => fmtMm(ys[k + 1] - ys[k])).join(' · '), rot: true });
+  }
   const g = sv('g', { class: 'dimchain' });
-  g.append(sv('path', { d: d.join(''), stroke: DIM_HEX, 'stroke-width': 1 / s, fill: 'none' }));
+  g.append(sv('path', { d: ext.join(''), stroke: '#aab2bd', 'stroke-width': u(0.75), fill: 'none' }));
+  g.append(sv('path', { d: dim.join(''), stroke: DIM_HEX, 'stroke-width': u(1), fill: 'none' }));
   for (const t of txt) {
-    const at = { x: t.x, y: t.y, 'text-anchor': 'middle', 'font-size': fsv, fill: DIM_HEX, 'font-family': MONO };
+    const at = {
+      x: t.x, y: t.y, 'text-anchor': 'middle', 'font-size': u(LABEL_FS), fill: DIM_HEX, 'font-family': MONO,
+      stroke: '#ffffff', 'stroke-width': u(3), 'paint-order': 'stroke',
+    };
     if (t.rot) at.transform = `rotate(-90 ${t.x} ${t.y})`;
     g.append(sv('text', at, t.t));
   }
@@ -1089,12 +1147,19 @@ function buildSheet(data) {
     }
     const [vx, vy, vw, vh] = vb;
     const dx = cx + 12, dy = cy + 28, dw = cw - 24, dh = ch - 40;
-    const k = A ? 0.78 : 0.9;
-    const s = Math.min((dw * k) / vw, (dh * k) / vh);
+    // Annotated views reserve room for their chains, from the rows actually used.
+    let s = Math.min((dw * 0.9) / vw, (dh * 0.9) / vh), L = null;
+    if (A) {
+      for (let it = 0; it < 2; it++) {
+        L = chainLayouts(A, s);
+        s = Math.min((dw - L.Y.reach - 8) / vw, (dh - L.X.reach - 8) / vh);
+      }
+      L = chainLayouts(A, s);
+    }
     const px = A ? dx : dx + (dw - vw * s) / 2, py = A ? dy : dy + (dh - vh * s) / 2;
     const g = sv('g', { transform: `translate(${px} ${py}) scale(${s}) translate(${-vx} ${-vy})` });
     for (const node of root.childNodes) g.append(document.importNode(node, true));
-    if (A) g.append(dimOverlay(A, s));
+    if (A) g.append(dimOverlay(A, s, L));
     svg.append(g);
   });
   // Title block
@@ -1141,12 +1206,86 @@ async function ensureDrawing(retry = true) {
   if (drawingMode) showSheet(data);
   if (retry && state.buildKey && state.buildKey !== data.key) ensureDrawing(false);
 }
+// Sheet zoom: the sheet is one vector SVG; zoom/pan are a CSS transform, so nothing is re-rendered.
+const SHEET_W = 960, SHEET_H = 680;
+const zoom = { z: 1, tx: 0, ty: 0, fitted: false };
+const vp = $('sheetVp'), paper = $('sheetPaper');
+const applyZoom = () => { paper.style.transform = `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.z})`; };
+const clampZ = (z) => Math.min(8, Math.max(0.5, z));
+function fitSheet() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  if (!w || !h) return;
+  zoom.z = clampZ(Math.min(w / SHEET_W, h / SHEET_H) * 0.98);
+  zoom.tx = (w - SHEET_W * zoom.z) / 2; zoom.ty = (h - SHEET_H * zoom.z) / 2;
+  zoom.fitted = true;
+  applyZoom();
+}
+// Zoom to z keeping the sheet point under viewport point (cx, cy) fixed.
+function zoomAt(cx, cy, z) {
+  z = clampZ(z);
+  const wx = (cx - zoom.tx) / zoom.z, wy = (cy - zoom.ty) / zoom.z;
+  zoom.z = z; zoom.tx = cx - wx * z; zoom.ty = cy - wy * z;
+  applyZoom();
+}
+const cellBox = (i) => {
+  const { W, H, M, TB } = SHEET;
+  const cw = (W - 2 * M) / 2, ch = (H - M - TB - 8 - M) / 2;
+  return { x: M + (i % 2) * cw, y: M + Math.floor(i / 2) * ch, w: cw, h: ch };
+};
+function zoomToCell(i) {
+  const b = cellBox(i), w = vp.clientWidth, h = vp.clientHeight;
+  zoom.z = clampZ(Math.min(w / b.w, h / b.h) * 0.95);
+  zoom.tx = w / 2 - (b.x + b.w / 2) * zoom.z; zoom.ty = h / 2 - (b.y + b.h / 2) * zoom.z;
+  applyZoom();
+}
+function zoomActual() {
+  zoom.z = 1;
+  zoom.tx = (vp.clientWidth - SHEET_W) / 2; zoom.ty = (vp.clientHeight - SHEET_H) / 2;
+  applyZoom();
+}
+vp.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const r = vp.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, zoom.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)));
+}, { passive: false });
+let pan = null;
+vp.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  pan = { x: e.clientX, y: e.clientY, tx: zoom.tx, ty: zoom.ty };
+  vp.setPointerCapture(e.pointerId);
+  vp.classList.add('panning');
+});
+vp.addEventListener('pointermove', (e) => {
+  if (!pan) return;
+  zoom.tx = pan.tx + e.clientX - pan.x; zoom.ty = pan.ty + e.clientY - pan.y;
+  applyZoom();
+});
+const endPan = () => { pan = null; vp.classList.remove('panning'); };
+vp.addEventListener('pointerup', endPan);
+vp.addEventListener('pointercancel', endPan);
+vp.addEventListener('dblclick', (e) => {
+  const r = vp.getBoundingClientRect();
+  const sx = (e.clientX - r.left - zoom.tx) / zoom.z, sy = (e.clientY - r.top - zoom.ty) / zoom.z;
+  if (sx < 0 || sy < 0 || sx > SHEET_W || sy > SHEET_H) return;
+  const { M, W, H, TB } = SHEET;
+  const cw = (W - 2 * M) / 2, ch = (H - M - TB - 8 - M) / 2;
+  zoomToCell((sx >= M + cw ? 1 : 0) + (sy >= M + ch ? 2 : 0));
+});
+new ResizeObserver(() => { if (drawingMode) fitSheet(); }).observe(vp);
+$('zFit').addEventListener('click', fitSheet);
+$('zIn').addEventListener('click', () => zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, zoom.z * 1.25));
+$('zOut').addEventListener('click', () => zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, zoom.z / 1.25));
+$('z1').addEventListener('click', zoomActual);
+
 function setMode(mode) {
   drawingMode = mode === 'drawing';
   $('viewer').classList.toggle('drawing', drawingMode);
   $('sheet').hidden = !drawingMode;
   for (const b of document.querySelectorAll('#modeSeg button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
-  if (drawingMode) ensureDrawing();
+  if (drawingMode) {
+    if (!zoom.fitted) fitSheet();
+    ensureDrawing();
+  }
 }
 document.querySelectorAll('#modeSeg button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 $('dlDrawing').addEventListener('click', async (e) => {
