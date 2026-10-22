@@ -42,7 +42,7 @@ uv run gutter_outlet.py --serve --open
 | Name | Where it is |
 |---|---|
 | Skirt | The half ring that sits over the outside of the gutter end, stopped below the bead and the hook |
-| Funnel | The loft from the gutter's D profile down to the round spigot, floor always descending |
+| Funnel | The loft from the gutter's D profile down to the round spigot, floor always descending, 8 lines thick |
 | Stop collar | The ring the pipe end rests against, with a 45° cone under it so it prints without support |
 | Spigot | The round stub the downpipe slides over |
 
@@ -51,7 +51,8 @@ uv run gutter_outlet.py --serve --open
 | Setting | Value | Meaning |
 |---|---|---|
 | `GUTTER_ID`, `SHEET`, `FIT` | 127, 0.6, 0.4 mm | Gutter inside diameter, sheet thickness, clearance per side |
-| `WALL` | 2.4 mm | 5 lines at 0.48 mm, pure perimeters |
+| `WALL` | 2.4 mm | Skirt and spigot wall, 5 lines at 0.48 mm |
+| `FUNNEL_WALL` | 3.84 mm | Funnel wall, 8 lines. It carries the water and takes the knocks |
 | `SKIRT_L`, `SKIRT_TOP` | 25, -8 mm | Skirt length, and how far below the gutter top it stops |
 | `FUNNEL_L`, `DROP` | 50, 3 mm | Funnel length and the floor drop along it |
 | `PIPE_OD`, `PIPE_WALL`, `PIPE_FIT` | 58, 1, 0.3 mm | Downpipe outside diameter and wall, clearance per side |
@@ -60,11 +61,11 @@ uv run gutter_outlet.py --serve --open
 The funnel is lofted between exact arcs and lines, so the STL is smooth and a
 rebuild takes about 0.3 s in the configurator.
 
-Use size: 115 × 134 × 76 mm. Prints standing on the spigot tip, 115 mm tall,
+Use size: 115 × 137 × 78 mm. Prints standing on the spigot tip, 115 mm tall,
 with an outer brim.
 
 ## Print settings
 
-- 0.4 mm nozzle, 0.2 mm layers, 6 wall loops, 15 % gyroid infill, no supports
+- 0.4 mm nozzle, 0.2 mm layers, 6 wall loops, 15 % gyroid infill, no supports. The funnel wall is 8 lines, so it gets a little infill between its loops
 - Bambu PLA Basic is fine indoors; outside in the sun and rain, print it in
   PETG or ASA

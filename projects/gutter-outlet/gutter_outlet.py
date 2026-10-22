@@ -25,7 +25,8 @@ LINE = 0.48            # Line width, 1.2 x the nozzle.
 LAYER = 0.2
 
 # 🧱 Skirt and funnel. The skirt sits over the gutter end; the funnel narrows to the spigot.
-WALL = 5 * LINE        # Wall of skirt, funnel and spigot, 5 lines.
+WALL = 5 * LINE        # Wall of the skirt and the spigot, 5 lines.
+FUNNEL_WALL = 8 * LINE  # Wall of the funnel, 8 lines. It carries the water and takes the knocks.
 SKIRT_L = 25.0         # Skirt length over the gutter. [10:60]
 SKIRT_TOP = -8.0       # The skirt stops this far below the gutter top, clearing bead and hook. [-30:0]
 FUNNEL_L = 50.0        # Funnel length; about 38 degree sides print without support. [30:120]
@@ -40,6 +41,7 @@ COLLAR = 2.5           # Pipe stop collar, radial size beyond the pipe OD. [1:6]
 
 R_SK_IN = GUTTER_ID / 2 + SHEET + FIT
 R_SK_OUT = R_SK_IN + WALL
+R_FN_OUT = R_SK_IN + FUNNEL_WALL         # The funnel starts outside the skirt wall.
 R_SP_OUT = (PIPE_OD - 2 * PIPE_WALL) / 2 - PIPE_FIT
 R_SP_IN = R_SP_OUT - WALL
 Z_FLOOR_B = -R_SK_IN - DROP
@@ -47,7 +49,7 @@ ZC = Z_FLOOR_B + R_SP_IN                 # Spigot axis: bore bottom = funnel flo
 R_COLLAR = PIPE_OD / 2 + COLLAR
 X_B = -FUNNEL_L
 X_TIP = X_B - SPIGOT_L
-assert WALL >= 2 * LINE, "the wall is thinner than two lines"
+assert min(WALL, FUNNEL_WALL) >= 2 * LINE, "a wall is thinner than two lines"
 assert R_SP_IN > 5, "the spigot bore is too small for the wall"
 assert ZC - R_SP_IN <= -R_SK_IN + 1e-6, "the floor goes up along the flow: a lip would hold water"
 
@@ -102,7 +104,10 @@ def build():
     skirt = skirt.cut(cq.Workplane("XY").box(SKIRT_L + 2, 2 * R_SK_OUT + 4, 100,
                                              centered=(False, True, False)).translate((-1, 0, SKIRT_TOP)))
     # Funnel: D (gutter profile) at x = 0 -> circle (spigot) at x = X_B.
-    outer = loft(d_wire(R_SK_OUT, WALL, 0.0), c_wire(R_SP_OUT, ZC, X_B, [WALL, 2 * R_SK_OUT, WALL]))
+    # The funnel is FUNNEL_WALL thick: its outer D sits FUNNEL_WALL outside the
+    # inner one, and its small end is FUNNEL_WALL outside the spigot bore.
+    r_end = R_SP_IN + FUNNEL_WALL
+    outer = loft(d_wire(R_FN_OUT, FUNNEL_WALL, 0.0), c_wire(r_end, ZC, X_B, [FUNNEL_WALL, 2 * R_FN_OUT, FUNNEL_WALL]))
     inner = loft(d_wire(R_SK_IN, 0.0, 0.01), c_wire(R_SP_IN, ZC, X_B - 0.01, [1.0]))
     # Spigot and stop collar, with a 45 degree cone under the collar for printing.
     spigot = cq.Workplane("YZ", origin=(X_TIP, 0, ZC)).circle(R_SP_OUT).extrude(SPIGOT_L + 0.5)
@@ -110,6 +115,7 @@ def build():
     cone_h = R_COLLAR - R_SP_OUT
     cone = cq.Solid.makeCone(R_SP_OUT, R_COLLAR, cone_h, pnt=cq.Vector(X_B - cone_h, 0, ZC),
                              dir=cq.Vector(1, 0, 0))
+    assert R_COLLAR >= R_SP_IN + FUNNEL_WALL, "the collar is smaller than the funnel's end"
     # Hollow the funnel first. Cutting the inner loft out of the assembled part
     # silently fails, because its end face coincides with the collar's face.
     funnel = outer.cut(inner)
@@ -134,8 +140,8 @@ def features():
     return {
         "Skirt": {"at": (SKIRT_L / 2, 0, -R_SK_OUT - 0.5), "normal": (0, 0, -1),
                   "params": ["SKIRT_L", "SKIRT_TOP", "FIT", "WALL"]},
-        "Funnel": {"at": (X_B / 2, -(R_SK_OUT + R_SP_OUT) / 2 - 0.5, (ZC - 20) / 2), "normal": (0, -1, 0),
-                   "params": ["FUNNEL_L", "DROP", "WALL"]},
+        "Funnel": {"at": (X_B / 2, -(R_FN_OUT + R_SP_IN + FUNNEL_WALL) / 2 - 0.5, (ZC - 20) / 2), "normal": (0, -1, 0),
+                   "params": ["FUNNEL_L", "DROP", "FUNNEL_WALL"]},
         "Stop collar": {"at": (X_B + 1.5, 0, ZC + R_COLLAR + 0.5), "normal": (0, 0, 1),
                         "params": ["COLLAR", "PIPE_OD"]},
         "Spigot": {"at": (X_B - SPIGOT_L / 2, 0, ZC + R_SP_OUT + 0.5), "normal": (0, 0, 1),
