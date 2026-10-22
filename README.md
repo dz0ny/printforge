@@ -68,6 +68,15 @@ Model Maker but with the CadQuery script as the source of truth:
 - **Features** are named in `features()`: click the lip on the part and the lip settings highlight; click a setting and its feature is tagged on the part.
 - **Dimensions** toggle the bounding box with its three sizes on the part.
 - **Drawing**: Top, Front, Right and Iso, each on its own page, centred and as large as the page allows. Hover an edge to see its dimensions, click to pin them, Show all for the full chains. Download one page or all.
+
+<p align="center">
+  <img src="./assets/drawing.png" alt="The drawing view: the sleeve's top projection filling the page, hidden lines dashed, overall sizes" width="900" />
+</p>
+
+<p align="center">
+  <img src="./assets/drawing_hover.png" alt="Hovering an edge shows its gaps to both neighbours and its distance from the datum" width="900" />
+</p>
+
 - **Rebuild** takes the model's own time, 0.3 s for the funnel, under 2 s for the sleeve, and repeats come from an in-memory cache. **Save to script** writes your values back into the Python file.
 - **Design rules** run in the build: a wall too low for the lips does not crash, it says "raise WALL_H to at least 38.6 or lower LIP to 5.4".
 
