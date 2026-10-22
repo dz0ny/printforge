@@ -9,7 +9,7 @@ import cadquery as cq
 from cadquery.selectors import BoxSelector
 
 # 🎛️ Mixer body size in mm. Measure your mixer.
-MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
+MIX_W = 185.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
 MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400]
 MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80]
 FOOT_H = 3.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
@@ -24,7 +24,7 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 40.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
+WALL_H = 36.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 FILLET = 6.0      # Fillet between the side walls and the base.
@@ -36,7 +36,7 @@ END_H = 16.0      # End stop height, low for the curved mixer edge.
 END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 
 # 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
-LIP = 8.0         # Lip reach over the mixer edge.
+LIP = 4.4         # Lip reach over the mixer edge. At a 36 mm wall this is the room for a 45 degree fill.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
 LIP_FREE = 80.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
