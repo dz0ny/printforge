@@ -28,6 +28,12 @@ the way you would with a friend at the workbench: *"make the lip 8 mm"*,
 
 <p align="center"><sub>Illustration generated from the real model. The renders below come straight from the CAD file.</sub></p>
 
+<p align="center">
+  <img src="./assets/configurator.png" alt="The configurator: grouped sliders on the left, the sleeve with the mixer as a translucent ghost and its dimensions on the right" width="900" />
+</p>
+
+<p align="center"><sub>The live configurator. Change the device, the shell follows.</sub></p>
+
 ## Why PrintForge exists
 
 Asking an AI for an STL usually ends in a mesh you can't change and a
@@ -147,6 +153,12 @@ uv run mixer_sleeve.py --serve --open
 
 "Save to script" writes your values back into `mixer_sleeve.py`. In Claude
 Code the same server is the `mixer-sleeve` entry in `.claude/launch.json`.
+
+<p align="center">
+  <img src="./assets/configurator_feature.png" alt="Clicking the lip on the part highlights the lip settings in the panel" width="900" />
+</p>
+
+<p align="center"><sub>Click a feature on the part and its settings light up. Click a setting and the feature is tagged on the part.</sub></p>
 
 The configurator is its own package, `printforge-configurator`, with no
 dependencies of its own. Any CadQuery project can use it:

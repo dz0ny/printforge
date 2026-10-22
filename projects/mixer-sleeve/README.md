@@ -44,6 +44,10 @@ script itself. It opens at <http://127.0.0.1:8765/>:
 uv run mixer_sleeve.py --serve --open
 ```
 
+<p align="center">
+  <img src="../../assets/configurator_feature.png" alt="The configurator with the Left lip feature selected" width="900" />
+</p>
+
 ## Named sides and features
 
 Use these names when you ask for a change.
