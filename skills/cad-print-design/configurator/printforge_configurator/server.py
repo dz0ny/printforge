@@ -289,6 +289,9 @@ def worker(model_path):
                     if last is None:
                         raise RuntimeError("no build yet")
                     reply = {"ok": True, "views": drawing_views(cq, last, Path(req["out"]))}
+        except AssertionError as e:
+            # A design rule from the model's own asserts: say it plainly, no traceback.
+            buf.write(f"Design rule: {e}\n")
         except Exception:
             buf.write(traceback.format_exc())
         reply["log"] = buf.getvalue()

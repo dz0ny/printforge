@@ -10,7 +10,7 @@ from cadquery.selectors import BoxSelector
 
 # 🎛️ Mixer body size in mm. Measure your mixer.
 MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
-MIX_D = 248.0   # Depth, front to back, along the slide axis. [100:400]
+MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400]
 MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80]
 FOOT_H = 3.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
 EDGE_R = 3.0    # Radius of the body's bottom edges. Measure it: the floor fillet must clear it. [0:10]
@@ -72,6 +72,10 @@ OUT_H = WALL_H
 IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
 LEN = SLEEVE_H - END
 TOTAL_LEN = LEN + END
+# The fill under each lip is as deep as the room above the mixer allows, up to
+# LIP. It always spans the whole lip, so a shallower fill is a little steeper
+# than 45 degrees; up to 1 mm less depth prints fine.
+FILL = max(0.0, min(LIP, IN_H - MIX_H - CLEAR_TOP))
 
 
 def box(x0, y0, z0, x1, y1, z1):
@@ -156,9 +160,9 @@ def check_design():
     """Design rules. They run inside build(), so a bad value saved from the
     configurator shows up in its build log instead of stopping the script from starting."""
     assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
-    assert IN_H - LIP >= MIX_H + CLEAR_TOP, (
-        f"the 45 degree fill under the lips would hit the mixer: raise WALL_H to at least "
-        f"{BASE + MIX_H + CLEAR_TOP + LIP + LIP_T:.1f} or lower LIP to {IN_H - MIX_H - CLEAR_TOP:.1f}")
+    assert LIP - FILL <= 1.0, (
+        f"the fill under the lips would be {LIP - FILL:.1f} mm shallower than the lip and too steep to print: "
+        f"raise WALL_H to at least {BASE + MIX_H + CLEAR_TOP + LIP - 1.0 + LIP_T:.1f} or lower LIP to {FILL + 1.0:.1f}")
     assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 
 
@@ -176,9 +180,9 @@ def build():
     part = part.cut(box(-1, y0, zt, LIP_FREE, y1, OUT_H + 1))
     part = part.cut(box(lip_end, y0, zt, LEN, y1, OUT_H + 1))
 
-    # Fill under each lip at 45 degrees.
+    # Fill under each lip: LIP inward, FILL deep, 45 degrees when there is room.
     for y, s in ((y0, 1), (y1, -1)):
-        tri = [(y, zt), (y + s * LIP, zt), (y, zt - LIP)]
+        tri = [(y, zt), (y + s * LIP, zt), (y, zt - FILL)]
         fill = cq.Workplane("YZ", origin=(LIP_FREE, 0, 0)).polyline(tri).close() \
             .extrude(lip_end - LIP_FREE)
         part = part.union(fill)

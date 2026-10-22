@@ -51,8 +51,36 @@ charge of the design, and you can rebuild it yourself with one command.
 - Printer-aware sizes: walls and plates are whole numbers of extrusion lines and layers for your nozzle and layer height
 - Print-ready STL in the print orientation, plus an editable STEP for Fusion, FreeCAD or Onshape
 - A Bambu Studio / OrcaSlicer 3MF with the recommended layer height, walls and infill already set, checked by slicing it headless
+- A live configurator: every setting a slider, grouped with icons, the device a translucent ghost inside the shell, rebuilt in seconds
+- A technical drawing from the model: one view per page, dimensions traced from the geometry and shown on hover, zoomable, downloadable as SVG
+- A checker that spots what a render hides: thin walls, knife edges, a part that runs into its device, a channel that got blocked, overhangs
+- Design rules in the model itself, so a value that cannot work says what to change and to what
 - Always `uv` and CadQuery: no conda, no global installs, reproducible builds
 - A growing list of CadQuery pitfalls the skill already knows how to avoid
+
+## The configurator
+
+Each project serves its own page, in the style of MakerWorld's Parametric
+Model Maker but with the CadQuery script as the source of truth:
+
+- **Settings** come straight from the script. A heading comment with an emoji is a group, the trailing comment is the description, a `[min:max]` makes a slider. Derived values stay hidden and recompute.
+- **The device** is a `device()` shape drawn as a ghost: the mixer on its feet, the gutter with its bead and hook, the downpipe. Click it and its sizes light up on the left.
+- **Features** are named in `features()`: click the lip on the part and the lip settings highlight; click a setting and its feature is tagged on the part.
+- **Dimensions** toggle the bounding box with its three sizes on the part.
+- **Drawing**: Top, Front, Right and Iso, each on its own page, centred and as large as the page allows. Hover an edge to see its dimensions, click to pin them, Show all for the full chains. Download one page or all.
+- **Rebuild** takes the model's own time, 0.3 s for the funnel, under 2 s for the sleeve, and repeats come from an in-memory cache. **Save to script** writes your values back into the Python file.
+- **Design rules** run in the build: a wall too low for the lips does not crash, it says "raise WALL_H to at least 38.6 or lower LIP to 5.4".
+
+The checker runs beside it:
+
+```bash
+uv run check_part.py mixer_sleeve.py
+```
+
+It casts rays through the walls, folds every edge, intersects the part with
+its device and with every `keep_clear()` volume, and reads the overhangs off
+the print STL. On the two examples it found a funnel blocked by its own
+collar and a mixer that could not pass under its own lips.
 
 ## Examples
 

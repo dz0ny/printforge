@@ -75,7 +75,7 @@ Use these names when you ask for a change.
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 40 mm | Outer side wall height: the 45° fill under the lips needs `LIP` mm above the mixer, and `build()` asserts it |
+| `WALL_H` | 40 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to 1 mm less than `LIP` is fine, beyond that `build()` says what to change |
 | `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
 | `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
 | `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
