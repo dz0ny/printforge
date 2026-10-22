@@ -95,7 +95,7 @@ collar and a mixer that could not pass under its own lips.
 
 | Project | What it is | Device it fits | Live |
 |---|---|---|---|
-| [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 195 × 248 × 26 mm | `uv run mixer_sleeve.py --serve` |
+| [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 195 mm wide | `uv run mixer_sleeve.py --serve` |
 | [`projects/gutter-outlet`](./projects/gutter-outlet) | Outlet funnel from a half-round gutter to a round downpipe, no inner lip anywhere | NW 280 gutter, 127 mm inside, to a 58 mm pipe | `uv run gutter_outlet.py --serve` |
 
 Each project is a folder with the model script, the STEP, the print-ready STL

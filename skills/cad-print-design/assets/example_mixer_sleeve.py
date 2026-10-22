@@ -9,7 +9,7 @@ import cadquery as cq
 from cadquery.selectors import BoxSelector
 
 # 🎛️ Mixer body size in mm. Measure your mixer.
-MIX_W = 185.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
+MIX_W = 195.0   # Width, left to right, on the open short side. Spec sheet: 195 x 248 x 50 mm, the 50 with knobs. [100:300]
 MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400]
 MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80]
 FOOT_H = 3.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]

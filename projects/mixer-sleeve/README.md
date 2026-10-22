@@ -71,24 +71,24 @@ Use these names when you ask for a change.
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 195 × 248 × 26 mm | Mixer body: width and depth from the Thomann spec (195 × 248 × 50, the 50 with knobs), thickness measured without knobs |
+| `MIX_W × MIX_D × MIX_H` | 195 × 215 × 26 mm | Width from the Thomann spec (195 × 248 × 50, the 50 with knobs); depth and thickness as the sleeve uses them, it only clips the lower part of the mixer |
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 36 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to 1 mm less than `LIP` is fine, beyond that `build()` says what to change |
+| `WALL_H` | 34 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to 1 mm less than `LIP` is fine, beyond that `build()` says what to change |
 | `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
 | `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
 | `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
 | `GUSSETS` | off | Ribs on the outside of each wall, 10 mm at 45°, 40 mm apart, for a stiffer wall joint |
 | `BASE` | 3.08 mm | 11 layers at 0.28 mm |
-| `LIP`, `LIP_T` | 4.4 mm, 1.96 mm | Lip reach and thickness: at a 36 mm wall, 4.4 mm is the room for a 45° fill above the mixer |
+| `LIP`, `LIP_T` | 3.4 mm, 1.96 mm | Lip reach and thickness: at a 36 mm wall, 4.4 mm is the room for a 45° fill above the mixer |
 | `LIP_FREE` | 80 mm | No lip on this length at the open end |
 | `END_H` | 16 mm | End stop height, low for the mixer's curved edge |
 | `HOLE_PATTERN` | 80 × 80 mm | Mount screw spacing |
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |
 
-Outside size: 203.2 × 36 × 213.5 mm.
+Outside size: 203.2 × 34 × 213.5 mm.
 
 ## Print settings
 
