@@ -57,6 +57,9 @@ uv run gutter_outlet.py --serve --open
 | `PIPE_OD`, `PIPE_WALL`, `PIPE_FIT` | 58, 1, 0.3 mm | Downpipe outside diameter and wall, clearance per side |
 | `SPIGOT_L`, `COLLAR` | 40, 2.5 mm | Spigot length into the pipe, collar size beyond the pipe |
 
+The funnel is lofted between exact arcs and lines, so the STL is smooth and a
+rebuild takes about 0.3 s in the configurator.
+
 Use size: 115 × 134 × 76 mm. Prints standing on the spigot tip, 115 mm tall,
 with an outer brim.
 

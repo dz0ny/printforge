@@ -49,3 +49,11 @@ These are things that went wrong while building a real part, and what fixed them
 ## Fillet trial loops are the slow part
 
 Adding risky edges to a fillet one at a time, with a full `fillet()` as the test for each, multiplies the cost: 8 fillet operations for one result. Try the complete set once and fall back to the one-by-one loop only when that raises. Classify edges with the three points of each edge computed once and compare edges by `hashCode()` in a set, not with nested `isSame()` loops. On the mixer sleeve this took a warm build from 2.5 s to 1.1 s with identical geometry.
+
+## Loft exact wires, not point polygons
+
+A loft between two 128-point polygons gives 128 ruled faces, and every boolean after it pays for all of them: the gutter outlet spent 4.6 s of a 4.7 s build in three cuts and four unions. Build the profiles from `Edge.makeThreePointArc` and `Edge.makeLine`, assemble with `Wire.assembleEdges`, and give both wires the same number of edges in the same order and direction. Split the round end's arcs in proportion to the lengths of the other profile's edges, or the ruled surface twists and the wall thickness wanders. Same part: 21 faces, 0.3 s, and smooth surfaces in the STL.
+
+## A cut that changes nothing
+
+`part.cut(tool)` can return the part unchanged, with no error, when a face of the tool lies exactly on a face of the part (here the inner loft ended on the collar's face). Check the volume after a cut you rely on. Fix it by cutting before the union that creates the coincidence, or by moving the tool face a little past the boundary.

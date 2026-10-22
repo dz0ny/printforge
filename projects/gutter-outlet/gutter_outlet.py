@@ -38,10 +38,6 @@ PIPE_FIT = 0.3         # Clearance per side, pipe over the spigot. [0:1]
 SPIGOT_L = 40.0        # Spigot length into the pipe. [15:80]
 COLLAR = 2.5           # Pipe stop collar, radial size beyond the pipe OD. [1:6]
 
-# ⚙️ Resolution. Points per loft section; more is smoother and slower.
-N_ARC = 96             # Points on the half circle. [24:192]
-N_TOP = 32             # Points on the flat top. [8:64]
-
 R_SK_IN = GUTTER_ID / 2 + SHEET + FIT
 R_SK_OUT = R_SK_IN + WALL
 R_SP_OUT = (PIPE_OD - 2 * PIPE_WALL) / 2 - PIPE_FIT
@@ -56,39 +52,47 @@ assert R_SP_IN > 5, "the spigot bore is too small for the wall"
 assert ZC - R_SP_IN <= -R_SK_IN + 1e-6, "the floor goes up along the flow: a lip would hold water"
 
 
-def d_points(r, ztop, x):
-    """D shape: bottom half-circle of radius r, flat top at ztop."""
-    pts = []
-    for i in range(N_ARC):  # 180 deg -> 360 deg through the bottom
-        a = math.pi + math.pi * i / N_ARC
-        pts.append((x, r * math.cos(a), r * math.sin(a)))
-    for i in range(N_TOP):  # right side up to the top, across, down the left side
-        t = i / N_TOP
-        total = 2 * ztop + 2 * r
-        s = t * total
-        if s < ztop:
-            pts.append((x, r, s))
-        elif s < ztop + 2 * r:
-            pts.append((x, r - (s - ztop), ztop))
-        else:
-            pts.append((x, -r, ztop - (s - ztop - 2 * r)))
-    return pts
+def d_wire(r, ztop, x):
+    """D profile at x: a half circle of radius r below z = 0 and a flat top at ztop.
+
+    Exact arcs and lines, so the loft has a few faces and the booleans stay fast.
+    With ztop at 0 the D is a half disc with two edges, otherwise four.
+    """
+    V = cq.Vector
+    edges = [cq.Edge.makeThreePointArc(V(x, r, 0), V(x, 0, -r), V(x, -r, 0))]
+    if ztop > 1e-6:
+        edges += [cq.Edge.makeLine(V(x, -r, 0), V(x, -r, ztop)),
+                  cq.Edge.makeLine(V(x, -r, ztop), V(x, r, ztop)),
+                  cq.Edge.makeLine(V(x, r, ztop), V(x, r, 0))]
+    else:
+        edges.append(cq.Edge.makeLine(V(x, -r, 0), V(x, r, 0)))
+    return cq.Wire.assembleEdges(edges)
 
 
-def c_points(r, zc, x):
-    pts = []
-    for i in range(N_ARC):
-        a = math.pi + math.pi * i / N_ARC
-        pts.append((x, r * math.cos(a), zc + r * math.sin(a)))
-    for i in range(N_TOP):
-        a = math.pi * i / N_TOP
-        pts.append((x, r * math.cos(a), zc + r * math.sin(a)))
-    return pts
+def c_wire(r, zc, x, top_fractions):
+    """Circle of radius r about (x, 0, zc): one bottom half arc, then top arcs.
+
+    The top half is split in the given fractions, so each edge of d_wire pairs
+    with a circle edge of matching share and the ruled loft does not twist or
+    bulge. For a D with a flat top of height ztop the fractions are the three
+    edge lengths over the top path: ztop, 2r, ztop.
+    """
+    V = cq.Vector
+
+    def at(a):
+        return V(x, r * math.cos(a), zc + r * math.sin(a))
+
+    edges = [cq.Edge.makeThreePointArc(at(0), at(-math.pi / 2), at(math.pi))]
+    total = sum(top_fractions)
+    a0 = math.pi
+    for f in top_fractions:
+        a1 = a0 - math.pi * f / total
+        edges.append(cq.Edge.makeThreePointArc(at(a0), at((a0 + a1) / 2), at(a1)))
+        a0 = a1
+    return cq.Wire.assembleEdges(edges)
 
 
-def loft(p1, p2):
-    w1 = cq.Wire.makePolygon([cq.Vector(*p) for p in p1], close=True)
-    w2 = cq.Wire.makePolygon([cq.Vector(*p) for p in p2], close=True)
+def loft(w1, w2):
     return cq.Workplane().add(cq.Solid.makeLoft([w1, w2], ruled=True))
 
 
@@ -98,16 +102,18 @@ def build():
     skirt = skirt.cut(cq.Workplane("XY").box(SKIRT_L + 2, 2 * R_SK_OUT + 4, 100,
                                              centered=(False, True, False)).translate((-1, 0, SKIRT_TOP)))
     # Funnel: D (gutter profile) at x = 0 -> circle (spigot) at x = X_B.
-    outer = loft(d_points(R_SK_OUT, WALL, 0.0), c_points(R_SP_OUT, ZC, X_B))
-    inner = loft(d_points(R_SK_IN, 0.0, 0.01), c_points(R_SP_IN, ZC, X_B - 0.01))
+    outer = loft(d_wire(R_SK_OUT, WALL, 0.0), c_wire(R_SP_OUT, ZC, X_B, [WALL, 2 * R_SK_OUT, WALL]))
+    inner = loft(d_wire(R_SK_IN, 0.0, 0.01), c_wire(R_SP_IN, ZC, X_B - 0.01, [1.0]))
     # Spigot and stop collar, with a 45 degree cone under the collar for printing.
     spigot = cq.Workplane("YZ", origin=(X_TIP, 0, ZC)).circle(R_SP_OUT).extrude(SPIGOT_L + 0.5)
     collar = cq.Workplane("YZ", origin=(X_B - 0.01, 0, ZC)).circle(R_COLLAR).extrude(3.0)
     cone_h = R_COLLAR - R_SP_OUT
     cone = cq.Solid.makeCone(R_SP_OUT, R_COLLAR, cone_h, pnt=cq.Vector(X_B - cone_h, 0, ZC),
                              dir=cq.Vector(1, 0, 0))
-    part = skirt.union(outer).union(spigot).union(collar).union(cq.Workplane().add(cone))
-    part = part.cut(inner)
+    # Hollow the funnel first. Cutting the inner loft out of the assembled part
+    # silently fails, because its end face coincides with the collar's face.
+    funnel = outer.cut(inner)
+    part = funnel.union(skirt).union(spigot).union(collar).union(cq.Workplane().add(cone))
     part = part.cut(cq.Workplane("YZ", origin=(X_TIP - 1, 0, ZC)).circle(R_SP_IN).extrude(SPIGOT_L + 1.2))
     return part
 
