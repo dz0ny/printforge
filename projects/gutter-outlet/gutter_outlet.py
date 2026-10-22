@@ -54,10 +54,15 @@ R_COLLAR = PIPE_OD / 2 + COLLAR
 X_B = -FUNNEL_L
 X_TIP = X_B - SPIGOT_L
 CONE_H = R_COLLAR - R_SP_OUT             # 45 degree cone under the collar.
-assert ROUND < FUNNEL_WALL / 2, "the round is too big for the skirt wall"
-assert min(WALL, FUNNEL_WALL) >= 2 * LINE, "a wall is thinner than two lines"
-assert R_SP_IN > 5, "the spigot bore is too small for the wall"
-assert ZC - R_SP_IN <= -R_SK_IN + 1e-6, "the floor goes up along the flow: a lip would hold water"
+
+
+def check_design():
+    """Design rules, run inside build() so the configurator reports them in its build log."""
+    assert min(WALL, FUNNEL_WALL) >= 2 * LINE, "a wall is thinner than two lines"
+    assert R_SP_IN > 5, "the spigot bore is too small for the wall"
+    assert ZC - R_SP_IN <= -R_SK_IN + 1e-6, "the floor goes up along the flow: a lip would hold water"
+    assert ROUND < FUNNEL_WALL / 2, "the round is too big for the skirt wall"
+
 
 
 def d_wire(r, ztop, x):
@@ -105,6 +110,7 @@ def loft(w1, w2):
 
 
 def build():
+    check_design()
     # Skirt: half ring over the gutter, x = 0 .. SKIRT_L, open above SKIRT_TOP.
     skirt = cq.Workplane("YZ").circle(R_SK_OUT).circle(R_SK_IN).extrude(SKIRT_L)
     skirt = skirt.cut(cq.Workplane("XY").box(SKIRT_L + 2, 2 * R_SK_OUT + 4, 100,

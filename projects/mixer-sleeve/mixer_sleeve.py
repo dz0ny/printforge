@@ -24,7 +24,7 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 35.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
+WALL_H = 40.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 FILLET = 6.0      # Fillet between the side walls and the base.
@@ -70,10 +70,7 @@ assert MARK_D >= 2.5 * NOZZLE and ROUND >= NOZZLE, "a feature is too small for t
 OUT_D = IN_D + 2 * WALL
 OUT_H = WALL_H
 IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
-assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
-assert IN_H - LIP >= MIX_H + CLEAR_TOP, "the 45 degree fill under the lips would hit the mixer: raise WALL_H or lower LIP"
 LEN = SLEEVE_H - END
-assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 TOTAL_LEN = LEN + END
 
 
@@ -155,7 +152,18 @@ def on(v, x=None, z=None, tol=0.05):
     return (x is None or abs(v.x - x) < tol) and (z is None or abs(v.z - z) < tol)
 
 
+def check_design():
+    """Design rules. They run inside build(), so a bad value saved from the
+    configurator shows up in its build log instead of stopping the script from starting."""
+    assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
+    assert IN_H - LIP >= MIX_H + CLEAR_TOP, (
+        f"the 45 degree fill under the lips would hit the mixer: raise WALL_H to at least "
+        f"{BASE + MIX_H + CLEAR_TOP + LIP + LIP_T:.1f} or lower LIP to {IN_H - MIX_H - CLEAR_TOP:.1f}")
+    assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
+
+
 def build():
+    check_design()
     y0, y1 = WALL, WALL + IN_D
     zf, zt = BASE, BASE + IN_H
 

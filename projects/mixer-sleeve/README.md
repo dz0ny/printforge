@@ -71,11 +71,11 @@ Use these names when you ask for a change.
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 189 × 248 × 31 mm | Mixer body, measured without knobs. The first print at 191 had 2 mm of side play |
+| `MIX_W × MIX_D × MIX_H` | 189 × 248 × 26 mm | Mixer body, measured without knobs. The first print at 191 had 2 mm of side play |
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 45 mm | Outer side wall height: the 45° fill under the lips needs `LIP` mm above the mixer, and the script asserts it |
+| `WALL_H` | 40 mm | Outer side wall height: the 45° fill under the lips needs `LIP` mm above the mixer, and `build()` asserts it |
 | `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
 | `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
 | `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
@@ -88,7 +88,7 @@ Use these names when you ask for a change.
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |
 
-Outside size: 197.2 × 45 × 213.5 mm.
+Outside size: 197.2 × 40 × 213.5 mm.
 
 ## Print settings
 
