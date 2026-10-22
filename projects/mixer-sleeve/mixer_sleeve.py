@@ -9,7 +9,10 @@ import cadquery as cq
 from cadquery.selectors import BoxSelector
 
 # 🎛️ Mixer body size in mm. Measure your mixer.
-MIX_W = 190.0   # Width, left to right, on the open short side, measured. The spec sheet says 195 with the top trim. [100:300]
+MIX_W = 190.0   # Width at the widest point of the body; the housing is barrel shaped. [100:300]
+MIX_W_BOTTOM = 188.0  # Width at the bottom edge, the one that rests on the end stop. Measure it. [100:300]
+MIX_W_TOP = 189.0     # Width where the sleeve's open end crosses the body, 211 mm up from the bottom edge. Measure it. [100:300]
+MIX_W_AT = 110.0      # Distance from the bottom edge to the widest point. [0:250]
 MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400]
 MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80]
 FOOT_H = 3.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
@@ -64,7 +67,8 @@ VENT_WEB = 6 * LINE  # Material between two hexes, 6 lines.
 VENT_MARGIN = 8.0   # Solid border around each vent area.
 SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
 
-IN_D = MIX_W + 2 * CLEAR
+IN_D = MIX_W + 2 * CLEAR  # The sleeve is sized for the widest point; the cavity narrows to follow the body.
+BOW = (MIX_W - min(MIX_W_BOTTOM, MIX_W_TOP)) / 2  # How far the cavity walls bow inward, per side.
 assert min(WALL, END, VENT_WEB) >= 2 * LINE, "a wall is thinner than two lines"
 assert MARK_D >= 2.5 * NOZZLE and ROUND >= NOZZLE, "a feature is too small for the nozzle"
 OUT_D = IN_D + 2 * WALL
@@ -164,6 +168,27 @@ def check_design():
         f"the fill under the lips would be {LIP - FILL:.1f} mm shallower than the lip and too steep to print: "
         f"raise WALL_H to at least {BASE + MIX_H + CLEAR_TOP + LIP - 1.0 + LIP_T:.1f} or lower LIP to {FILL + 1.0:.1f}")
     assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
+    assert max(MIX_W_BOTTOM, MIX_W_TOP) <= MIX_W, "MIX_W must be the widest point of the body"
+    assert 0 < MIX_W_AT < LEN, "MIX_W_AT must lie inside the sleeve"
+
+
+def outline(extra, x_open=-1.0, x_bottom=None):
+    """The body's plan outline grown by `extra` on each side, as a closed 2D wire in XY.
+
+    The body is barrel shaped: MIX_W_BOTTOM at the bottom edge (end stop side),
+    MIX_W at MIX_W_AT from it, MIX_W_TOP where the sleeve's open end crosses it.
+    A spline through the three half widths on each side gives the sides.
+    """
+    yc = WALL + IN_D / 2
+    x_bottom = LEN - CLEAR if x_bottom is None else x_bottom
+    x_wide = x_bottom - MIX_W_AT
+    hb, hw, ht = MIX_W_BOTTOM / 2 + extra, MIX_W / 2 + extra, MIX_W_TOP / 2 + extra
+    wp = (cq.Workplane("XY").moveTo(x_open, yc - ht)
+          .spline([(x_wide, yc - hw), (x_bottom, yc - hb)], includeCurrent=True)
+          .lineTo(x_bottom, yc + hb)
+          .spline([(x_wide, yc + hw), (x_open, yc + ht)], includeCurrent=True)
+          .close())
+    return wp
 
 
 def build():
@@ -172,19 +197,28 @@ def build():
     zf, zt = BASE, BASE + IN_H
 
     part = box(0, 0, 0, TOTAL_LEN, OUT_D, OUT_H)
-    part = part.cut(box(-1, y0, zf, LEN, y1, zt))
-    part = part.cut(box(-1, y0 + LIP, zt - 1, LEN, y1 - LIP, OUT_H + 1))
+    # The cavity follows the body's barrel shape, CLEAR outside it, up to the end stop.
+    cavity = outline(CLEAR, x_bottom=LEN).extrude(zt - zf).translate((0, 0, zf))
+    part = part.cut(cavity)
+    # The lip opening is the cavity outline LIP further in, so the lips follow the body too.
+    lip_cut = outline(CLEAR - LIP, x_bottom=LEN).extrude(OUT_H - zt + 2).translate((0, 0, zt - 1))
+    part = part.cut(lip_cut)
 
     # Remove the lips near the open end and before the bottom slope.
     lip_end = TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
     part = part.cut(box(-1, y0, zt, LIP_FREE, y1, OUT_H + 1))
     part = part.cut(box(lip_end, y0, zt, LEN, y1, OUT_H + 1))
 
-    # Fill under each lip: LIP inward, FILL deep, 45 degrees when there is room.
-    for y, s in ((y0, 1), (y1, -1)):
-        tri = [(y, zt), (y + s * LIP, zt), (y, zt - FILL)]
-        fill = cq.Workplane("YZ", origin=(LIP_FREE, 0, 0)).polyline(tri).close() \
-            .extrude(lip_end - LIP_FREE)
+    # Fill under the lips, following the body: a slab of the cavity's outline,
+    # FILL deep under the lips, minus a loft from the lip edge at the top to the
+    # cavity wall at the bottom. What is left is a 45 degree slope from the
+    # lip edge down to the wall on both sides, only where the lips are.
+    if FILL > 0:
+        slab = outline(CLEAR, x_bottom=LEN).extrude(FILL).translate((0, 0, zt - FILL))
+        w_top = outline(CLEAR - LIP, x_bottom=LEN).translate((0, 0, zt)).val()
+        w_bot = outline(CLEAR - LIP + FILL, x_bottom=LEN).translate((0, 0, zt - FILL)).val()
+        core = cq.Workplane().add(cq.Solid.makeLoft([w_bot, w_top], ruled=True))
+        fill = slab.cut(core).intersect(box(LIP_FREE, -1, zt - FILL - 1, lip_end, OUT_D + 1, zt + 1))
         part = part.union(fill)
 
     # Lower the end stop. The walls and lips run down to it at 45 degrees.
@@ -195,9 +229,10 @@ def build():
     part = part.cut(cutter)
 
     # Inner fillets: long floor edges, then the end stop edges.
-    part = part.edges(sel(0, y0, zf, LEN, y0, zf) + sel(0, y1, zf, LEN, y1, zf)) \
+    b = BOW + 0.5
+    part = part.edges(sel(0, y0, zf, LEN, y0 + b, zf) + sel(0, y1 - b, zf, LEN, y1, zf)) \
         .fillet(FILLET)
-    part = part.edges(sel(LEN, y0, zf, LEN, y0, zf + 5) + sel(LEN, y1, zf, LEN, y1, zf + 5)
+    part = part.edges(sel(LEN, y0, zf, LEN, y0 + b, zf + 5) + sel(LEN, y1 - b, zf, LEN, y1, zf + 5)
                       + sel(LEN, y0, zf, LEN, y1, zf)).fillet(END_FILLET)
 
     # Round every other sharp edge in one fillet.
@@ -224,24 +259,41 @@ def build():
     def all_pts(e, test):
         return all(test(p) for p in pts[e.hashCode()])
 
-    base = [e for e in edges if e.geomType() == "LINE"
-            and any(all_pts(e, t) for t in (outer, wall_top, lip_ends, open_end))]
-    base_ids = {e.hashCode() for e in base}
-    extra = [e for e in edges if e.hashCode() not in base_ids and all_pts(e, slope)]
-    # Try the whole set in one fillet. Only when that fails, add the slope
-    # edges one by one and keep those that still work.
-    keep, skipped = base + sorted(extra, key=lambda e: -e.Length()), 0
-    try:
-        part = part.newObject(keep).fillet(ROUND)
-    except Exception:
-        keep = list(base)
+    groups = {"outer": outer, "open end": open_end, "wall top": wall_top, "lip ends": lip_ends}
+    picked = {name: [e for e in edges if e.geomType() == "LINE" and all_pts(e, t)]
+              for name, t in groups.items()}
+    seen = set()
+    for name in picked:  # An edge belongs to the first group that claims it.
+        picked[name] = [e for e in picked[name] if not (e.hashCode() in seen or seen.add(e.hashCode()))]
+    extra = [e for e in edges if e.hashCode() not in seen and all_pts(e, slope)]
+
+    def works(edge_list):
+        try:
+            part.newObject(edge_list).fillet(ROUND)
+            return True
+        except Exception:
+            return False
+
+    # Try everything in one fillet. Only when that fails, add the groups one
+    # by one, then the slope edges one by one, and keep what still works.
+    keep = [e for g in picked.values() for e in g] + sorted(extra, key=lambda e: -e.Length())
+    skipped, sharp_groups = 0, []
+    if not works(keep):
+        keep = []
+        for name, g in picked.items():
+            if g and works(keep + g):
+                keep += g
+            elif g:
+                sharp_groups.append(name)
         for e in sorted(extra, key=lambda e: -e.Length()):
-            try:
-                part.newObject(keep + [e]).fillet(ROUND)
+            if works(keep + [e]):
                 keep.append(e)
-            except Exception:
+            else:
                 skipped += 1
+    if keep:
         part = part.newObject(keep).fillet(ROUND)
+    if sharp_groups:
+        print(f"edges stay sharp: {', '.join(sharp_groups)}")
     print(f"rounded {len(keep)} edges, {skipped} slope edges stay sharp")
 
     marks = cq.Workplane("XY").pushPoints(hole_points()).circle(MARK_D / 2).extrude(MARK_DEPTH)
@@ -268,9 +320,12 @@ def device():
     """
     y0, x1 = WALL + CLEAR, LEN - CLEAR  # The mixer rests CLEAR before the end stop.
     x0 = x1 - MIX_D
-    body = box(x0, y0, BASE + FOOT_H, x1, y0 + MIX_W, BASE + MIX_H)
+    body = outline(0.0, x_open=x0).extrude(MIX_H - FOOT_H).translate((0, 0, BASE + FOOT_H))
     if EDGE_R > 0:
-        body = body.edges("|X").edges("<Z").fillet(EDGE_R)
+        try:
+            body = body.edges("<Z").fillet(EDGE_R)
+        except Exception:
+            pass  # A fillet along the splines can fail; the ghost then has square bottom edges.
     for fx in (x0 + 15, x1 - 15):
         for fy in (y0 + 15, y0 + MIX_W - 15):
             body = body.union(cq.Workplane("XY", origin=(fx, fy, BASE)).circle(6).extrude(max(FOOT_H, 0.01)))
@@ -291,7 +346,7 @@ def features():
         "Mount mark M1": ((pts[0][0], pts[0][1], -0.5), (0, 0, -1),
                           ["MARK_D", "MARK_DEPTH", "PAD_R"]),
         "Left wall": ((TOTAL_LEN / 2, -0.5, OUT_H / 2), (0, -1, 0),
-                      ["WALL", "WALL_H", "FILLET", "SIDE_VENTS", "SIDE_HEX"]),
+                      ["WALL", "WALL_H", "FILLET", "MIX_W", "MIX_W_BOTTOM", "MIX_W_TOP", "SIDE_VENTS", "SIDE_HEX"]),
         "Right wall": ((TOTAL_LEN / 2, OUT_D + 0.5, OUT_H / 2), (0, 1, 0),
                        ["WALL", "WALL_H", "FILLET", "SIDE_VENTS", "SIDE_HEX"]),
         "Open end": ((-0.5, WALL / 2, OUT_H / 2), (-1, 0, 0), ["SLEEVE_H", "LIP_FREE"]),
@@ -307,7 +362,7 @@ def features():
         "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1),
                   ["BASE", "CLEAR", "MIX_W", "MIX_H"]),
         "Mixer": ((LEN - MIX_D / 2, OUT_D / 2, BASE + MIX_H + 0.5), (0, 0, 1),
-                  ["MIX_W", "MIX_D", "MIX_H", "FOOT_H", "EDGE_R", "CLEAR", "CLEAR_TOP"]),
+                  ["MIX_W", "MIX_W_BOTTOM", "MIX_W_TOP", "MIX_W_AT", "MIX_D", "MIX_H", "FOOT_H", "EDGE_R", "CLEAR", "CLEAR_TOP"]),
     }
     if GUSSETS:
         f["Gusset"] = ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7),

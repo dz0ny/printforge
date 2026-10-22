@@ -57,7 +57,7 @@ Use these names when you ask for a change.
 |---|---|
 | Back plate / Mount face | The flat back that screws to the wall mount |
 | Mount marks M1–M4 | Small marks for the mount screws, 80 × 80 mm apart, each in a solid pad |
-| Left wall, Right wall | The long sides that grip the mixer |
+| Left wall, Right wall | The long sides that grip the mixer. Their inner faces bow to follow the body, from a spline through the three measured widths |
 | Left lip, Right lip | 4.4 mm lips over the mixer's front edge, with a 45° fill underneath |
 | Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily |
 | Open end | The top, where the mixer slides in |
@@ -71,7 +71,8 @@ Use these names when you ask for a change.
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 190 × 215 × 26 mm | Width measured on the body (the spec sheet says 195 with the top trim); depth and thickness as the sleeve uses them, it only clips the lower part |
+| `MIX_W × MIX_D × MIX_H` | 190 × 215 × 26 mm | Widest point, depth and thickness as the sleeve uses them |
+| `MIX_W_BOTTOM`, `MIX_W_TOP`, `MIX_W_AT` | 188, 189, 110 mm | The body is barrel shaped: width at the bottom edge, at the sleeve's open end, and where the widest point sits. Measure these three |
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
