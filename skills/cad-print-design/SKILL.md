@@ -88,6 +88,24 @@ An STL carries no settings. Also write a 3MF that opens in Bambu Studio or OrcaS
 
 The script stores the settings on the object, and object settings override the template's process (verified: 110 layers at 0.28 mm on a project set to 0.20 mm). The G-code header still prints the project values, so count layers instead of trusting the header. Without a template, the 3MF still has the geometry and the object settings. Bambu's command line cannot slice it with the stock presets, and the behaviour in the app is not verified, so prefer a template.
 
+## 6b. Interactive configurator
+
+For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. `serve.py` runs the model locally and `configurator.html` is the page.
+
+1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A comment line above a block of settings is the group title. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
+2. Add a `device()` function that returns the device as a CadQuery shape in its resting position. The page draws it as a translucent ghost inside the shell. It is never exported.
+3. Add a launcher for the project in `.claude/launch.json` at the repo root, so the page opens in the Claude browser pane:
+
+```json
+{"name": "mixer-sleeve", "runtimeExecutable": "uv",
+ "runtimeArgs": ["run", "skills/cad-print-design/scripts/serve.py", "projects/mixer-sleeve/mixer_sleeve.py", "--port", "8765"],
+ "port": 8765}
+```
+
+Then start it with the browser `preview_start` tool by name, or by hand with `uv run skills/cad-print-design/scripts/serve.py <model>.py --port 8765`.
+
+The page has Rebuild, an auto-rebuild switch, Download STL and STEP, and Save to script, which writes the values back into the Python file and keeps every comment. The server needs no CadQuery itself: it keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve) and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+
 ## 7. Each iteration
 
 - Change the fewest parameters that do what was asked, rebuild, re-render and look.

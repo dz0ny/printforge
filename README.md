@@ -133,11 +133,24 @@ Change any number at the top of `mixer_sleeve.py` and run the two commands
 again. See the [project README](./projects/mixer-sleeve/README.md) for the
 named features and parameters.
 
+Or adjust it live. The configurator exposes every setting at the top of the
+script as a slider, shows the mixer as a translucent ghost inside the sleeve,
+and rebuilds the part on demand:
+
+```bash
+uv run skills/cad-print-design/scripts/serve.py projects/mixer-sleeve/mixer_sleeve.py --port 8765
+```
+
+Then open <http://127.0.0.1:8765/>. "Save to script" writes your values back
+into `mixer_sleeve.py`. In Claude Code the same server is the `mixer-sleeve`
+entry in `.claude/launch.json`.
+
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, example |
+| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, live configurator, example |
+| `.claude/launch.json` | Launchers that open each project's configurator in the Claude browser pane |
 | `projects/` | Parts designed with the skill, each one rebuildable with `uv run` |
 | `dist/` | The packaged `.skill` file for Claude apps |
 | `assets/` | README images |

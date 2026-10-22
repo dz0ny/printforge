@@ -8,9 +8,9 @@ import cadquery as cq
 from cadquery.selectors import BoxSelector
 
 # Mixer body size in mm. Measure your mixer.
-MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play.
-MIX_D = 248.0   # Depth, front to back, along the slide axis.
-MIX_H = 25.0    # Body thickness with feet, without knobs.
+MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
+MIX_D = 248.0   # Depth, front to back, along the slide axis. [100:400]
+MIX_H = 25.0    # Body thickness with feet, without knobs. [10:80]
 
 # Printer settings. The part prints flat on its back, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
@@ -21,8 +21,8 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 
-SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge.
-WALL_H = 50.0     # Outer side wall height, floor to lip top.
+SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
+WALL_H = 50.0     # Outer side wall height, floor to lip top. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 
@@ -71,12 +71,14 @@ assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
 LEN = SLEEVE_H - END
 assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 TOTAL_LEN = LEN + END
-E = 0.5  # Selector box margin.
 
 
 def box(x0, y0, z0, x1, y1, z1):
     return cq.Workplane("XY").box(x1 - x0, y1 - y0, z1 - z0, centered=False) \
         .translate((x0, y0, z0))
+
+
+E = 0.5  # Selector box margin. Below the first def, so the configurator hides it.
 
 
 def sel(x0, y0, z0, x1, y1, z1):
@@ -232,6 +234,11 @@ def build():
             part = part.union(rib)
     print(f"gussets: {len(gusset_points(lip_end))} per side")
     return part
+
+
+def device():
+    """Return the mixer body as it sits in the sleeve, for the configurator's ghost view."""
+    return box(LEN - MIX_D, WALL + CLEAR, BASE, LEN, WALL + CLEAR + MIX_W, BASE + MIX_H)
 
 
 def labels(rb):

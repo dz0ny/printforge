@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAD Configurator</title>
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" } }
+</script>
+<style>
+:root {
+  --bg: #f4f6f8; --panel: #ffffff; --fg: #1c2330; --muted: #6b7480; --line: #e1e5eb;
+  --accent: #2563eb; --accent-fg: #ffffff; --dirty: #fff3c4; --err: #b42318; --err-bg: #fdecea;
+  --viewer: #e9edf2; --input: #ffffff; --btn: #ffffff;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
+    --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f;
+    --viewer: #0f1319; --input: #11151c; --btn: #242b37;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
+  --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f;
+  --viewer: #0f1319; --input: #11151c; --btn: #242b37;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+#model { font-family: var(--mono); font-weight: 600; margin-right: auto; }
+button, .btn {
+  font: inherit; color: var(--fg); background: var(--btn); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+button:disabled { opacity: .55; cursor: default; }
+button.primary, #rebuild { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.link {
+  background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px;
+  text-transform: none; letter-spacing: 0; cursor: pointer;
+}
+.check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+#status { color: var(--muted); font-variant-numeric: tabular-nums; }
+#saveMsg { color: var(--muted); font-size: 12.5px; }
+#saveMsg.err, #status.err { color: var(--err); }
+.spin {
+  display: none; width: 12px; height: 12px; border: 2px solid currentColor;
+  border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
+}
+#rebuild.busy .spin { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+main { flex: 1; display: flex; min-height: 0; }
+aside {
+  width: 320px; flex: none; overflow-y: auto; background: var(--panel);
+  border-right: 1px solid var(--line); display: flex; flex-direction: column;
+}
+#groups { flex: 1; padding: 4px 0; }
+.group h2 {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+  margin: 0; padding: 14px 14px 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.row { padding: 8px 14px; border-left: 3px solid transparent; }
+.row.dirty { background: var(--dirty); border-left-color: var(--accent); }
+.row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.name { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+.desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.row-head > div:last-child { flex: none; padding-top: 1px; }
+input[type=number] {
+  width: 92px; font: inherit; padding: 4px 6px; background: var(--input); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 5px; text-align: right;
+}
+input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
+#logbox { margin-top: auto; border-top: 1px solid var(--line); padding: 8px 14px; }
+#logbox summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+#logbox pre {
+  font: 11.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word;
+  max-height: 220px; overflow: auto; margin: 6px 0 0; color: var(--muted);
+}
+#logbox.error { background: var(--err-bg); }
+#logbox.error summary, #logbox.error pre { color: var(--err); }
+#viewer { flex: 1; position: relative; min-width: 0; background: var(--viewer); overflow: hidden; }
+#viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; }
+#tools button { background: var(--panel); padding: 4px 9px; font-size: 12.5px; }
+#info {
+  position: absolute; left: 12px; bottom: 10px; font-variant-numeric: tabular-nums;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px;
+}
+#info:empty { display: none; }
+@media (max-width: 799px) {
+  html, body { height: auto; }
+  main { flex-direction: column; flex: none; }
+  aside { width: auto; max-height: 50vh; border-right: 0; border-bottom: 1px solid var(--line); }
+  #viewer { flex: none; height: 70vh; }
+}
+</style>
+</head>
+<body>
+<header>
+  <span id="model">loading...</span>
+  <button id="rebuild" disabled><span class="spin"></span>Rebuild</button>
+  <label class="check"><input type="checkbox" id="auto"> Auto rebuild</label>
+  <label class="check" id="devWrap" hidden><input type="checkbox" id="showDev" checked> Show device</label>
+  <a class="btn" id="dlStl" href="/api/mesh/shell.stl" download="part.stl">Download STL</a>
+  <a class="btn" id="dlStep" href="/api/step" download="part.step">Download STEP</a>
+  <button id="save" disabled>Save to script</button>
+  <span id="saveMsg"></span>
+  <span id="status"></span>
+</header>
+<main>
+  <aside>
+    <div id="groups"></div>
+    <details id="logbox" open>
+      <summary>Build log</summary>
+      <pre id="log"></pre>
+    </details>
+  </aside>
+  <section id="viewer">
+    <div id="tools">
+      <button data-view="fit">Fit</button>
+      <button data-view="iso">Iso</button>
+      <button data-view="top">Top</button>
+      <button data-view="front">Front</button>
+    </div>
+    <div id="info"></div>
+  </section>
+</main>
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+const json = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const state = { values: {}, initial: {}, built: {}, ctl: {}, busy: false, queued: false, timer: 0, ready: false };
+
+function setStatus(text, bad) { const s = $('status'); s.textContent = text || ''; s.className = bad ? 'err' : ''; }
+function showLog(text, bad) {
+  $('log').textContent = text || '(no output)';
+  $('logbox').classList.toggle('error', !!bad);
+  if (bad) $('logbox').open = true;
+}
+function setBusy(on) {
+  const b = $('rebuild');
+  b.classList.toggle('busy', on);
+  b.disabled = on || !state.ready;
+}
+function markDirty() {
+  for (const name in state.ctl) {
+    state.ctl[name].row.classList.toggle('dirty', state.values[name] !== state.built[name]);
+  }
+}
+function changed() {
+  markDirty();
+  clearTimeout(state.timer);
+  if ($('auto').checked) state.timer = setTimeout(build, 800);
+}
+function setValue(name, v) { state.values[name] = v; changed(); }
+
+async function build() {
+  if (!state.ready) return;
+  if (state.busy) { state.queued = true; return; }
+  state.busy = true; state.queued = false;
+  const snap = { ...state.values };
+  const t0 = performance.now();
+  setBusy(true);
+  setStatus('Building... 0 s');
+  const tick = setInterval(() => setStatus(`Building... ${Math.round((performance.now() - t0) / 1000)} s`), 250);
+  try {
+    const r = await fetch('/api/build', json({ values: snap }));
+    const res = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}: invalid response` }));
+    showLog(res.log, !res.ok);
+    if (res.ok) {
+      state.built = snap;
+      setStatus(`Build ${res.build} · ${res.seconds.toFixed(1)} s`);
+      $('info').textContent = `${res.bbox.map((v) => v.toFixed(1)).join(' × ')} mm · ${Math.round(res.volume_cm3)} cm³ · ${Math.round(res.seconds)} s`;
+      const v = await viewerReady;
+      if (v) await v.show(res);
+    } else {
+      setStatus('Build failed', true);
+    }
+  } catch (e) {
+    showLog(String(e), true);
+    setStatus('Build failed', true);
+  } finally {
+    clearInterval(tick);
+    state.busy = false;
+    setBusy(false);
+    markDirty();
+    if (state.queued) build();
+  }
+}
+
+function makeRow(p) {
+  const row = el('div', 'row');
+  const head = el('div', 'row-head');
+  const left = el('div');
+  const name = el('div', 'name'); name.textContent = p.name;
+  const desc = el('div', 'desc'); desc.textContent = p.description || '';
+  left.append(name, desc);
+  const ctl = el('div');
+  let sync;
+  let rng = null;
+  if (p.type === 'bool') {
+    const cb = el('input'); cb.type = 'checkbox';
+    cb.addEventListener('change', () => setValue(p.name, cb.checked));
+    ctl.append(cb);
+    sync = (v) => { cb.checked = !!v; };
+  } else {
+    const step = Number.isInteger(p.value) ? 1 : 0.1;
+    const num = el('input'); num.type = 'number'; num.step = step;
+    num.addEventListener('input', () => {
+      const v = parseFloat(num.value);
+      if (Number.isNaN(v)) return;
+      setValue(p.name, v);
+      if (rng) rng.value = v;
+    });
+    ctl.append(num);
+    if (p.min != null || p.max != null) {
+      rng = el('input'); rng.type = 'range'; rng.step = step;
+      rng.min = p.min ?? 0;
+      rng.max = p.max ?? Math.max(10, p.value * 2);
+      rng.addEventListener('input', () => {
+        num.value = rng.value;
+        setValue(p.name, parseFloat(rng.value));
+      });
+    }
+    sync = (v) => { num.value = v; if (rng) rng.value = v; };
+  }
+  sync(p.value);
+  state.ctl[p.name] = { row, sync };
+  head.append(left, ctl);
+  row.append(head);
+  if (rng) row.append(rng);
+  return row;
+}
+
+function renderPanel(groups) {
+  const wrap = $('groups');
+  for (const g of groups) {
+    const sec = el('section', 'group');
+    const h = el('h2');
+    h.append(g.title);
+    const reset = el('button', 'link');
+    reset.type = 'button';
+    reset.textContent = 'Reset';
+    reset.addEventListener('click', () => {
+      for (const p of g.params) {
+        state.values[p.name] = state.initial[p.name];
+        state.ctl[p.name].sync(state.initial[p.name]);
+      }
+      changed();
+    });
+    h.append(reset);
+    sec.append(h);
+    for (const p of g.params) sec.append(makeRow(p));
+    wrap.append(sec);
+  }
+}
+
+async function init() {
+  try {
+    const r = await fetch('/api/params');
+    if (!r.ok) throw new Error(`/api/params returned HTTP ${r.status}`);
+    const data = await r.json();
+    const stem = data.model.replace(/\.py$/, '');
+    $('model').textContent = data.model;
+    $('dlStl').download = `${stem}.stl`;
+    $('dlStep').download = `${stem}.step`;
+    $('devWrap').hidden = !data.has_device;
+    for (const g of data.groups) {
+      for (const p of g.params) { state.values[p.name] = p.value; state.initial[p.name] = p.value; }
+    }
+    state.built = { ...state.values };
+    renderPanel(data.groups);
+    state.ready = true;
+    $('save').disabled = false;
+    setBusy(false);
+    build();
+  } catch (e) {
+    showLog(`Could not load parameters: ${e.message}`, true);
+    setStatus('No parameters', true);
+  }
+}
+
+$('rebuild').addEventListener('click', build);
+$('save').addEventListener('click', async () => {
+  const msg = $('saveMsg'), btn = $('save');
+  btn.disabled = true; msg.className = ''; msg.textContent = 'Saving...';
+  try {
+    const r = await fetch('/api/save', json({ values: { ...state.values } }));
+    const res = await r.json();
+    if (res.ok) {
+      msg.textContent = res.changed && res.changed.length ? `Saved ${res.changed.join(', ')}` : 'Nothing to save';
+    } else {
+      msg.className = 'err';
+      msg.textContent = `Save failed: ${res.log || res.error || 'unknown error'}`;
+    }
+  } catch (e) {
+    msg.className = 'err';
+    msg.textContent = `Save failed: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+$('showDev').addEventListener('change', async () => (await viewerReady)?.setDevice($('showDev').checked));
+document.querySelectorAll('#tools button').forEach((b) =>
+  b.addEventListener('click', async () => (await viewerReady)?.view(b.dataset.view)));
+
+async function loadViewer() {
+  try {
+    const [T, { STLLoader }, { OrbitControls }] = await Promise.all([
+      import('three'),
+      import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/STLLoader.js'),
+      import('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js'),
+    ]);
+    return makeViewer(T, STLLoader, OrbitControls);
+  } catch (e) {
+    showLog(`3D viewer unavailable: ${e.message}`, true);
+    return null;
+  }
+}
+
+function makeViewer(T, STLLoader, OrbitControls) {
+  const host = $('viewer');
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  host.prepend(renderer.domElement);
+  const scene = new T.Scene();
+  const camera = new T.PerspectiveCamera(35, 1, 0.1, 1e5);
+  camera.up.set(0, 0, 1);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  const sun = new T.DirectionalLight(0xffffff, 1.6); sun.position.set(1, -2, 3);
+  const fill = new T.DirectionalLight(0xffffff, 0.35); fill.position.set(-2, 1, -1);
+  scene.add(new T.HemisphereLight(0xffffff, 0x556070, 0.9), sun, fill);
+  const shellMat = new T.MeshStandardMaterial({ color: 0xc8ccd2, roughness: 0.55, metalness: 0.05 });
+  const devMat = new T.MeshStandardMaterial({ color: 0x2f7fd6, transparent: true, opacity: 0.35, depthWrite: false });
+  const root = new T.Group();
+  scene.add(root);
+  const loader = new STLLoader();
+  let shell = null, device = null, grid = null, fitted = false, devOn = true;
+  let center = new T.Vector3(), radius = 50;
+
+  const resize = () => {
+    const w = Math.max(host.clientWidth, 1), h = Math.max(host.clientHeight, 1);
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  };
+  new ResizeObserver(resize).observe(host);
+  resize();
+  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+  const frame = (dir) => {
+    const v = T.MathUtils.degToRad(camera.fov) / 2;
+    const h = Math.atan(Math.tan(v) * camera.aspect);
+    const dist = (radius / Math.sin(Math.min(v, h))) * 1.1;
+    camera.near = dist / 100; camera.far = dist * 100;
+    camera.updateProjectionMatrix();
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(dir.clone().normalize(), dist);
+    controls.update();
+  };
+  const VIEWS = { iso: [1, -1, 0.9], top: [0.001, -0.001, 1], front: [0, -1, 0.001] };
+  const view = (name) => frame(name === 'fit'
+    ? camera.position.clone().sub(controls.target)
+    : new T.Vector3(...VIEWS[name]));
+
+  const load = (url) => new Promise((ok, fail) => loader.load(url, ok, undefined, fail));
+  const mesh = (geo, mat) => {
+    geo.computeVertexNormals();
+    return new T.Mesh(geo, mat);
+  };
+  const drop = (m) => { if (m) { root.remove(m); m.geometry.dispose(); } };
+
+  return {
+    view,
+    setDevice(on) { devOn = on; if (device) device.visible = on; },
+    async show(b) {
+      const [sg, dg] = await Promise.all([load(b.shell), b.device ? load(b.device) : null]);
+      drop(shell); drop(device);
+      shell = mesh(sg, shellMat); root.add(shell);
+      device = dg ? mesh(dg, devMat) : null;
+      if (device) { device.visible = devOn; root.add(device); }
+      sg.computeBoundingBox();
+      const bb = sg.boundingBox;
+      center = bb.getCenter(new T.Vector3());
+      const s = bb.getSize(new T.Vector3());
+      radius = s.length() / 2;
+      if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
+      const g = Math.max(10, Math.ceil((Math.max(s.x, s.y) * 1.5) / 10) * 10);
+      grid = new T.GridHelper(g, g / 10, 0x8a939e, 0xb8c0ca);
+      grid.rotation.x = Math.PI / 2;
+      grid.position.set(center.x, center.y, 0);
+      scene.add(grid);
+      if (!fitted) { fitted = true; view('iso'); }
+    },
+  };
+}
+
+const viewerReady = loadViewer();
+init();
+</script>
+</body>
+</html>

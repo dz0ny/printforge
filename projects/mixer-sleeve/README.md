@@ -22,6 +22,7 @@ reachable through the open front, and the rear jacks stay free at the top.
 | `make_3mf.py` | Builds the 3MF from the STL, the settings and the template |
 | `labels.json` | Named anchor points that `render_views.py` draws as tags |
 | `render_views.py` | Renders the labeled views in `views/` |
+| `device()` in `mixer_sleeve.py` | The mixer body in its resting position, drawn as a ghost by the configurator, never exported |
 | `sections.png` | Cross-sections through the lip and the end stop |
 
 ## Rebuild
@@ -35,6 +36,13 @@ uv run make_3mf.py mixer_sleeve.stl --settings print_settings.json \
 
 For another printer, save any project in Bambu Studio or OrcaSlicer with your
 printer and filament, and pass that `.3mf` as `--template`.
+
+To adjust the sleeve with sliders instead, run the configurator from the repo
+root and open <http://127.0.0.1:8765/>:
+
+```bash
+uv run skills/cad-print-design/scripts/serve.py projects/mixer-sleeve/mixer_sleeve.py --port 8765
+```
 
 ## Named sides and features
 
