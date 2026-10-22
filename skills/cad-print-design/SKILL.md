@@ -36,7 +36,20 @@ Copy `scripts/render_views.py` from this skill into the project. It declares its
 Use `assets/example_mixer_sleeve.py` as a working reference. It's a complete sleeve with lips, 45° lip fills, hex vents, a low end stop, a slope and mount marks. The shape of a good script:
 
 1. **A printer block first:** `NOZZLE`, `LINE` (about 1.1 × nozzle) and `LAYER`. Then express every thickness as a count of those: `WALL = 6 * LINE`, `BASE = 11 * LAYER`. Use lines for thicknesses that lie across the bed in the print orientation, and layers for thicknesses that stack upward. When the user changes nozzle or layer height, the whole part re-tunes. Assert that no wall is thinner than two lines.
-2. **Parameters at the top, in mm, named after the features.** For example `WALL`, `BASE`, `LIP`, `LIP_FREE`, `END_H`, `HOLE_PATTERN`, with a one-line comment each. A user request should map to changing one or two of these. Derived values (`IN_D`, `OUT_H`, ...) come next.
+2. **Parameters at the top, in mm, named after the features, in groups.** For example `WALL`, `BASE`, `LIP`, `LIP_FREE`, `END_H`, `HOLE_PATTERN`, with a one-line comment each. A user request should map to changing one or two of these. Derived values (`IN_D`, `OUT_H`, ...) come next.
+   Start every project with the settings in groups, because the configurator (section 6b) draws each group as a collapsible section. A group is a comment line with an emoji and a short name above its settings, and runs until the next such line:
+
+   ```python
+   # 🎛️ Mixer body size in mm. Measure your mixer.
+   MIX_W = 189.0   # Width, left to right, on the open short side. [100:300]
+   MIX_H = 31.0    # Body thickness with feet, without knobs. [10:80]
+
+   # 🖨️ Printer. The part prints flat, so X and Y use lines and Z uses layers.
+   NOZZLE = 0.4
+   LINE = 0.45     # Line width, about 1.1 x the nozzle.
+   ```
+
+   The device comes first, then the printer, then one group per feature family (shell, end stop, lips, vents, mount). Pick an emoji that reads as the feature. Give the device sizes a `[min:max]` so they get sliders.
 3. **One `build()` in a design frame** that is easy to reason about, for example X along the slide, Y across, Z off the back plate.
 4. **Exports:**
    - `<part>.step` in the *use* orientation (as mounted), for CAD viewing.
@@ -92,8 +105,9 @@ The script stores the settings on the object, and object settings override the t
 
 For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. `serve.py` runs the model locally and `configurator.html` is the page.
 
-1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A comment line above a block of settings is the group title. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
+1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A comment line above a block of settings is the group: its leading emoji is the group's icon and the first sentence its title, and the group runs until the next heading. The page shows each group as a collapsible section, the first one open. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
 2. Add a `device()` function that returns the device as a CadQuery shape in its resting position. The page draws it as a translucent ghost inside the shell. It is never exported.
+2b. Describe the features in a `features()` function: `{"Left lip": {"at": (x, y, z), "normal": (0, 0, 1), "params": ["LIP", "LIP_T"]}, ...}` in the model's own frame. Build `labels()` for the views from it, so the tags and the page share one table. In the page, clicking a feature highlights its settings on the left and clicking a setting's name shows its feature on the part.
 3. Add a launcher for the project in `.claude/launch.json` at the repo root, so the page opens in the Claude browser pane:
 
 ```json
@@ -104,7 +118,7 @@ For a part built around a device, give the user a page where they can adjust the
 
 Then start it with the browser `preview_start` tool by name, or by hand with `uv run skills/cad-print-design/scripts/serve.py <model>.py --port 8765`.
 
-The page has Rebuild, an auto-rebuild switch, Download STL and STEP, and Save to script, which writes the values back into the Python file and keeps every comment. The server needs no CadQuery itself: it keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve) and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, Download STL and STEP, and Save to script, which writes the values back into the Python file and keeps every comment. The server needs no CadQuery itself: it keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (about 5 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
 
 ## 7. Each iteration
 

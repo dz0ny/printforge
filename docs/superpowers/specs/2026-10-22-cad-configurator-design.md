@@ -32,6 +32,10 @@ see it inside the shell and change its size.
   a separate environment) and the STEP is exported only on download. A crash
   shows up in the build log and the worker restarts on the next build. Rebuild
   is a button, with an optional auto-rebuild.
+- Builds are cached in memory, keyed on the model source and the values, so the
+  same input never builds twice. The last eight stay in memory; nothing goes to disk.
+- Groups: a heading comment's leading emoji is the group icon, and the page shows
+  each group as a collapsible card, MakerWorld style, in a light theme only.
 - "Save to script" writes the values back into the Python file. The committed
   script stays the source of truth.
 - Each project gets an entry in `.claude/launch.json`, so the page opens in the

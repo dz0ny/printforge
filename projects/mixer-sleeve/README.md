@@ -22,7 +22,7 @@ reachable through the open front, and the rear jacks stay free at the top.
 | `make_3mf.py` | Builds the 3MF from the STL, the settings and the template |
 | `labels.json` | Named anchor points that `render_views.py` draws as tags |
 | `render_views.py` | Renders the labeled views in `views/` |
-| `device()` in `mixer_sleeve.py` | The mixer body in its resting position, drawn as a ghost by the configurator, never exported |
+| `device()`, `features()` in `mixer_sleeve.py` | The mixer body as a ghost for the configurator, and the named features with the settings behind each, used for the view tags and for click-to-highlight |
 | `sections.png` | Cross-sections through the lip and the end stop |
 
 ## Rebuild
@@ -60,20 +60,20 @@ Use these names when you ask for a change.
 | Bottom slope | The 45° run from the walls down to the end stop |
 | Back vents | 11.5 mm hexes in the back. The side walls are solid since the first print broke there |
 | Floor fillet | The 6 mm rounding between the walls and the back plate |
-| Gussets | Four 10 mm ribs at 45° on the outside of each wall, 40 mm apart, bracing the wall to the back plate |
+| Gussets | Optional 10 mm ribs at 45° on the outside of each wall, off by default (`GUSSETS`) |
 
 ## Main settings
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 189 × 248 × 25 mm | Mixer body, measured without knobs. The first print at 191 had 2 mm of side play |
+| `MIX_W × MIX_D × MIX_H` | 189 × 248 × 31 mm | Mixer body, measured without knobs. The first print at 191 had 2 mm of side play |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 50 mm | Outer side wall height, so the lips clear the mixer |
+| `WALL_H` | 41 mm | Outer side wall height, so the lips clear the mixer |
 | `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
 | `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
 | `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
-| `GUSSET`, `GUSSET_T`, `GUSSET_PITCH` | 10 mm, 2.7 mm, 40 mm | Outside gusset reach and height, thickness, spacing |
+| `GUSSETS` | off | Ribs on the outside of each wall, 10 mm at 45°, 40 mm apart, for a stiffer wall joint |
 | `BASE` | 3.08 mm | 11 layers at 0.28 mm |
 | `LIP`, `LIP_T` | 8 mm, 1.96 mm | Lip reach and thickness |
 | `LIP_FREE` | 60 mm | No lip on this length at the open end |
@@ -82,7 +82,7 @@ Use these names when you ask for a change.
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |
 
-Outside size: 217.2 × 50 × 213.5 mm, gussets included; 197.2 mm across the walls.
+Outside size: 197.2 × 41 × 213.5 mm.
 
 ## Print settings
 

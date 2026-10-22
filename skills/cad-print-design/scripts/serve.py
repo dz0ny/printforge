@@ -16,6 +16,7 @@ interpreter that runs the server.
 """
 import argparse
 import ast
+import hashlib
 import json
 import math
 import os
@@ -57,9 +58,18 @@ def is_param(node):
 
 
 def clean_title(line):
-    """The first sentence of a heading comment, without the final period."""
+    """The first sentence of a heading comment, without the final period, as (icon, title).
+
+    A heading may start with an emoji, for example `# 🎛️ Mixer body size in mm.`;
+    that leading symbol is the group's icon.
+    """
     text = line.lstrip("#").strip()
-    return text.split(". ")[0].rstrip(".").strip()
+    text = text.split(". ")[0].rstrip(".").strip()
+    icon = None
+    parts = text.split(None, 1)
+    if len(parts) == 2 and not any(ch.isalnum() for ch in parts[0]):
+        icon, text = parts
+    return icon, text
 
 
 def num(text):
@@ -92,14 +102,17 @@ def parse_model(path):
     for node in head:
         starts.setdefault(node.lineno, []).append(node)
         covered.update(range(node.lineno + 1, node.end_lineno + 1))
-    groups, pending, title = {}, [], None
+    groups, icons, pending, title = {}, {}, [], None
     for lineno in range(1, stop):
         if lineno in starts:
             for node in starts[lineno]:
                 # A comment block directly above a statement starts a new group,
                 # which runs until the next such block. Blank lines do not end it.
                 if pending and isinstance(node, ast.Assign):
-                    title = clean_title(pending[0]) or title
+                    icon, text = clean_title(pending[0])
+                    if text:
+                        title = text
+                        icons[title] = icon
                 pending = []
                 if is_param(node):
                     groups.setdefault(title or "Settings", []).append(param_of(node, lines))
@@ -112,7 +125,7 @@ def parse_model(path):
         elif not text:
             pending = []
     has_device = any(isinstance(n, ast.FunctionDef) and n.name == "device" for n in tree.body)
-    return [{"title": t, "params": ps} for t, ps in groups.items()], has_device
+    return [{"title": t, "icon": icons.get(t), "params": ps} for t, ps in groups.items()], has_device
 
 
 def param_table(path):
@@ -185,8 +198,26 @@ def build_once(cq, model, overrides, out):
     if callable(device):
         cq.exporters.export(device(), str(out / "device.stl"), tolerance=0.02, angularTolerance=0.1)
     bb = solid.BoundingBox()
-    info = {"bbox": [bb.xlen, bb.ylen, bb.zlen], "volume_cm3": solid.Volume() / 1000}
+    info = {"bbox": [bb.xlen, bb.ylen, bb.zlen], "volume_cm3": solid.Volume() / 1000,
+            "features": feature_list(ns)}
     return part, info, callable(device)
+
+
+def feature_list(ns):
+    """The model's features() as a list the page can use, or [] when it has none.
+
+    features() returns {name: {"at": (x, y, z), "normal": (nx, ny, nz), "params": [names]}}
+    in the same frame as the exported meshes.
+    """
+    fn = ns.get("features")
+    if not callable(fn):
+        return []
+    out = []
+    for name, f in fn().items():
+        out.append({"name": name, "at": [float(v) for v in f["at"]],
+                    "normal": [float(v) for v in f.get("normal", (0, 0, 1))],
+                    "params": list(f.get("params", []))})
+    return out
 
 
 def worker(model_path):
@@ -287,48 +318,88 @@ class Server(ThreadingHTTPServer):
         self.page = page
         self.lock = threading.Lock()
         self.count = 0
-        self.last = None  # {"n", "root", "out", "device"} of the last successful build
+        self.last = None  # The current build entry, see run_build.
+        self.cache = {}  # key -> entry, in memory only, newest last. See build_key.
         self.worker = Worker(model)
+        self.worker_key = None  # The key of the build the worker holds for STEP export.
+
+
+CACHE_SIZE = 8  # Builds kept in memory; a mesh is a few MB.
+
+
+def build_key(model, values):
+    """A build is the model source plus the values, so the same input never builds twice."""
+    h = hashlib.sha256(model.read_bytes())
+    h.update(json.dumps(values, sort_keys=True).encode("utf-8"))
+    return h.hexdigest()
 
 
 def run_build(srv, values):
     with srv.lock:
+        key = build_key(srv.model, values)
+        entry = srv.cache.get(key)
+        if entry is None:
+            entry = build_entry(srv, key, values)
+            if not entry["ok"]:
+                return {"ok": False, "log": entry["log"]}
+            srv.cache[key] = entry
+            while len(srv.cache) > CACHE_SIZE:
+                del srv.cache[next(iter(srv.cache))]
+        else:
+            srv.cache[key] = srv.cache.pop(key)  # Mark it as the newest.
         srv.count += 1
         n = srv.count
-        root = Path(tempfile.mkdtemp(prefix="cad-configurator-"))
-        out = root / f"build-{n}"
-        out.mkdir()
+        srv.last = entry
+        cached = entry.get("served", False)
+        entry["served"] = True
+        return {"ok": True, "build": n, "seconds": 0.0 if cached else entry["seconds"], "cached": cached,
+                "log": entry["log"], "bbox": entry["info"]["bbox"], "volume_cm3": entry["info"]["volume_cm3"],
+                "features": entry["info"].get("features", []),
+                "shell": f"/api/mesh/shell.stl?build={n}",
+                "device": f"/api/mesh/device.stl?build={n}" if entry["device"] is not None else None}
+
+
+def build_entry(srv, key, values):
+    """Run the worker once and keep everything it produced in memory."""
+    root = Path(tempfile.mkdtemp(prefix="cad-configurator-"))
+    try:
         t0 = time.monotonic()
-        reply = srv.worker.request({"cmd": "build", "values": values, "out": str(out)})
+        reply = srv.worker.request({"cmd": "build", "values": values, "out": str(root)})
         secs = time.monotonic() - t0
         log = reply.get("log", "")
         if not reply.get("ok"):
-            shutil.rmtree(root, ignore_errors=True)
             return {"ok": False, "log": log}
-        info = reply["info"]
-        has_device = reply["device"]
-        prev = srv.last
-        srv.last = {"n": n, "root": root, "out": out, "device": has_device}
-        if prev:
-            shutil.rmtree(prev["root"], ignore_errors=True)
-        return {"ok": True, "build": n, "seconds": round(secs, 2), "log": log,
-                "bbox": info["bbox"], "volume_cm3": info["volume_cm3"],
-                "shell": f"/api/mesh/shell.stl?build={n}",
-                "device": f"/api/mesh/device.stl?build={n}" if has_device else None}
+        srv.worker_key = key
+        device = root / "device.stl"
+        return {"ok": True, "key": key, "values": values, "seconds": round(secs, 2), "log": log,
+                "info": reply["info"], "shell": (root / "shell.stl").read_bytes(),
+                "device": device.read_bytes() if device.exists() else None, "step": None}
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def export_step(srv):
-    """Write the STEP of the last build on demand; it is too slow to do on every build."""
+    """The STEP of the current build, exported on demand and then kept in memory."""
     with srv.lock:
-        last = srv.last
-        if not last:
+        entry = srv.last
+        if not entry:
             return None, "no build yet"
-        f = last["out"] / "shell.step"
-        if not f.exists():
-            reply = srv.worker.request({"cmd": "step", "out": str(f)})
-            if not reply.get("ok"):
-                return None, reply.get("log", "STEP export failed")
-        return f.read_bytes(), None
+        if entry["step"] is None:
+            if srv.worker_key != entry["key"]:
+                # The worker holds another build (a cache hit): rebuild it there first.
+                fresh = build_entry(srv, entry["key"], entry["values"])
+                if not fresh["ok"]:
+                    return None, fresh["log"]
+            root = Path(tempfile.mkdtemp(prefix="cad-configurator-"))
+            try:
+                f = root / "shell.step"
+                reply = srv.worker.request({"cmd": "step", "out": str(f)})
+                if not reply.get("ok"):
+                    return None, reply.get("log", "STEP export failed")
+                entry["step"] = f.read_bytes()
+            finally:
+                shutil.rmtree(root, ignore_errors=True)
+        return entry["step"], None
 
 
 def save_values(srv, values):
@@ -393,13 +464,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _mesh(self, name):
         last = self.server.last
-        f = last and last["out"] / name
-        if not f or not f.exists():
+        data = last and last[name]
+        if not data:
             return self._json(404, {"ok": False, "error": "no mesh for the last build"})
-        try:
-            data = f.read_bytes()
-        except FileNotFoundError:
-            return self._json(404, {"ok": False, "error": "build was replaced"})
         self._send(200, data, "model/stl", {"Cache-Control": "no-store"})
 
     def do_GET(self):
@@ -415,9 +482,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"model": srv.model.name, "groups": groups,
                                         "has_device": has_device})
             if path == "/api/mesh/shell.stl":
-                return self._mesh("shell.stl")
+                return self._mesh("shell")
             if path == "/api/mesh/device.stl":
-                return self._mesh("device.stl")
+                return self._mesh("device")
             if path == "/api/step":
                 data, err = export_step(srv)
                 if err:
@@ -469,8 +536,6 @@ def main():
     finally:
         srv.server_close()
         srv.worker.stop()
-        if srv.last:
-            shutil.rmtree(srv.last["root"], ignore_errors=True)
 
 
 if __name__ == "__main__":

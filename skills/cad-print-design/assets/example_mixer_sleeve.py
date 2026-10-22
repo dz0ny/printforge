@@ -7,53 +7,53 @@ Run `uv run mixer_sleeve.py` to write the STEP and the STL.
 import cadquery as cq
 from cadquery.selectors import BoxSelector
 
-# Mixer body size in mm. Measure your mixer.
+# 🎛️ Mixer body size in mm. Measure your mixer.
 MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
 MIX_D = 248.0   # Depth, front to back, along the slide axis. [100:400]
-MIX_H = 25.0    # Body thickness with feet, without knobs. [10:80]
+MIX_H = 31.0    # Body thickness with feet, without knobs. [10:80]
 
-# Printer settings. The part prints flat on its back, so X and Y use lines and Z uses layers.
+# 🖨️ Printer. The part prints flat on its back, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
 LINE = 0.45        # Line width, about 1.1 x the nozzle.
 LAYER = 0.28
 
-# Sleeve settings in mm.
+# 📐 Sleeve. Sizes in mm.
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
-
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 50.0     # Outer side wall height, floor to lip top. [20:100]
+WALL_H = 41.0     # Outer side wall height, floor to lip top. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
+FILLET = 6.0      # Fillet between the side walls and the base.
+ROUND = 1.0       # Radius on the outer edges and lip tips.
 
+# 🛑 End stop. The mixer rests on it.
 END = 6 * LINE    # End stop thickness, 6 lines: 3 wall loops on each side, no infill.
 END_H = 16.0      # End stop height, low for the curved mixer edge.
+END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 
+# 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
 LIP = 8.0         # Lip reach over the mixer edge.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
 LIP_FREE = 60.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
-# A 45 degree fill under each lip lets the part print flat on its back.
 
-FILLET = 6.0      # Fillet between the side walls and the base.
-END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
-ROUND = 1.0       # Radius on the outer edges and lip tips.
-
-# Gussets on the outside of each wall. The part prints flat, so the wall to
+# 🧱 Gussets. Ribs on the outside of each wall. The part prints flat, so the wall to
 # floor joint is only layer adhesion. A 45 degree rib spreads a side knock
 # over many layers and still prints without supports.
+GUSSETS = False    # Ribs on the outside of the walls. Off: the walls are smooth.
 GUSSET = 10.0      # Gusset reach out from the wall and height up the wall.
 GUSSET_T = 6 * LINE  # Gusset thickness along the slide axis, 6 lines.
 GUSSET_PITCH = 40.0  # Distance between gussets.
 GUSSET_FIRST = 20.0  # First gusset, measured from the open end.
 
-# Mount points on the back. Each one gets a small mark in a solid pad.
+# 🔩 Mount marks. Each mount point on the back gets a small mark in a solid pad.
 HOLE_PATTERN = (80.0, 80.0)  # Spacing in X and Y of the back mount.
 MARK_D = 3.0       # Mark diameter.
 MARK_DEPTH = 3 * LAYER  # Mark depth into the back face, 3 layers.
 PAD_R = 17.0       # Radius of the solid pad around each mark.
 
-# Hex vents on all walls, with the hex points along the print Z axis.
+# 🕳️ Vents. Hexes with their points along the print Z axis.
 VENT_HEX = 11.5     # Back vent hex size across the corners.
 SIDE_HEX = 9.0      # Side vent hex size.
 SIDE_VENTS = False  # The side vents weakened the walls. The back vents are enough.
@@ -94,7 +94,7 @@ def hole_points():
 def gusset_points(lip_end):
     """Return the X centres of the gussets, from the open end up to the lips' end."""
     pts, x = [], GUSSET_FIRST
-    while x + GUSSET_T / 2 <= lip_end:
+    while GUSSETS and x + GUSSET_T / 2 <= lip_end:
         pts.append(x)
         x += GUSSET_PITCH
     return pts
@@ -241,27 +241,53 @@ def device():
     return box(LEN - MIX_D, WALL + CLEAR, BASE, LEN, WALL + CLEAR + MIX_W, BASE + MIX_H)
 
 
+def features():
+    """Named features: an anchor on the surface, its outward normal, and the settings behind it.
+
+    The configurator highlights these settings when the feature is clicked, and
+    `labels()` turns the anchors into the tags on the rendered views.
+    """
+    pts = hole_points()
+    lip_end = TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
+    f = {
+        "Back plate": ((TOTAL_LEN / 2, OUT_D / 2, -0.5), (0, 0, -1),
+                       ["BASE", "VENT_HEX", "VENT_WEB", "VENT_MARGIN"]),
+        "Mount mark M1": ((pts[0][0], pts[0][1], -0.5), (0, 0, -1),
+                          ["MARK_D", "MARK_DEPTH", "PAD_R"]),
+        "Left wall": ((TOTAL_LEN / 2, -0.5, OUT_H / 2), (0, -1, 0),
+                      ["WALL", "WALL_H", "FILLET", "SIDE_VENTS", "SIDE_HEX"]),
+        "Right wall": ((TOTAL_LEN / 2, OUT_D + 0.5, OUT_H / 2), (0, 1, 0),
+                       ["WALL", "WALL_H", "FILLET", "SIDE_VENTS", "SIDE_HEX"]),
+        "Open end": ((-0.5, WALL / 2, OUT_H / 2), (-1, 0, 0), ["SLEEVE_H", "LIP_FREE"]),
+        "End stop": ((TOTAL_LEN + 0.5, OUT_D / 2, END_H / 2), (1, 0, 0),
+                     ["END", "END_H", "END_FILLET", "CLEAR"]),
+        "Left lip": (((LIP_FREE + lip_end) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1),
+                     ["LIP", "LIP_T", "LIP_SLOPE_GAP", "CLEAR_TOP"]),
+        "Right lip": (((LIP_FREE + lip_end) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1),
+                      ["LIP", "LIP_T", "LIP_SLOPE_GAP", "CLEAR_TOP"]),
+        "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1), ["LIP_FREE"]),
+        "Bottom slope": ((TOTAL_LEN - (OUT_H - END_H) / 2, WALL / 2, (OUT_H + END_H) / 2),
+                         (0.7, 0, 0.7), ["END_H", "WALL_H", "LIP_SLOPE_GAP"]),
+        "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1),
+                  ["BASE", "CLEAR", "MIX_W", "MIX_H"]),
+        "Mixer": ((LEN - MIX_D / 2, OUT_D / 2, BASE + MIX_H + 0.5), (0, 0, 1),
+                  ["MIX_W", "MIX_D", "MIX_H", "CLEAR", "CLEAR_TOP"]),
+    }
+    if GUSSETS:
+        f["Gusset"] = ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7),
+                       ["GUSSETS", "GUSSET", "GUSSET_T", "GUSSET_PITCH", "GUSSET_FIRST"])
+    return {name: {"at": at, "normal": n, "params": params} for name, (at, n, params) in f.items()}
+
+
 def labels(rb):
     """Return named anchors in the upright frame for render_views.py."""
-    pts = hole_points()
-    design = {
-        "Back plate": ((TOTAL_LEN / 2, OUT_D / 2, -0.5), (0, 0, -1)),
-        "Mount mark M1": ((pts[0][0], pts[0][1], -0.5), (0, 0, -1)),
-        "Left wall": ((TOTAL_LEN / 2, -0.5, OUT_H / 2), (0, -1, 0)),
-        "Right wall": ((TOTAL_LEN / 2, OUT_D + 0.5, OUT_H / 2), (0, 1, 0)),
-        "Open end": ((-0.5, WALL / 2, OUT_H / 2), (-1, 0, 0)),
-        "End stop": ((TOTAL_LEN + 0.5, OUT_D / 2, END_H / 2), (1, 0, 0)),
-        "Left lip": (((LIP_FREE + LEN) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1)),
-        "Right lip": (((LIP_FREE + LEN) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1)),
-        "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1)),
-        "Bottom slope": ((TOTAL_LEN - (OUT_H - END_H) / 2, WALL / 2, (OUT_H + END_H) / 2), (0.7, 0, 0.7)),
-        "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1)),
-        "Gusset": ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7)),
-    }
     # The upright export turns (x, y, z) into (z, y, -x) and then moves it to the origin.
     out = {"_views": {"left": "Mount face", "right": "Knob side", "top": "Open end",
                       "bottom": "End stop", "front": "Left wall", "back": "Right wall"}}
-    for name, ((x, y, z), (nx, ny, nz)) in design.items():
+    for name, f in features().items():
+        if name == "Mixer":
+            continue  # The mixer is not part of the printed part.
+        (x, y, z), (nx, ny, nz) = f["at"], f["normal"]
         out[name] = {"at": [z - rb.xmin, y - rb.ymin, -x - rb.zmin], "normal": [nz, ny, -nx]}
     return out
 

@@ -9,21 +9,21 @@
 </script>
 <style>
 :root {
-  --bg: #f4f6f8; --panel: #ffffff; --fg: #1c2330; --muted: #6b7480; --line: #e1e5eb;
-  --accent: #2563eb; --accent-fg: #ffffff; --dirty: #fff3c4; --err: #b42318; --err-bg: #fdecea;
-  --viewer: #e9edf2; --input: #ffffff; --btn: #ffffff;
+  --bg: #f4f6f8; --panel: #ffffff; --panel-2: #f6f7f9; --fg: #1c2330; --muted: #6b7480; --line: #e1e5eb;
+  --accent: #2563eb; --accent-fg: #ffffff; --amber: #d97706; --dirty: #fff3c4; --err: #b42318; --err-bg: #fdecea; --dim: #15803d;
+  --viewer: #e9edf2; --viewer-grad: linear-gradient(180deg, #f3f5f8, #e6eaf0); --input: #ffffff; --btn: #ffffff;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
-    --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f;
+    --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80; --dim: #4ade80;
     --viewer: #0f1319; --input: #11151c; --btn: #242b37;
   }
 }
 :root[data-theme="dark"] {
   --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
-  --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f;
+  --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80;
   --viewer: #0f1319; --input: #11151c; --btn: #242b37;
 }
 * { box-sizing: border-box; }
@@ -33,54 +33,149 @@ body {
   background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
   font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Header: 56 px, one 36 px control height */
 header {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
-  padding: 8px 14px; background: var(--panel); border-bottom: 1px solid var(--line);
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 8px;
+  height: 56px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
-#model { font-family: var(--mono); font-weight: 600; margin-right: auto; }
+#model {
+  font-size: 14px; font-weight: 600; margin-right: auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#saveMsg { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+#saveMsg.err { color: var(--err); }
 button, .btn {
-  font: inherit; color: var(--fg); background: var(--btn); border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px 10px; cursor: pointer; text-decoration: none;
-  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--btn); border: 1px solid var(--line);
+  border-radius: 8px; height: 36px; padding: 0 12px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
 }
+button:hover:not(:disabled) { border-color: #cdd4dd; }
 button:disabled { opacity: .55; cursor: default; }
-button.primary, #rebuild { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-button.link {
-  background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px;
-  text-transform: none; letter-spacing: 0; cursor: pointer;
-}
-.check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
-#status { color: var(--muted); font-variant-numeric: tabular-nums; }
-#saveMsg { color: var(--muted); font-size: 12.5px; }
-#saveMsg.err, #status.err { color: var(--err); }
+#rebuild { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+#rebuild:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.06); }
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; font-size: 13px; }
 .spin {
   display: none; width: 12px; height: 12px; border: 2px solid currentColor;
   border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
 }
 #rebuild.busy .spin { display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toggle switches */
+input[type=checkbox] {
+  -webkit-appearance: none; appearance: none; position: relative; flex: none;
+  width: 36px; height: 20px; margin: 0; border-radius: 10px; background: #cdd4dd; cursor: pointer;
+  transition: background .15s;
+}
+input[type=checkbox]::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .25); transition: transform .15s;
+}
+input[type=checkbox]:checked { background: var(--accent); }
+input[type=checkbox]:checked::after { transform: translateX(16px); }
+
+/* Dropdown menus */
+.dd { position: relative; }
+.dd > button[aria-expanded="true"] { border-color: var(--accent); }
+.menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 220px;
+  display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, .12);
+}
+.menu > a, .menu > label {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 36px; padding: 0 10px;
+  border-radius: 8px; color: var(--fg); text-decoration: none; white-space: nowrap; font-size: 13px;
+}
+.menu > a:hover, .menu > label:hover { background: var(--panel-2); }
+.menu > a[hidden], .menu > label[hidden] { display: none; }
+
 main { flex: 1; display: flex; min-height: 0; }
+
+/* Panel: cards on a light grey background */
 aside {
-  width: 320px; flex: none; overflow-y: auto; background: var(--panel);
+  width: 340px; flex: none; overflow-y: auto; background: var(--panel-2);
   border-right: 1px solid var(--line); display: flex; flex-direction: column;
 }
-#groups { flex: 1; padding: 4px 0; }
-.group h2 {
-  font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
-  margin: 0; padding: 14px 14px 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+#groups { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ghead {
+  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 8px 0 14px;
+  cursor: pointer; user-select: none;
 }
-.row { padding: 8px 14px; border-left: 3px solid transparent; }
-.row.dirty { background: var(--dirty); border-left-color: var(--accent); }
-.row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.name { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
-.desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
-.row-head > div:last-child { flex: none; padding-top: 1px; }
-input[type=number] {
-  width: 92px; font: inherit; padding: 4px 6px; background: var(--input); color: var(--fg);
-  border: 1px solid var(--line); border-radius: 5px; text-align: right;
+.ghead:hover { background: var(--panel-2); }
+.ghead:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.gicon { flex: none; width: 20px; text-align: center; font-size: 16px; line-height: 1; }
+.gtitle {
+  flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
-#logbox { margin-top: auto; border-top: 1px solid var(--line); padding: 8px 14px; }
+.gdot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.icon-btn {
+  flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); font-size: 15px; line-height: 1; justify-content: center;
+}
+.icon-btn:hover:not(:disabled) { color: var(--accent); background: var(--panel-2); border: 0; }
+.chev { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); transition: transform .15s; }
+.chev-ico { display: block; }
+button .chev-ico { margin-left: 4px; vertical-align: -2px; color: var(--muted); }
+.group.open > .ghead .chev { transform: rotate(180deg); }
+.gbody { border-top: 1px solid var(--line); }
+.gbody[hidden] { display: none; }
+
+/* Parameter rows */
+.row { position: relative; padding: 12px 14px; }
+.row + .row { border-top: 1px solid var(--line); }
+.row.dirty::before, .row.selected::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.row.dirty::before { background: var(--amber); }
+.row.selected::after { background: var(--accent); }
+.row.dirty.selected::before { left: 3px; }
+.row.selected { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; min-width: 0; cursor: pointer; }
+.name:hover .ptitle { text-decoration: underline; }
+.ptitle { font-size: 13px; font-weight: 600; }
+.ptag { font: 11px/1.2 var(--mono); color: var(--muted); }
+.row-head > div:last-child { flex: none; }
+
+/* Number field with flat steppers */
+.numctl {
+  display: inline-flex; align-items: stretch; flex: none; height: 36px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--input);
+}
+.numctl:focus-within { outline: 2px solid var(--accent); outline-offset: 0; }
+.numctl input {
+  width: 60px; border: 0; border-radius: 0; padding: 0 2px; background: transparent; color: var(--fg);
+  font: 13px var(--mono); text-align: center; outline: none; -moz-appearance: textfield;
+}
+.numctl input::-webkit-outer-spin-button, .numctl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.numctl .step {
+  width: 28px; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent;
+  color: var(--muted); font-size: 16px; line-height: 1; justify-content: center;
+}
+.numctl .step:hover:not(:disabled) { color: var(--fg); background: var(--panel-2); border: 0; }
+.numctl .step:disabled { opacity: .35; }
+
+/* Slider: 4 px track, accent fill up to the thumb */
+.rowbottom { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 4px; margin: 0; border-radius: 2px; cursor: pointer;
+  background: linear-gradient(to right, var(--accent) var(--p, 0%), var(--line) var(--p, 0%));
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--accent); box-shadow: 0 1px 2px rgba(16, 24, 40, .2);
+}
+input[type=range]::-moz-range-thumb {
+  box-sizing: border-box; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--accent); box-shadow: 0 1px 2px rgba(16, 24, 40, .2);
+}
+input[type=range]::-moz-range-track { height: 4px; background: transparent; }
+input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+/* Build log */
+#logbox { margin-top: auto; border-top: 1px solid var(--line); padding: 8px 14px; background: var(--panel); }
 #logbox summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 #logbox pre {
   font: 11.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word;
@@ -88,15 +183,40 @@ input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
 }
 #logbox.error { background: var(--err-bg); }
 #logbox.error summary, #logbox.error pre { color: var(--err); }
-#viewer { flex: 1; position: relative; min-width: 0; background: var(--viewer); overflow: hidden; }
+
+/* Viewer */
+#viewer { flex: 1; position: relative; min-width: 0; background: var(--viewer-grad, var(--viewer)); overflow: hidden; }
 #viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; }
-#tools button { background: var(--panel); padding: 4px 9px; font-size: 12.5px; }
-#info {
-  position: absolute; left: 12px; bottom: 10px; font-variant-numeric: tabular-nums;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px;
+#tools {
+  position: absolute; top: 12px; right: 12px; display: flex; padding: 3px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
 }
+#tools button {
+  height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; font-size: 13px;
+}
+#tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
+#readout {
+  position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-start;
+  gap: 8px; padding: 12px; max-width: calc(100% - 24px); pointer-events: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+}
+#info { font: 12px/1.4 var(--mono); color: var(--fg); white-space: nowrap; }
 #info:empty { display: none; }
+#hint { font-size: 12px; color: var(--muted); }
+#flabel, #ftip {
+  position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 999px;
+  padding: 4px 10px; font-size: 12px;
+}
+#flabel { border-color: var(--accent); }
+#flabel b { margin-right: 6px; font-weight: 600; }
+#flabel .fp { font: 11px var(--mono); color: var(--muted); margin-right: 6px; }
+#ftip { font-weight: 600; }
+.dimlabel {
+  position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
+  font: 600 12px/1 var(--mono); color: var(--dim); background: var(--panel);
+  border: 1px solid var(--dim); border-radius: 999px; padding: 4px 8px;
+}
 @media (max-width: 799px) {
   html, body { height: auto; }
   main { flex-direction: column; flex: none; }
@@ -109,13 +229,24 @@ input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
 <header>
   <span id="model">loading...</span>
   <button id="rebuild" disabled><span class="spin"></span>Rebuild</button>
-  <label class="check"><input type="checkbox" id="auto"> Auto rebuild</label>
-  <label class="check" id="devWrap" hidden><input type="checkbox" id="showDev" checked> Show device</label>
-  <a class="btn" id="dlStl" href="/api/mesh/shell.stl" download="part.stl">Download STL</a>
-  <a class="btn" id="dlStep" href="/api/step" download="part.step">Download STEP</a>
+  <div class="dd" id="viewWrap">
+    <button id="viewBtn" aria-haspopup="true" aria-expanded="false">View <svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="menu" id="viewMenu" hidden>
+      <label class="check mi"><input type="checkbox" id="auto"> Auto rebuild</label>
+      <label class="check mi" id="devWrap" hidden><input type="checkbox" id="showDev" checked> Show device</label>
+      <label class="check mi"><input type="checkbox" id="showDims" checked> Dimensions</label>
+    </div>
+  </div>
+  <div class="dd" id="dlWrap">
+    <button id="dlBtn" aria-haspopup="true" aria-expanded="false" disabled>Download <svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="menu" id="dlMenu" hidden>
+      <a id="dlSleeve" href="/api/mesh/shell.stl" download="part.stl">Sleeve STL</a>
+      <a id="dlStep" href="/api/step" download="part.step">Sleeve STEP</a>
+      <a id="dlDev" href="/api/mesh/device.stl" download="device.stl" hidden>Device STL</a>
+    </div>
+  </div>
   <button id="save" disabled>Save to script</button>
   <span id="saveMsg"></span>
-  <span id="status"></span>
 </header>
 <main>
   <aside>
@@ -132,16 +263,22 @@ input[type=range] { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
       <button data-view="top">Top</button>
       <button data-view="front">Front</button>
     </div>
-    <div id="info"></div>
+    <div id="readout">
+      <div id="info"></div>
+      <div id="hint">Click a feature to see its settings</div>
+    </div>
   </section>
 </main>
 <script type="module">
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 const json = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-const state = { values: {}, initial: {}, built: {}, ctl: {}, busy: false, queued: false, timer: 0, ready: false };
+const state = {
+  values: {}, initial: {}, built: {}, ctl: {}, busy: false, queued: false, timer: 0, ready: false,
+  features: [], selected: null, groups: new Map(),
+};
+let viewer = null;
 
-function setStatus(text, bad) { const s = $('status'); s.textContent = text || ''; s.className = bad ? 'err' : ''; }
 function showLog(text, bad) {
   $('log').textContent = text || '(no output)';
   $('logbox').classList.toggle('error', !!bad);
@@ -153,9 +290,13 @@ function setBusy(on) {
   b.disabled = on || !state.ready;
 }
 function markDirty() {
+  const dirtyGroups = new Set();
   for (const name in state.ctl) {
-    state.ctl[name].row.classList.toggle('dirty', state.values[name] !== state.built[name]);
+    const d = state.values[name] !== state.built[name];
+    state.ctl[name].row.classList.toggle('dirty', d);
+    if (d) dirtyGroups.add(state.ctl[name].group);
   }
+  for (const [title, g] of state.groups) g.dot.hidden = !dirtyGroups.has(title);
 }
 function changed() {
   markDirty();
@@ -164,33 +305,42 @@ function changed() {
 }
 function setValue(name, v) { state.values[name] = v; changed(); }
 
+// Highlight the rows of a feature, scroll to the first, and move the viewer marker.
+// name = null clears the selection.
+function select(name, at) {
+  const f = name ? state.features.find((x) => x.name === name) : null;
+  state.selected = f ? f.name : null;
+  const rows = f ? f.params.filter((pn) => state.ctl[pn]) : [];
+  for (const pn in state.ctl) state.ctl[pn].row.classList.toggle('selected', rows.includes(pn));
+  for (const pn of rows) setGroupOpen(state.ctl[pn].group, true); // open first, so the row can be scrolled to
+  if (rows.length) state.ctl[rows[0]].row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (f) $('hint').hidden = true;
+  viewer?.setMarker(f, at);
+}
+
 async function build() {
   if (!state.ready) return;
   if (state.busy) { state.queued = true; return; }
   state.busy = true; state.queued = false;
   const snap = { ...state.values };
-  const t0 = performance.now();
   setBusy(true);
-  setStatus('Building... 0 s');
-  const tick = setInterval(() => setStatus(`Building... ${Math.round((performance.now() - t0) / 1000)} s`), 250);
   try {
     const r = await fetch('/api/build', json({ values: snap }));
     const res = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}: invalid response` }));
     showLog(res.log, !res.ok);
     if (res.ok) {
       state.built = snap;
-      setStatus(`Build ${res.build} · ${res.seconds.toFixed(1)} s`);
-      $('info').textContent = `${res.bbox.map((v) => v.toFixed(1)).join(' × ')} mm · ${Math.round(res.volume_cm3)} cm³ · ${Math.round(res.seconds)} s`;
+      state.features = res.features || [];
+      $('info').textContent = `${res.bbox.map((v) => v.toFixed(1)).join(' × ')} mm · ${Math.round(res.volume_cm3)} cm³ · ${res.cached ? 'cached' : Math.round(res.seconds) + ' s'}`;
+      $('dlBtn').disabled = false;
+      $('dlDev').hidden = !res.device;
       const v = await viewerReady;
       if (v) await v.show(res);
-    } else {
-      setStatus('Build failed', true);
+      select(state.selected); // re-anchor the same feature, or clear if it is gone
     }
   } catch (e) {
     showLog(String(e), true);
-    setStatus('Build failed', true);
   } finally {
-    clearInterval(tick);
     state.busy = false;
     setBusy(false);
     markDirty();
@@ -198,16 +348,23 @@ async function build() {
   }
 }
 
-function makeRow(p) {
+function makeRow(p, group) {
   const row = el('div', 'row');
   const head = el('div', 'row-head');
   const left = el('div');
-  const name = el('div', 'name'); name.textContent = p.name;
-  const desc = el('div', 'desc'); desc.textContent = p.description || '';
-  left.append(name, desc);
+  const name = el('div', 'name');
+  const title = el('span', 'ptitle'); title.textContent = p.description || p.name;
+  const tag = el('span', 'ptag'); tag.textContent = p.name;
+  name.append(title, tag);
+  name.addEventListener('click', () => {
+    const f = state.features.find((x) => x.params.includes(p.name));
+    if (f) select(f.name);
+  });
+  left.append(name);
   const ctl = el('div');
+  head.append(left, ctl);
+  row.append(head);
   let sync;
-  let rng = null;
   if (p.type === 'bool') {
     const cb = el('input'); cb.type = 'checkbox';
     cb.addEventListener('change', () => setValue(p.name, cb.checked));
@@ -215,54 +372,116 @@ function makeRow(p) {
     sync = (v) => { cb.checked = !!v; };
   } else {
     const step = Number.isInteger(p.value) ? 1 : 0.1;
+    const clamp = (v) => Math.min(p.max ?? Infinity, Math.max(p.min ?? -Infinity, v));
+    const numctl = el('div', 'numctl');
+    const minus = el('button', 'step'); minus.type = 'button'; minus.textContent = '−'; minus.title = 'Decrease';
+    const plus = el('button', 'step'); plus.type = 'button'; plus.textContent = '+'; plus.title = 'Increase';
     const num = el('input'); num.type = 'number'; num.step = step;
+    numctl.append(minus, num, plus);
+    let rng = null;
+    const paint = (r) => r.style.setProperty('--p', `${Math.min(100, Math.max(0, ((r.value - r.min) / (r.max - r.min)) * 100))}%`);
+    const bounds = (v) => {
+      minus.disabled = p.min != null && v <= p.min;
+      plus.disabled = p.max != null && v >= p.max;
+    };
+    const stepBy = (dir) => {
+      const cur = parseFloat(num.value);
+      const base = Number.isNaN(cur) ? state.values[p.name] : cur;
+      const v = clamp(Number((base + dir * step).toFixed(6)));
+      sync(v);
+      setValue(p.name, v);
+    };
+    minus.addEventListener('click', () => stepBy(-1));
+    plus.addEventListener('click', () => stepBy(1));
     num.addEventListener('input', () => {
       const v = parseFloat(num.value);
       if (Number.isNaN(v)) return;
       setValue(p.name, v);
-      if (rng) rng.value = v;
+      if (rng) { rng.value = v; paint(rng); }
+      bounds(v);
     });
-    ctl.append(num);
     if (p.min != null || p.max != null) {
       rng = el('input'); rng.type = 'range'; rng.step = step;
       rng.min = p.min ?? 0;
       rng.max = p.max ?? Math.max(10, p.value * 2);
       rng.addEventListener('input', () => {
+        paint(rng);
         num.value = rng.value;
+        bounds(parseFloat(rng.value));
         setValue(p.name, parseFloat(rng.value));
       });
+      // MakerWorld layout: value box on the left of the slider, under the title.
+      const bottom = el('div', 'rowbottom');
+      bottom.append(numctl, rng);
+      row.append(bottom);
+    } else {
+      ctl.append(numctl);
     }
-    sync = (v) => { num.value = v; if (rng) rng.value = v; };
+    sync = (v) => { num.value = v; if (rng) { rng.value = v; paint(rng); } bounds(v); };
   }
   sync(p.value);
-  state.ctl[p.name] = { row, sync };
-  head.append(left, ctl);
-  row.append(head);
-  if (rng) row.append(rng);
+  state.ctl[p.name] = { row, sync, group };
   return row;
 }
 
-function renderPanel(groups) {
+// Accordion state, remembered per model in localStorage (storage may be unavailable).
+let groupKey = 'cfg.groups.';
+let openMap = {};
+function loadOpen() {
+  try { return JSON.parse(localStorage.getItem(groupKey)) || {}; } catch (e) { return {}; }
+}
+function saveOpen() {
+  try { localStorage.setItem(groupKey, JSON.stringify(openMap)); } catch (e) { /* ignore */ }
+}
+function setGroupOpen(title, open, persist = true) {
+  const g = state.groups.get(title);
+  if (!g) return;
+  g.sec.classList.toggle('open', open);
+  g.body.hidden = !open;
+  g.head.setAttribute('aria-expanded', String(open));
+  if (persist) { openMap[title] = open; saveOpen(); }
+}
+
+function renderPanel(groups, model) {
+  groupKey = `cfg.groups.${model}`;
+  openMap = loadOpen();
   const wrap = $('groups');
-  for (const g of groups) {
+  groups.forEach((g, i) => {
     const sec = el('section', 'group');
-    const h = el('h2');
-    h.append(g.title);
-    const reset = el('button', 'link');
+    const head = el('div', 'ghead');
+    head.tabIndex = 0;
+    head.setAttribute('role', 'button');
+    const icon = el('span', 'gicon'); icon.textContent = g.icon || '▪';
+    const title = el('span', 'gtitle'); title.textContent = g.title;
+    const dot = el('span', 'gdot'); dot.hidden = true; dot.title = 'Changed, not built yet';
+    const reset = el('button', 'icon-btn');
     reset.type = 'button';
-    reset.textContent = 'Reset';
-    reset.addEventListener('click', () => {
+    reset.textContent = '↺';
+    reset.title = 'Reset group';
+    reset.setAttribute('aria-label', 'Reset group');
+    reset.addEventListener('click', (e) => {
+      e.stopPropagation();
       for (const p of g.params) {
         state.values[p.name] = state.initial[p.name];
         state.ctl[p.name].sync(state.initial[p.name]);
       }
       changed();
     });
-    h.append(reset);
-    sec.append(h);
-    for (const p of g.params) sec.append(makeRow(p));
+    const chev = el('span', 'chev'); chev.innerHTML = '<svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    head.append(icon, title, dot, reset, chev);
+    const body = el('div', 'gbody');
+    for (const p of g.params) body.append(makeRow(p, g.title));
+    sec.append(head, body);
     wrap.append(sec);
-  }
+    state.groups.set(g.title, { sec, head, body, dot });
+    const toggle = () => setGroupOpen(g.title, body.hidden);
+    head.addEventListener('click', toggle);
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+    // First group open by default; the rest closed unless remembered.
+    setGroupOpen(g.title, g.title in openMap ? !!openMap[g.title] : i === 0, false);
+  });
 }
 
 async function init() {
@@ -272,25 +491,48 @@ async function init() {
     const data = await r.json();
     const stem = data.model.replace(/\.py$/, '');
     $('model').textContent = data.model;
-    $('dlStl').download = `${stem}.stl`;
-    $('dlStep').download = `${stem}.step`;
+    $('dlSleeve').textContent = `${stem}.stl`; $('dlSleeve').download = `${stem}.stl`;
+    $('dlStep').textContent = `${stem}.step`; $('dlStep').download = `${stem}.step`;
+    $('dlDev').textContent = `${stem}_device.stl`; $('dlDev').download = `${stem}_device.stl`;
     $('devWrap').hidden = !data.has_device;
     for (const g of data.groups) {
       for (const p of g.params) { state.values[p.name] = p.value; state.initial[p.name] = p.value; }
     }
     state.built = { ...state.values };
-    renderPanel(data.groups);
+    renderPanel(data.groups, data.model);
     state.ready = true;
     $('save').disabled = false;
     setBusy(false);
     build();
   } catch (e) {
     showLog(`Could not load parameters: ${e.message}`, true);
-    setStatus('No parameters', true);
   }
 }
 
 $('rebuild').addEventListener('click', build);
+
+// Header dropdowns: one open at a time; close on outside click, Escape, or picking a download.
+const menus = [];
+function setupMenu(wrapId, btnId, menuId) {
+  const wrap = $(wrapId), btn = $(btnId), menu = $(menuId);
+  const m = {
+    wrap,
+    close: () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); },
+  };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = menu.hidden;
+    for (const x of menus) x.close();
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+  menu.addEventListener('click', (e) => { if (e.target.closest('a')) m.close(); });
+  menus.push(m);
+}
+setupMenu('viewWrap', 'viewBtn', 'viewMenu');
+setupMenu('dlWrap', 'dlBtn', 'dlMenu');
+document.addEventListener('click', (e) => { for (const m of menus) if (!m.wrap.contains(e.target)) m.close(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') for (const m of menus) m.close(); });
 $('save').addEventListener('click', async () => {
   const msg = $('saveMsg'), btn = $('save');
   btn.disabled = true; msg.className = ''; msg.textContent = 'Saving...';
@@ -311,6 +553,7 @@ $('save').addEventListener('click', async () => {
   }
 });
 $('showDev').addEventListener('change', async () => (await viewerReady)?.setDevice($('showDev').checked));
+$('showDims').addEventListener('change', async () => (await viewerReady)?.setDims($('showDims').checked));
 document.querySelectorAll('#tools button').forEach((b) =>
   b.addEventListener('click', async () => (await viewerReady)?.view(b.dataset.view)));
 
@@ -357,7 +600,157 @@ function makeViewer(T, STLLoader, OrbitControls) {
   };
   new ResizeObserver(resize).observe(host);
   resize();
-  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+  // Feature marker, label overlay and tooltip.
+  const accent = new T.Color(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2563eb');
+  // Unit sphere; show() scales it to 0.4% of the part size, clamped to [0.3, 1.5] mm.
+  const marker = new T.Mesh(new T.SphereGeometry(1, 16, 12), new T.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }));
+  marker.visible = false;
+  scene.add(marker);
+  const label = el('div'); label.id = 'flabel'; label.hidden = true;
+  const tip = el('div'); tip.id = 'ftip'; tip.hidden = true;
+  host.append(label, tip);
+  const canvas = renderer.domElement;
+  let features = [], anchored = null, anchorPos = null;
+  const placeLabel = () => {
+    if (!anchored) return;
+    const p = anchorPos.clone();
+    if (p.clone().sub(camera.position).dot(camera.getWorldDirection(new T.Vector3())) <= 0) { label.hidden = true; return; }
+    p.project(camera);
+    label.hidden = false;
+    label.style.transform = `translate(${((p.x + 1) / 2) * host.clientWidth + 10}px, ${((1 - p.y) / 2) * host.clientHeight - 28}px)`;
+  };
+  // Overall-size dimensions: grey bounding box and extension lines, green dimension
+  // lines with end ticks, and HTML labels. Kept out of the raycast targets.
+  const DIM_GREEN = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dim').trim().slice(1), 16) || 0x15803d;
+  const DIM_GREY = 0x6b7480;
+  const dimGroup = new T.Group();
+  scene.add(dimGroup);
+  let dimsOn = true, box = null, dimLabels = [];
+  const clearDims = () => {
+    for (const c of dimGroup.children) { c.geometry.dispose(); c.material.dispose(); }
+    dimGroup.clear();
+    for (const d of dimLabels) d.el.remove();
+    dimLabels = [];
+  };
+  const rebuildDims = () => {
+    clearDims();
+    if (!dimsOn || !box) return;
+    const { min, max } = box;
+    const size = box.getSize(new T.Vector3());
+    const L = Math.max(size.x, size.y, size.z);
+    const off = 0.06 * L, tk = 0.015 * L;
+    const grey = [], green = [];
+    const seg = (list, a, b) => list.push(new T.Vector3(...a), new T.Vector3(...b));
+    const corner = (i) => [i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z];
+    for (let i = 0; i < 8; i++) {
+      for (const bit of [1, 2, 4]) if (!(i & bit)) seg(grey, corner(i), corner(i | bit));
+    }
+    // X along the front-bottom edge, Y along the right-bottom edge, Z along the front-right vertical edge.
+    const xo = min.y - off, yo = max.x + off, zo = min.y - off;
+    seg(grey, corner(0), [min.x, xo, min.z]);
+    seg(grey, corner(1), [max.x, xo, min.z]);
+    seg(grey, corner(1), [yo, min.y, min.z]);
+    seg(grey, corner(3), [yo, max.y, min.z]);
+    seg(grey, corner(1), [yo, zo, min.z]);
+    seg(grey, corner(5), [yo, zo, max.z]);
+    seg(green, [min.x, xo, min.z], [max.x, xo, min.z]);
+    seg(green, [min.x, xo, min.z - tk], [min.x, xo, min.z + tk]);
+    seg(green, [max.x, xo, min.z - tk], [max.x, xo, min.z + tk]);
+    seg(green, [yo, min.y, min.z], [yo, max.y, min.z]);
+    seg(green, [yo, min.y, min.z - tk], [yo, min.y, min.z + tk]);
+    seg(green, [yo, max.y, min.z - tk], [yo, max.y, min.z + tk]);
+    seg(green, [yo, zo, min.z], [yo, zo, max.z]);
+    seg(green, [yo - tk, zo, min.z], [yo + tk, zo, min.z]);
+    seg(green, [yo - tk, zo, max.z], [yo + tk, zo, max.z]);
+    const lines = (pts, color, opacity) => {
+      const m = new T.LineBasicMaterial({ color, transparent: opacity < 1, opacity, depthTest: false });
+      const o = new T.LineSegments(new T.BufferGeometry().setFromPoints(pts), m);
+      o.renderOrder = 1;
+      dimGroup.add(o);
+    };
+    lines(grey, DIM_GREY, 0.6);
+    lines(green, DIM_GREEN, 1);
+    const dims = [
+      { at: [(min.x + max.x) / 2, xo, min.z], v: size.x },
+      { at: [yo, (min.y + max.y) / 2, min.z], v: size.y },
+      { at: [yo, zo, (min.z + max.z) / 2], v: size.z },
+    ];
+    for (const d of dims) {
+      const e = el('div', 'dimlabel');
+      e.textContent = `${d.v.toFixed(1)} mm`;
+      host.append(e);
+      dimLabels.push({ el: e, at: new T.Vector3(...d.at) });
+    }
+  };
+  const camDir = new T.Vector3();
+  const placeDimLabels = () => {
+    if (!dimLabels.length) return;
+    camera.getWorldDirection(camDir);
+    const w = host.clientWidth, h = host.clientHeight;
+    for (const d of dimLabels) {
+      if (d.at.clone().sub(camera.position).dot(camDir) <= 0) { d.el.hidden = true; continue; }
+      const p = d.at.clone().project(camera);
+      d.el.hidden = false;
+      d.el.style.transform = `translate(${((p.x + 1) / 2) * w}px, ${((1 - p.y) / 2) * h}px) translate(-50%, -50%)`;
+    }
+  };
+
+  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); placeLabel(); placeDimLabels(); });
+
+  // Raycast the shell (and the device ghost when visible) and return the feature
+  // whose anchor is nearest to the hit, or null when nothing is within 60 mm.
+  const ray = new T.Raycaster();
+  const ndc = new T.Vector2();
+  const featureAt = (x, y) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const targets = [];
+    if (shell) targets.push(shell);
+    if (device && device.visible) targets.push(device);
+    const hit = ray.intersectObjects(targets, false)[0];
+    if (!hit || !features.length) return null;
+    // A device hit selects Mixer with no distance check; the marker then sits at the hit point.
+    if (hit.object === device) {
+      const mixer = features.find((f) => f.name === 'Mixer');
+      if (mixer) return { f: mixer, at: hit.point.clone() };
+    }
+    const dist = (f) => hit.point.distanceTo(new T.Vector3(...f.at));
+    const pick = features.reduce((best, f) => (!best || dist(f) < dist(best) ? f : best), null);
+    return dist(pick) <= 60 ? { f: pick, at: null } : null;
+  };
+
+  // A click is a press and release within 4 px; anything more is an orbit drag.
+  let downAt = null, hoverAt = null, hoverFrame = 0;
+  canvas.addEventListener('pointerdown', (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointercancel', () => { downAt = null; });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!downAt) return;
+    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4;
+    downAt = null;
+    if (!moved) {
+      const r = featureAt(e.clientX, e.clientY);
+      select(r ? r.f.name : null, r?.at);
+    }
+  });
+  const hideTip = () => { tip.hidden = true; canvas.style.cursor = ''; };
+  canvas.addEventListener('pointermove', (e) => {
+    hoverAt = { x: e.clientX, y: e.clientY, dragging: e.buttons !== 0 };
+    if (hoverFrame) return;
+    hoverFrame = requestAnimationFrame(() => {
+      hoverFrame = 0;
+      if (!hoverAt) return hideTip();
+      const picked = hoverAt.dragging ? null : featureAt(hoverAt.x, hoverAt.y);
+      const f = picked && picked.f;
+      if (!f) return hideTip();
+      const r = host.getBoundingClientRect();
+      tip.textContent = f.name;
+      tip.style.transform = `translate(${hoverAt.x - r.left + 14}px, ${hoverAt.y - r.top + 14}px)`;
+      tip.hidden = false;
+      canvas.style.cursor = 'pointer';
+    });
+  });
+  canvas.addEventListener('pointerleave', () => { hoverAt = null; hideTip(); });
 
   const frame = (dir) => {
     const v = T.MathUtils.degToRad(camera.fov) / 2;
@@ -383,8 +776,23 @@ function makeViewer(T, STLLoader, OrbitControls) {
 
   return {
     view,
+    probe: (x, y) => featureAt(x, y),  // for debugging from the console
     setDevice(on) { devOn = on; if (device) device.visible = on; },
+    setDims(on) { dimsOn = on; rebuildDims(); },
+    setMarker(f, at) {
+      anchored = f || null;
+      marker.visible = !!f;
+      label.hidden = !f;
+      if (!f) return;
+      anchorPos = at ? at.clone() : new T.Vector3(...f.at);
+      marker.position.copy(anchorPos);
+      label.replaceChildren();
+      const b = el('b'); b.textContent = f.name; label.append(b);
+      for (const pn of f.params) { const s = el('span', 'fp'); s.textContent = pn; label.append(s); }
+      placeLabel();
+    },
     async show(b) {
+      features = b.features || [];
       const [sg, dg] = await Promise.all([load(b.shell), b.device ? load(b.device) : null]);
       drop(shell); drop(device);
       shell = mesh(sg, shellMat); root.add(shell);
@@ -395,6 +803,9 @@ function makeViewer(T, STLLoader, OrbitControls) {
       center = bb.getCenter(new T.Vector3());
       const s = bb.getSize(new T.Vector3());
       radius = s.length() / 2;
+      marker.scale.setScalar(Math.min(1.5, Math.max(0.3, 0.004 * Math.max(s.x, s.y, s.z))));
+      box = bb.clone();
+      rebuildDims();
       if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
       const g = Math.max(10, Math.ceil((Math.max(s.x, s.y) * 1.5) / 10) * 10);
       grid = new T.GridHelper(g, g / 10, 0x8a939e, 0xb8c0ca);
@@ -406,7 +817,7 @@ function makeViewer(T, STLLoader, OrbitControls) {
   };
 }
 
-const viewerReady = loadViewer();
+const viewerReady = loadViewer().then((v) => (viewer = v, window.__viewer = v));
 init();
 </script>
 </body>

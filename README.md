@@ -78,6 +78,9 @@ How it evolved, one plain-language request at a time:
 | "The wall is not high enough, needs to be 5 cm" | Walls 50 mm, a named `WALL_H` setting |
 | "Narrow it, the mixer slides left and right" | Inside width 192 → 190 mm |
 | "After printing the side broke off" | Side vents removed, 3.6 mm walls, 6 mm floor fillet, 45° gussets outside each wall |
+| "Remove these legs" | Gussets behind a `GUSSETS` switch, off |
+| "Make the viewer interactive" | Click a feature in the configurator and its settings light up on the left |
+| "MakerWorld has this toggle that shows dimensions" | Dimensions toggle: bounding box with the three sizes on the part |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.
 
