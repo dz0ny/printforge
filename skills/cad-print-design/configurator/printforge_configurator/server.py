@@ -228,6 +228,30 @@ def feature_list(ns):
     return out
 
 
+DRAWING_VIEWS = {
+    "top": ((0, 0, 1), (0, 1, 0)),
+    "front": ((0, -1, 0), (0, 0, 1)),
+    "right": ((1, 0, 0), (0, 0, 1)),
+    "iso": ((1, -1, 0.8), (0, 0, 1)),
+}
+
+
+def drawing_views(cq, part, out):
+    """Orthographic SVG projections with dashed hidden lines, as strings keyed by view."""
+    views = {}
+    for name, (direction, up) in DRAWING_VIEWS.items():
+        f = out / f"{name}.svg"
+        cq.exporters.export(part, str(f), opt={
+            "projectionDir": direction, "showHidden": True, "width": 800, "height": 600,
+            "marginLeft": 20, "marginTop": 20, "strokeWidth": 0.5, "hiddenColor": (120, 120, 120)})
+        svg = f.read_text(encoding="utf-8")
+        # CadQuery writes width and height but no viewBox; the page needs one to fit the view.
+        if "viewBox" not in svg:
+            svg = svg.replace('height="600.0"', 'height="600.0" viewBox="0 0 800 600"', 1)
+        views[name] = svg
+    return views
+
+
 def worker(model_path):
     """Read one JSON request per line on stdin and answer one JSON line on stdout.
 
@@ -261,6 +285,10 @@ def worker(model_path):
                         raise RuntimeError("no build yet")
                     cq.exporters.export(last, req["out"])
                     reply = {"ok": True}
+                elif req["cmd"] == "drawing":
+                    if last is None:
+                        raise RuntimeError("no build yet")
+                    reply = {"ok": True, "views": drawing_views(cq, last, Path(req["out"]))}
         except Exception:
             buf.write(traceback.format_exc())
         reply["log"] = buf.getvalue()
@@ -386,6 +414,28 @@ def build_entry(srv, key, values):
         shutil.rmtree(root, ignore_errors=True)
 
 
+def export_drawing(srv):
+    """The drawing views of the current build, made on demand and kept with the entry."""
+    with srv.lock:
+        entry = srv.last
+        if not entry:
+            return None, "no build yet"
+        if entry.get("drawing") is None:
+            if srv.worker_key != entry["key"]:
+                fresh = build_entry(srv, entry["key"], entry["values"])
+                if not fresh["ok"]:
+                    return None, fresh["log"]
+            root = Path(tempfile.mkdtemp(prefix="cad-configurator-"))
+            try:
+                reply = srv.worker.request({"cmd": "drawing", "out": str(root)})
+                if not reply.get("ok"):
+                    return None, reply.get("log", "drawing failed")
+                entry["drawing"] = reply["views"]
+            finally:
+                shutil.rmtree(root, ignore_errors=True)
+        return {"ok": True, "key": entry["key"], "bbox": entry["info"]["bbox"], "views": entry["drawing"]}, None
+
+
 def export_step(srv):
     """The STEP of the current build, exported on demand and then kept in memory."""
     with srv.lock:
@@ -493,6 +543,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._mesh("shell")
             if path == "/api/mesh/device.stl":
                 return self._mesh("device")
+            if path == "/api/drawing":
+                data, err = export_drawing(srv)
+                if err:
+                    return self._json(200, {"ok": False, "log": err})
+                return self._json(200, data)
             if path == "/api/step":
                 data, err = export_step(srv)
                 if err:

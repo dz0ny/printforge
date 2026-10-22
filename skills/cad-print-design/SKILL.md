@@ -101,6 +101,25 @@ An STL carries no settings. Also write a 3MF that opens in Bambu Studio or OrcaS
 
 The script stores the settings on the object, and object settings override the template's process (verified: 110 layers at 0.28 mm on a project set to 0.20 mm). The G-code header still prints the project values, so count layers instead of trusting the header. Without a template, the 3MF still has the geometry and the object settings. Bambu's command line cannot slice it with the stock presets, and the behaviour in the app is not verified, so prefer a template.
 
+## 5b. Checks a render hides
+
+Run the checker after every build, before looking at the views:
+
+```bash
+uv run check_part.py <model>.py            # add --overhang 55 or --min-wall 1.2 per part
+```
+
+It builds the model and reports, with an exit code for scripts:
+
+- validity and that the part is one solid,
+- walls thinner than two lines, found by casting rays inward from the surface and reported as an area, so a hairline notch where a fillet ends does not fail the part but a sliver or a blocked channel does,
+- knife edges, where two faces fold back on each other,
+- overlap with `device()`: the floor fillet running into a device's square edge, a stop that is in the way,
+- `keep_clear()` volumes: a list of shapes that must stay empty, such as a water channel, a screw's access, or the path a plug travels. Define it in the model next to `device()`,
+- overhangs in the print orientation, read from the exported STL.
+
+Model the device honestly: feet, edge radii, beads and hooks. The gutter outlet's bead and the mixer's rubber feet both changed what the checks found. When a check fails, fix the geometry, not the threshold; a per-part threshold is fine when the part really needs it, and the README says so.
+
 ## 6b. Interactive configurator
 
 For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. The `printforge-configurator` package in `configurator/` is the server and the page; it needs no CadQuery itself.
@@ -136,7 +155,7 @@ For a part built around a device, give the user a page where they can adjust the
     "port": 8765}
    ```
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Download menu with the shell STL, the shell STEP and the device STL, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view with top, front, right and isometric projections, hidden lines dashed and overall sizes, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
 
 ## 7. Each iteration
 

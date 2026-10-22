@@ -102,6 +102,8 @@ How it evolved, one plain-language request at a time:
 | "Remove these legs" | Gussets behind a `GUSSETS` switch, off |
 | "Make the viewer interactive" | Click a feature in the configurator and its settings light up on the left |
 | "MakerWorld has this toggle that shows dimensions" | Dimensions toggle: bounding box with the three sizes on the part |
+| "Can we have a technical drawing in the viewer?" | Drawing view: top, front, right and iso with hidden lines and sizes, downloadable as SVG |
+| "See if we can have a script that spots these" | `check_part.py`: thin walls, knife edges, device overlap, keep-clear volumes, overhangs. It found a funnel outlet blocked by its own collar, and a mixer that could not pass under its own lips |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.
 
@@ -192,7 +194,7 @@ uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-prin
 
 | Path | What it is |
 |---|---|
-| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, example |
+| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, part checker, example |
 | `skills/cad-print-design/configurator/` | The `printforge-configurator` package: the live configurator server and page |
 | `.claude/launch.json` | Launchers that open each project's configurator in the Claude browser pane |
 | `projects/` | Parts designed with the skill, each one rebuildable with `uv run` |

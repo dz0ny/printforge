@@ -41,7 +41,7 @@ header {
   height: 56px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line);
 }
 #model {
-  font-size: 14px; font-weight: 600; margin-right: auto; min-width: 0;
+  font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 #saveMsg { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
@@ -62,6 +62,15 @@ button:disabled { opacity: .55; cursor: default; }
 }
 #rebuild.busy .spin { display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 3D / Drawing segmented control */
+.seg {
+  display: inline-flex; flex: none; height: 36px; padding: 3px; gap: 2px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
+}
+.seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; }
+.seg button:hover:not(:disabled) { border: 0; color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--panel); box-shadow: 0 1px 2px rgba(16, 24, 40, .12); font-weight: 600; }
 
 /* Toggle switches */
 input[type=checkbox] {
@@ -195,6 +204,17 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
   height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; font-size: 13px;
 }
 #tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
+/* Drawing sheet, shown in place of the 3D view */
+#sheet { position: absolute; inset: 0; overflow: auto; padding: 16px; }
+#sheetPaper svg { display: block; width: 100%; min-width: 720px; height: auto; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
+#sheetMsg {
+  position: absolute; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
+}
+#sheetMsg.err { color: var(--err); }
+#sheetMsg .spin { display: inline-block; }
+#viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
+#viewer.drawing #ftip, #viewer.drawing .dimlabel { display: none !important; }
 #readout {
   position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-start;
   gap: 8px; padding: 12px; max-width: calc(100% - 24px); pointer-events: none;
@@ -228,6 +248,10 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 <body>
 <header>
   <span id="model">loading...</span>
+  <div class="seg" id="modeSeg" role="group" aria-label="View mode">
+    <button type="button" data-mode="3d" aria-pressed="true">3D</button>
+    <button type="button" data-mode="drawing" aria-pressed="false">Drawing</button>
+  </div>
   <button id="rebuild" disabled><span class="spin"></span>Rebuild</button>
   <div class="dd" id="viewWrap">
     <button id="viewBtn" aria-haspopup="true" aria-expanded="false">View <svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -242,6 +266,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
     <div class="menu" id="dlMenu" hidden>
       <a id="dlSleeve" href="/api/mesh/shell.stl" download="part.stl">Sleeve STL</a>
       <a id="dlStep" href="/api/step" download="part.step">Sleeve STEP</a>
+      <a id="dlDrawing" href="#">Drawing SVG</a>
       <a id="dlDev" href="/api/mesh/device.stl" download="device.stl" hidden>Device STL</a>
     </div>
   </div>
@@ -267,6 +292,10 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
       <div id="info"></div>
       <div id="hint">Click a feature to see its settings</div>
     </div>
+    <section id="sheet" hidden>
+      <div id="sheetPaper"></div>
+      <div id="sheetMsg" hidden></div>
+    </section>
   </section>
 </main>
 <script type="module">
@@ -275,7 +304,7 @@ const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.cla
 const json = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const state = {
   values: {}, initial: {}, built: {}, ctl: {}, busy: false, queued: false, timer: 0, ready: false,
-  features: [], selected: null, groups: new Map(),
+  features: [], selected: null, groups: new Map(), buildKey: null, model: '', stem: 'part',
 };
 let viewer = null;
 
@@ -331,12 +360,14 @@ async function build() {
     if (res.ok) {
       state.built = snap;
       state.features = res.features || [];
+      state.buildKey = res.key ?? null;
       $('info').textContent = `${res.bbox.map((v) => v.toFixed(1)).join(' × ')} mm · ${Math.round(res.volume_cm3)} cm³ · ${res.cached ? 'cached' : Math.round(res.seconds) + ' s'}`;
       $('dlBtn').disabled = false;
       $('dlDev').hidden = !res.device;
       const v = await viewerReady;
       if (v) await v.show(res);
       select(state.selected); // re-anchor the same feature, or clear if it is gone
+      if (drawingMode) ensureDrawing();
     }
   } catch (e) {
     showLog(String(e), true);
@@ -491,6 +522,7 @@ async function init() {
     const data = await r.json();
     const stem = data.model.replace(/\.py$/, '');
     $('model').textContent = data.model;
+    state.model = data.model; state.stem = stem;
     $('dlSleeve').textContent = `${stem}.stl`; $('dlSleeve').download = `${stem}.stl`;
     $('dlStep').textContent = `${stem}.step`; $('dlStep').download = `${stem}.step`;
     $('dlDev').textContent = `${stem}_device.stl`; $('dlDev').download = `${stem}_device.stl`;
@@ -819,6 +851,318 @@ function makeViewer(T, STLLoader, OrbitControls) {
     },
   };
 }
+
+/* ---- Technical drawing sheet ---- */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const DIM_HEX = getComputedStyle(document.documentElement).getPropertyValue('--dim').trim() || '#15803d';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+const SHEET = { W: 960, H: 680, M: 12, TB: 40 };
+const SHEET_VIEWS = [
+  { key: 'top', title: 'Top (from +Z)', annotate: true },
+  { key: 'front', title: 'Front (from −Y)', annotate: true },
+  { key: 'right', title: 'Right (from +X)', annotate: true },
+  { key: 'iso', title: 'Isometric', annotate: false },
+];
+const f1 = (v) => Number(v).toFixed(1);
+const sv = (tag, attrs = {}, text) => {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (text != null) e.textContent = text;
+  return e;
+};
+let drawingMode = false, drawSeq = 0;
+const drawCache = new Map(); // build key -> payload
+
+function parseView(str) {
+  const doc = new DOMParser().parseFromString(str, 'image/svg+xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('invalid SVG');
+  const root = doc.documentElement;
+  let vb = (root.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+  if (vb.length !== 4 || vb.some(Number.isNaN)) {
+    vb = [0, 0, parseFloat(root.getAttribute('width')) || 100, parseFloat(root.getAttribute('height')) || 100];
+  }
+  return { root, vb };
+}
+
+const isGreyColor = (c) => {
+  if (c === 'grey' || c === 'gray') return true;
+  let m = c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/), rgb = null;
+  if (m) {
+    const h = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1];
+    rgb = [0, 2, 4].map((k) => parseInt(h.substr(k, 2), 16));
+  } else if ((m = c.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/))) rgb = m.slice(1).map(Number);
+  return !!rgb && rgb[0] === rgb[1] && rgb[1] === rgb[2] && rgb[0] > 0;
+};
+// Stroke and dash are inherited from the enclosing groups, so read them up the tree.
+const inherited = (e, name) => {
+  for (let n = e; n && n.getAttribute; n = n.parentNode) {
+    const v = n.getAttribute(name);
+    if (v != null) return v;
+  }
+  return null;
+};
+// Hidden edges are dashed or grey; visible edges are solid and not grey.
+function isHiddenEl(e) {
+  const dash = inherited(e, 'stroke-dasharray');
+  if (dash && dash.trim() !== 'none') return true;
+  const stroke = (inherited(e, 'stroke') || '').trim().toLowerCase();
+  return stroke === 'none' || isGreyColor(stroke);
+}
+
+// Root group transform "scale(SX, SY) translate(TX, TY)": page = (SX*(x+TX), SY*(y+TY)), path x/y in mm.
+function parseXf(root) {
+  const g = root.getElementsByTagName('g')[0];
+  const t = g && g.getAttribute('transform');
+  const m = t && t.match(/scale\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)\s*translate\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)/);
+  if (!m) return { SX: 1, SY: 1, TX: 0, TY: 0 };
+  return { SX: parseFloat(m[1]), SY: parseFloat(m[2]), TX: parseFloat(m[3]), TY: parseFloat(m[4]) };
+}
+
+// Polylines (arrays of [x, y]) of an SVG path d with absolute or relative M/L and Z; other commands end the path.
+function parsePolylines(d) {
+  const toks = d.match(/[MLZmlz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || [];
+  const isCmd = (t) => /[A-Za-z]/.test(t);
+  const lines = [];
+  let cur = null, x = 0, y = 0, sx = 0, sy = 0, cmd = '', i = 0;
+  while (i < toks.length) {
+    if (isCmd(toks[i])) cmd = toks[i++];
+    const up = cmd.toUpperCase(), rel = cmd !== up;
+    if (up === 'Z') { if (cur) cur.push([sx, sy]); x = sx; y = sy; cur = null; cmd = ''; continue; }
+    if (up !== 'M' && up !== 'L') break;
+    if (i + 1 >= toks.length || isCmd(toks[i]) || isCmd(toks[i + 1])) break;
+    let nx = parseFloat(toks[i++]), ny = parseFloat(toks[i++]);
+    if (Number.isNaN(nx) || Number.isNaN(ny)) break;
+    if (rel) { nx += x; ny += y; }
+    if (up === 'M') { cur = [[nx, ny]]; lines.push(cur); sx = nx; sy = ny; cmd = rel ? 'l' : 'L'; }
+    else { if (!cur) { cur = [[x, y]]; lines.push(cur); } cur.push([nx, ny]); }
+    x = nx; y = ny;
+  }
+  return lines;
+}
+
+// Merge consecutive steps whose direction changes by under 1 degree (tessellated arcs) into single runs [ax, ay, bx, by].
+function mergeRuns(pts, out) {
+  let s0 = pts[0], c = null;
+  const len = (p, q) => Math.hypot(q[0] - p[0], q[1] - p[1]);
+  for (let k = 1; k < pts.length; k++) {
+    const p = pts[k];
+    if (c === null) { if (len(s0, p) > 1e-9) c = p; continue; }
+    if (len(c, p) < 1e-9) continue;
+    const r = [c[0] - s0[0], c[1] - s0[1]], d = [p[0] - c[0], p[1] - c[1]];
+    const cos = (r[0] * d[0] + r[1] * d[1]) / (Math.hypot(r[0], r[1]) * Math.hypot(d[0], d[1]));
+    if (Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI < 1) c = p;
+    else { out.push([s0[0], s0[1], c[0], c[1]]); s0 = c; c = p; }
+  }
+  if (c !== null) out.push([s0[0], s0[1], c[0], c[1]]);
+}
+
+// Visible geometry of one orthographic view in mm: extent, ordinate levels and the mm-to-page mapping.
+function analyzeView(str) {
+  const { root, vb } = parseView(str);
+  const xf = parseXf(root);
+  const num = (e, n) => parseFloat(e.getAttribute(n));
+  const runs = [];
+  for (const e of [...root.getElementsByTagName('path'), ...root.getElementsByTagName('line')]) {
+    if (isHiddenEl(e)) continue;
+    if (e.localName === 'line') { mergeRuns([[num(e, 'x1'), num(e, 'y1')], [num(e, 'x2'), num(e, 'y2')]], runs); continue; }
+    for (const pl of parsePolylines(e.getAttribute('d') || '')) mergeRuns(pl, runs);
+  }
+  if (!runs.length) throw new Error('no visible edges');
+  const minOf = (arr) => arr.reduce((m, v) => Math.min(m, v), Infinity);
+  const maxOf = (arr) => arr.reduce((m, v) => Math.max(m, v), -Infinity);
+  const xa = [], ya = [];
+  for (const [a1, b1, a2, b2] of runs) xa.push(a1, a2), ya.push(b1, b2);
+  const x0 = minOf(xa), x1 = maxOf(xa), y0 = minOf(ya), y1 = maxOf(ya);
+  const E = Math.max(x1 - x0, y1 - y0);
+  if (!(E > 0)) throw new Error('degenerate drawing');
+  // Half a display pixel, in mm, for "vertical" and "horizontal".
+  const tolV = 0.5 / Math.abs(xf.SX), tolH = 0.5 / Math.abs(xf.SY);
+  const levels = (vertical, lo, hi) => {
+    const pts = [];
+    for (const [a1, b1, a2, b2] of runs) {
+      const len = Math.hypot(a2 - a1, b2 - b1);
+      if (len < 0.02 * E) continue;
+      if (vertical && Math.abs(a1 - a2) < tolV) pts.push([(a1 + a2) / 2, len]);
+      if (!vertical && Math.abs(b1 - b2) < tolH) pts.push([(b1 + b2) / 2, len]);
+    }
+    pts.sort((p, q) => p[0] - q[0]);
+    const tol = 0.006 * E, groups = [];
+    for (const [v, w] of pts) {
+      const g = groups[groups.length - 1];
+      if (g && v - g.start <= tol) { g.sum += v * w; g.w += w; } else groups.push({ start: v, sum: v * w, w });
+    }
+    let lv = groups.map((g) => ({ v: g.sum / g.w, w: g.w }));
+    for (const v of [lo, hi]) {
+      const near = lv.find((l) => Math.abs(l.v - v) <= tol);
+      if (near) near.v = v; else lv.push({ v, w: 0 });
+    }
+    if (lv.length > 14) {
+      const ext = lv.filter((l) => l.v === lo || l.v === hi);
+      const rest = lv.filter((l) => l.v !== lo && l.v !== hi).sort((p, q) => q.w - p.w).slice(0, 14);
+      lv = [...ext, ...rest];
+    }
+    return lv.sort((p, q) => p.v - q.v).map((l) => l.v);
+  };
+  const pX = (x) => xf.SX * (x + xf.TX), pY = (y) => xf.SY * (y + xf.TY);
+  const px = [pX(x0), pX(x1)], py = [pY(y0), pY(y1)];
+  const pb = { x0: Math.min(...px), x1: Math.max(...px), y0: Math.min(...py), y1: Math.max(...py) };
+  return { root, vb, E, x0, x1, y0, y1, xs: levels(true, x0, x1), ys: levels(false, y0, y1), pX, pY, pb };
+}
+
+// Ordinate chains in view (page) coordinates: X levels below the drawing, Y levels to its right.
+// Overlay sizes are given in sheet px and divided by the fit scale s, so text and ticks keep their size.
+function dimOverlay(a, s) {
+  const { pb, pX, pY, xs, ys, E: mmE } = a;
+  const E = Math.max(pb.x1 - pb.x0, pb.y1 - pb.y0);
+  const gap = 3 / s, tk = 4 / s, ar = 6 / s, fsv = 10 / s;
+  const f = (v) => v.toFixed(1).replace(/\.0$/, '');
+  const d = [], txt = [];
+  // X chain
+  const yb1 = pb.y1 + 0.08 * E, yb2 = yb1 + 0.06 * E;
+  const xp = xs.map(pX);
+  for (const x of xp) d.push(`M${x} ${pb.y1 + gap}V${yb1 + gap}`, `M${x - tk} ${yb1 + tk}L${x + tk} ${yb1 - tk}`);
+  d.push(`M${Math.min(...xp)} ${yb1}H${Math.max(...xp)}`);
+  for (let i = 0; i + 1 < xs.length; i++) {
+    if ((xs[i + 1] - xs[i]) / mmE >= 0.025) txt.push({ x: (xp[i] + xp[i + 1]) / 2, y: yb1 - 4 / s, t: f(xs[i + 1] - xs[i]) });
+  }
+  const xl = Math.min(...xp), xr = Math.max(...xp);
+  d.push(`M${xl} ${pb.y1 + gap}V${yb2 + gap}`, `M${xr} ${pb.y1 + gap}V${yb2 + gap}`, `M${xl} ${yb2}H${xr}`);
+  d.push(`M${xl + ar} ${yb2 - ar / 2}L${xl} ${yb2}L${xl + ar} ${yb2 + ar / 2}`, `M${xr - ar} ${yb2 - ar / 2}L${xr} ${yb2}L${xr - ar} ${yb2 + ar / 2}`);
+  txt.push({ x: (xl + xr) / 2, y: yb2 - 4 / s, t: f(xs[xs.length - 1] - xs[0]) });
+  // Y chain
+  const xr1 = pb.x1 + 0.08 * E, xr2 = xr1 + 0.06 * E;
+  const yp = ys.map(pY);
+  for (const y of yp) d.push(`M${pb.x1 + gap} ${y}H${xr1 + gap}`, `M${xr1 - tk} ${y + tk}L${xr1 + tk} ${y - tk}`);
+  d.push(`M${xr1} ${Math.min(...yp)}V${Math.max(...yp)}`);
+  for (let i = 0; i + 1 < ys.length; i++) {
+    if ((ys[i + 1] - ys[i]) / mmE >= 0.025) txt.push({ x: xr1 - 4 / s, y: (yp[i] + yp[i + 1]) / 2, t: f(ys[i + 1] - ys[i]), rot: true });
+  }
+  const yt = Math.min(...yp), yb = Math.max(...yp);
+  d.push(`M${pb.x1 + gap} ${yt}H${xr2 + gap}`, `M${pb.x1 + gap} ${yb}H${xr2 + gap}`, `M${xr2} ${yt}V${yb}`);
+  d.push(`M${xr2 - ar / 2} ${yt + ar}L${xr2} ${yt}L${xr2 + ar / 2} ${yt + ar}`, `M${xr2 - ar / 2} ${yb - ar}L${xr2} ${yb}L${xr2 + ar / 2} ${yb - ar}`);
+  txt.push({ x: xr2 - 4 / s, y: (yt + yb) / 2, t: f(ys[ys.length - 1] - ys[0]), rot: true });
+  const g = sv('g', { class: 'dimchain' });
+  g.append(sv('path', { d: d.join(''), stroke: DIM_HEX, 'stroke-width': 1 / s, fill: 'none' }));
+  for (const t of txt) {
+    const at = { x: t.x, y: t.y, 'text-anchor': 'middle', 'font-size': fsv, fill: DIM_HEX, 'font-family': MONO };
+    if (t.rot) at.transform = `rotate(-90 ${t.x} ${t.y})`;
+    g.append(sv('text', at, t.t));
+  }
+  return g;
+}
+
+const analysisCache = new WeakMap(); // payload object -> { view key: analysis | null }
+function analyzeAll(data) {
+  let out = analysisCache.get(data);
+  if (!out) {
+    out = {};
+    for (const v of SHEET_VIEWS) {
+      if (!v.annotate || !data.views || !data.views[v.key]) continue;
+      try { out[v.key] = analyzeView(data.views[v.key]); } catch (e) { out[v.key] = null; }
+    }
+    analysisCache.set(data, out);
+  }
+  return out;
+}
+
+// Standalone SVG: four cells; annotated views fit the page in the top-left 78% of the cell, leaving room for chains.
+function buildSheet(data) {
+  const { W, H, M, TB } = SHEET;
+  const x0 = M, y0 = M, x1 = W - M, y1 = H - M;
+  const cw = (x1 - x0) / 2, ch = (y1 - TB - 8 - y0) / 2;
+  const b = data.bbox;
+  const an = analyzeAll(data);
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'font-family': 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif' });
+  svg.append(sv('rect', { x: 0.5, y: 0.5, width: W - 1, height: H - 1, fill: '#ffffff', stroke: '#1c2330' }));
+  SHEET_VIEWS.forEach((v, i) => {
+    const cx = x0 + (i % 2) * cw, cy = y0 + Math.floor(i / 2) * ch;
+    svg.append(sv('rect', { x: cx + 0.5, y: cy + 0.5, width: cw - 1, height: ch - 1, fill: 'none', stroke: '#e1e5eb' }));
+    svg.append(sv('text', { x: cx + 12, y: cy + 22, 'font-size': 14, 'font-weight': 600, fill: '#1c2330' }, v.title));
+    const A = an[v.key];
+    let root = null, vb = null;
+    if (A) { root = A.root; vb = A.vb; } else {
+      try { const p = parseView(data.views[v.key]); root = p.root; vb = p.vb; } catch (e) { root = null; }
+    }
+    if (!root) {
+      svg.append(sv('text', { x: cx + cw / 2, y: cy + ch / 2, 'text-anchor': 'middle', 'font-size': 13, fill: '#b42318' }, `${v.title}: view unavailable`));
+      return;
+    }
+    const [vx, vy, vw, vh] = vb;
+    const dx = cx + 12, dy = cy + 28, dw = cw - 24, dh = ch - 40;
+    const k = A ? 0.78 : 0.9;
+    const s = Math.min((dw * k) / vw, (dh * k) / vh);
+    const px = A ? dx : dx + (dw - vw * s) / 2, py = A ? dy : dy + (dh - vh * s) / 2;
+    const g = sv('g', { transform: `translate(${px} ${py}) scale(${s}) translate(${-vx} ${-vy})` });
+    for (const node of root.childNodes) g.append(document.importNode(node, true));
+    if (A) g.append(dimOverlay(A, s));
+    svg.append(g);
+  });
+  // Title block
+  const ty = y1 - TB, tw = x1 - x0;
+  svg.append(sv('rect', { x: x0, y: ty, width: tw, height: TB, fill: '#f6f7f9', stroke: '#1c2330' }));
+  for (const fx of [0.3, 0.6, 0.8]) {
+    svg.append(sv('path', { d: `M${x0 + tw * fx} ${ty}V${y1}`, stroke: '#1c2330', fill: 'none' }));
+  }
+  svg.append(sv('text', { x: x0 + 12, y: ty + 25, 'font-size': 13, 'font-weight': 600, fill: '#1c2330' }, state.model));
+  svg.append(sv('text', { x: x0 + tw * 0.3 + 12, y: ty + 25, 'font-size': 12, fill: DIM_HEX }, `Overall ${b.map(f1).join(' × ')} mm`));
+  svg.append(sv('text', { x: x0 + tw * 0.6 + 12, y: ty + 25, 'font-size': 12, fill: '#1c2330' }, `Date ${new Date().toISOString().slice(0, 10)}`));
+  svg.append(sv('text', { x: x0 + tw * 0.8 + 12, y: ty + 25, 'font-size': 12, fill: '#1c2330' }, 'scale: fit'));
+  return svg;
+}
+
+function showSheetMsg(text, bad) {
+  const m = $('sheetMsg');
+  m.hidden = !text;
+  m.classList.toggle('err', !!bad);
+  m.replaceChildren();
+  if (text && !bad) m.append(el('span', 'spin'));
+  if (text) m.append(text);
+}
+function showSheet(data) {
+  showSheetMsg('', false);
+  $('sheetPaper').replaceChildren(buildSheet(data));
+}
+async function fetchDrawing() {
+  const r = await fetch('/api/drawing');
+  const data = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}: invalid response` }));
+  if (data.ok && data.key) drawCache.set(data.key, data);
+  return data;
+}
+// Draw the sheet for the current build key, fetching only when that key is not cached.
+async function ensureDrawing(retry = true) {
+  const want = state.buildKey;
+  if (want && drawCache.has(want)) { showSheet(drawCache.get(want)); return; }
+  const seq = ++drawSeq;
+  showSheetMsg('Drawing…', false);
+  let data;
+  try { data = await fetchDrawing(); } catch (e) { data = { ok: false, log: String(e) }; }
+  if (seq !== drawSeq) return; // superseded by a newer request
+  if (!data.ok) { if (drawingMode) showSheetMsg(data.log || 'Drawing failed', true); return; }
+  if (drawingMode) showSheet(data);
+  if (retry && state.buildKey && state.buildKey !== data.key) ensureDrawing(false);
+}
+function setMode(mode) {
+  drawingMode = mode === 'drawing';
+  $('viewer').classList.toggle('drawing', drawingMode);
+  $('sheet').hidden = !drawingMode;
+  for (const b of document.querySelectorAll('#modeSeg button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+  if (drawingMode) ensureDrawing();
+}
+document.querySelectorAll('#modeSeg button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('dlDrawing').addEventListener('click', async (e) => {
+  e.preventDefault();
+  try {
+    const data = drawCache.get(state.buildKey) ?? await fetchDrawing();
+    if (!data.ok) throw new Error(data.log || 'Drawing failed');
+    const xml = new XMLSerializer().serializeToString(buildSheet(data));
+    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+    const a = el('a'); a.href = url; a.download = `${state.stem}_drawing.svg`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    showLog(`Drawing download failed: ${err.message}`, true);
+  }
+});
 
 const viewerReady = loadViewer().then((v) => (viewer = v, window.__viewer = v));
 init();

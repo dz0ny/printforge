@@ -12,6 +12,8 @@ from cadquery.selectors import BoxSelector
 MIX_W = 189.0   # Width, left to right, on the open short side. The first print at 191 had 2 mm of play. [100:300]
 MIX_D = 248.0   # Depth, front to back, along the slide axis. [100:400]
 MIX_H = 31.0    # Body thickness with feet, without knobs. [10:80]
+FOOT_H = 4.0    # Height of the rubber feet under the body; the body's edges sit this high. [0:10]
+EDGE_R = 3.0    # Radius of the body's bottom edges. Measure it: the floor fillet must clear it. [0:10]
 
 # 🖨️ Printer. The part prints flat on its back, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
@@ -22,7 +24,7 @@ LAYER = 0.28
 CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400]
-WALL_H = 41.0     # Outer side wall height, floor to lip top. [20:100]
+WALL_H = 45.0     # Outer side wall height, floor to lip top. The 45 degree fill under the lips needs LIP mm above the mixer. [20:100]
 WALL = 8 * LINE   # Side wall thickness, 8 lines. The first print broke at 6.
 BASE = 11 * LAYER  # Base plate thickness, 11 layers.
 FILLET = 6.0      # Fillet between the side walls and the base.
@@ -69,6 +71,7 @@ OUT_D = IN_D + 2 * WALL
 OUT_H = WALL_H
 IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
 assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
+assert IN_H - LIP >= MIX_H + CLEAR_TOP, "the 45 degree fill under the lips would hit the mixer: raise WALL_H or lower LIP"
 LEN = SLEEVE_H - END
 assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 TOTAL_LEN = LEN + END
@@ -246,8 +249,20 @@ def build():
 
 
 def device():
-    """Return the mixer body as it sits in the sleeve, for the configurator's ghost view."""
-    return box(LEN - MIX_D, WALL + CLEAR, BASE, LEN, WALL + CLEAR + MIX_W, BASE + MIX_H)
+    """The mixer as it sits in the sleeve: the body on its feet, with rounded bottom edges.
+
+    The configurator draws it as a ghost, and check_part.py makes sure the
+    sleeve's floor fillets stay out of it.
+    """
+    y0, x1 = WALL + CLEAR, LEN - CLEAR  # The mixer rests CLEAR before the end stop.
+    x0 = x1 - MIX_D
+    body = box(x0, y0, BASE + FOOT_H, x1, y0 + MIX_W, BASE + MIX_H)
+    if EDGE_R > 0:
+        body = body.edges("|X").edges("<Z").fillet(EDGE_R)
+    for fx in (x0 + 15, x1 - 15):
+        for fy in (y0 + 15, y0 + MIX_W - 15):
+            body = body.union(cq.Workplane("XY", origin=(fx, fy, BASE)).circle(6).extrude(max(FOOT_H, 0.01)))
+    return body
 
 
 def features():
@@ -280,7 +295,7 @@ def features():
         "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1),
                   ["BASE", "CLEAR", "MIX_W", "MIX_H"]),
         "Mixer": ((LEN - MIX_D / 2, OUT_D / 2, BASE + MIX_H + 0.5), (0, 0, 1),
-                  ["MIX_W", "MIX_D", "MIX_H", "CLEAR", "CLEAR_TOP"]),
+                  ["MIX_W", "MIX_D", "MIX_H", "FOOT_H", "EDGE_R", "CLEAR", "CLEAR_TOP"]),
     }
     if GUSSETS:
         f["Gusset"] = ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7),

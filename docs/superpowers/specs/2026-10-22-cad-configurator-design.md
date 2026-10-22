@@ -49,6 +49,14 @@ see it inside the shell and change its size.
   printforge_configurator model.py` and `uvx --from <git> printforge-configurator`
   serve any script with nothing added. Publishing to PyPI is left to the owner.
 
+- A Drawing view: the worker exports top, front, right and iso SVG projections
+  with hidden lines; the page lays them on a sheet with overall sizes and a
+  title block, and the sheet downloads as one SVG.
+- `scripts/check_part.py` is the companion checker: thin walls by inward rays
+  (area based), knife edges, overlap with `device()`, `keep_clear()` volumes and
+  overhangs from the print STL. Models describe the device honestly (feet, edge
+  radii, beads) and list the volumes that must stay empty.
+
 ## Parts
 
 - `skills/cad-print-design/configurator/`: the `printforge-configurator` package,
