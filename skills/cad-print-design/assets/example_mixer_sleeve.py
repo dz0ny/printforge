@@ -36,7 +36,7 @@ END_H = 16.0      # End stop height, low for the curved mixer edge.
 END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
 
 # 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
-LIP = 3.4         # Lip reach over the mixer edge. At a 36 mm wall this is the room for a 45 degree fill.
+LIP = 2.4         # Lip reach over the mixer edge. The tip sits on the edge; its 45 degree underside needs this much room above the mixer.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
 LIP_FREE = 80.0   # No lip on this length at the open end.
 LIP_SLOPE_GAP = 3.0  # The lips stop this far before the bottom slope.
@@ -72,9 +72,9 @@ OUT_H = WALL_H
 IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
 LEN = SLEEVE_H - END
 TOTAL_LEN = LEN + END
-# The fill under each lip is as deep as the room above the mixer allows, up to
-# LIP. It always spans the whole lip, so a shallower fill is a little steeper
-# than 45 degrees; up to 1 mm less depth prints fine.
+# Each lip's underside slopes at 45 degrees from the lip plate down to the tip,
+# which sits CLEAR_TOP above the mixer. The slope needs LIP mm of room above
+# the mixer; beyond that the underside is flat, and up to 1 mm of flat prints.
 FILL = max(0.0, min(LIP, IN_H - MIX_H - CLEAR_TOP))
 
 
@@ -161,7 +161,7 @@ def check_design():
     configurator shows up in its build log instead of stopping the script from starting."""
     assert IN_H >= MIX_H + CLEAR_TOP, "the wall is too low for the mixer"
     assert LIP - FILL <= 1.0, (
-        f"the fill under the lips would be {LIP - FILL:.1f} mm shallower than the lip and too steep to print: "
+        f"the lip underside would be flat for {LIP - FILL:.1f} mm beyond its 45 degree slope: "
         f"raise WALL_H to at least {BASE + MIX_H + CLEAR_TOP + LIP - 1.0 + LIP_T:.1f} or lower LIP to {FILL + 1.0:.1f}")
     assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
 
@@ -180,9 +180,12 @@ def build():
     part = part.cut(box(-1, y0, zt, LIP_FREE, y1, OUT_H + 1))
     part = part.cut(box(lip_end, y0, zt, LEN, y1, OUT_H + 1))
 
-    # Fill under each lip: LIP inward, FILL deep, 45 degrees when there is room.
+    # The wedge under each lip: from the plate at the tip straight down to the
+    # mixer's edge, then back up to the plate at 45 degrees. The tip touches
+    # the edge gently; the slope prints flat on the back without support.
     for y, s in ((y0, 1), (y1, -1)):
-        tri = [(y, zt), (y + s * LIP, zt), (y, zt - FILL)]
+        tip = y + s * LIP
+        tri = [(tip, zt), (tip, zt - FILL), (tip - s * FILL, zt)]
         fill = cq.Workplane("YZ", origin=(LIP_FREE, 0, 0)).polyline(tri).close() \
             .extrude(lip_end - LIP_FREE)
         part = part.union(fill)
@@ -211,7 +214,7 @@ def build():
         return abs(p.z - OUT_H) < 0.05
 
     def lip_ends(p):
-        return (on(p, x=LIP_FREE) or on(p, x=lip_end)) and p.z > zt - LIP - 0.1
+        return (on(p, x=LIP_FREE) or on(p, x=lip_end)) and p.z > zt - FILL - 0.1
 
     def open_end(p):
         return on(p, x=0)
