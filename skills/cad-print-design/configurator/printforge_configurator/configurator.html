@@ -206,7 +206,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 #tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
 /* Drawing sheet, shown in place of the 3D view */
 #sheet { position: absolute; inset: 0; overflow: hidden; }
-#sheetVp { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; }
+#sheetVp { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
 #sheetVp.panning { cursor: grabbing; }
 #sheetPaper { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 #zoomBar {
