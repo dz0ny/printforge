@@ -71,7 +71,7 @@ Use these names when you ask for a change.
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 195 × 215 × 26 mm | Width from the Thomann spec (195 × 248 × 50, the 50 with knobs); depth and thickness as the sleeve uses them, it only clips the lower part of the mixer |
+| `MIX_W × MIX_D × MIX_H` | 190 × 215 × 26 mm | Width measured on the body (the spec sheet says 195 with the top trim); depth and thickness as the sleeve uses them, it only clips the lower part |
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
@@ -88,7 +88,7 @@ Use these names when you ask for a change.
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |
 
-Outside size: 203.2 × 34 × 213.5 mm.
+Outside size: 198.2 × 34 × 213.5 mm.
 
 ## Print settings
 
