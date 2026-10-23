@@ -40,6 +40,20 @@
         "8767"
       ],
       "port": 8767
+    },
+    {
+      "name": "cocoa-dispenser",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "projects/cocoa-dispenser",
+        "projects/cocoa-dispenser/cocoa_dispenser.py",
+        "--serve",
+        "--port",
+        "8768"
+      ],
+      "port": 8768
     }
   ]
 }
