@@ -16,6 +16,10 @@ The script runs the model's build(), and device() when it exists, and prints a r
 - overhangs in the print orientation, read from <stem>.stl next to the model when it
   exists: faces that point down more than --overhang degrees and are not on the bed.
 
+A model with several printed parts defines parts() -> {name: shape} in print
+orientation; then validity, walls, knife edges and overhangs (<stem>_<name>.stl)
+run per part, and the device and keep-clear checks run on the assembly from build().
+
 Exit code 1 when a check fails, so it can gate a commit. Thresholds default to a
 0.4 mm nozzle: a wall under two lines (0.9 mm) is a sliver.
 """
@@ -57,8 +61,9 @@ def thin_walls(mesh, min_wall, samples=4000, seed=0):
     almost no area; a real sliver or a blocked channel gives area.
     """
     rng = np.random.default_rng(seed)
-    n = len(mesh.faces)
-    idx = rng.choice(n, size=min(samples, n), replace=False, p=mesh.area_faces / mesh.area)
+    good = np.flatnonzero(mesh.area_faces > 0)  # Degenerate triangles cannot be sampled.
+    idx = rng.choice(good, size=min(samples, len(good)), replace=False,
+                     p=mesh.area_faces[good] / mesh.area_faces[good].sum())
     origins = mesh.triangles_center[idx] - mesh.face_normals[idx] * 1e-3
     dirs = -mesh.face_normals[idx]
     locs, ray_ids, _ = mesh.ray.intersects_location(origins, dirs, multiple_hits=False)
@@ -120,12 +125,12 @@ def main():
     ap.add_argument("--overhang", type=float, default=45.0, help="degrees from vertical")
     ap.add_argument("--max-thin-area", type=float, default=5.0, help="mm2 of surface with a wall under --min-wall allowed")
     ap.add_argument("--max-overlap", type=float, default=0.05, help="cm3 the part may share with the device or a keep-clear volume")
+    ap.add_argument("--skip", default="", help="comma-separated part names to leave out, e.g. a printed spring that bends by design")
     ap.add_argument("--max-overhang-area", type=float, default=100.0, help="mm2 of unsupported faces allowed")
     a = ap.parse_args()
 
     ns = load_model(a.model)
     part = ns["build"]()
-    solid = part.val()
     fails = []
 
     def report(ok, text):
@@ -133,26 +138,51 @@ def main():
         if not ok:
             fails.append(text)
 
-    report(solid.isValid(), "valid solid")
-    n_solids = len(part.solids().vals())
-    report(n_solids == 1, f"{n_solids} solid(s)")
-    bb = solid.BoundingBox()
-    print(f"     size {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, volume {solid.Volume() / 1000:.1f} cm3")
+    def check_shape(shape, label, stl):
+        solid = shape.val()
+        report(solid.isValid(), f"{label}valid")
+        n_solids = len(shape.solids().vals())
+        report(n_solids == 1, f"{label}{n_solids} solid(s)")
+        bb = solid.BoundingBox()
+        print(f"     {label}size {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, volume {solid.Volume() / 1000:.1f} cm3")
+        mesh = to_trimesh(shape)
+        t, at, thin_area = thin_walls(mesh, a.min_wall)
+        if t is None:
+            report(False, f"{label}thin walls: no ray hit anything, is the mesh closed?")
+        else:
+            report(thin_area <= a.max_thin_area,
+                   f"{label}walls under {a.min_wall} mm cover about {thin_area:.0f} mm2; thinnest {t:.2f} mm at {fmt_pt(at)}")
+        knives = knife_edges(solid, a.knife)
+        if knives:
+            worst = knives[0]
+            report(False, f"{label}{len(knives)} knife edge(s): worst {worst[0]:.0f} deg over {worst[1]:.1f} mm at {fmt_pt(worst[2])}")
+        else:
+            report(True, f"{label}no knife edges above {a.knife:.0f} deg")
+        if stl.exists():
+            area, low, m = overhangs(stl, a.overhang)
+            report(area <= a.max_overhang_area,
+                   f"{label}overhangs past {a.overhang:.0f} deg in {stl.name}: {area:.0f} mm2"
+                   + (f", lowest at z = {low:.1f}" if low is not None else ""))
+            print(f"     {label}print size {m.extents[0]:.1f} x {m.extents[1]:.1f} x {m.extents[2]:.1f} mm")
+        else:
+            print(f"     {label}no {stl.name} next to the model, overhangs not checked")
 
-    mesh = to_trimesh(part)
-    t, at, thin_area = thin_walls(mesh, a.min_wall)
-    if t is None:
-        report(False, "thin walls: no ray hit anything, is the mesh closed?")
+    stem = Path(a.model).with_suffix("")
+    parts = ns.get("parts")
+    if callable(parts):
+        skip = {n.strip() for n in a.skip.split(",") if n.strip()}
+        for name, shape in parts().items():
+            if name in skip:
+                print(f"     {name}: skipped")
+                continue
+            stl = Path(f"{stem}_{name}.stl")
+            if not stl.exists() and (stem.parent / f"{name}.stl").exists():
+                stl = stem.parent / f"{name}.stl"  # Models that export plain <name>.stl per part.
+            check_shape(shape, f"{name}: ", stl)
+        abb = part.val().BoundingBox()
+        print(f"     assembly size {abb.xlen:.1f} x {abb.ylen:.1f} x {abb.zlen:.1f} mm")
     else:
-        report(thin_area <= a.max_thin_area,
-               f"walls under {a.min_wall} mm cover about {thin_area:.0f} mm2; thinnest {t:.2f} mm at {fmt_pt(at)}")
-
-    knives = knife_edges(solid, a.knife)
-    if knives:
-        worst = knives[0]
-        report(False, f"{len(knives)} knife edge(s): worst {worst[0]:.0f} deg over {worst[1]:.1f} mm at {fmt_pt(worst[2])}")
-    else:
-        report(True, f"no knife edges above {a.knife:.0f} deg")
+        check_shape(part, "", stem.with_suffix(".stl"))
 
     device = ns.get("device")
     if callable(device):
@@ -178,16 +208,6 @@ def main():
                               f"y {ib.ymin:.1f}..{ib.ymax:.1f}, z {ib.zmin:.1f}..{ib.zmax:.1f}")
             else:
                 report(True, f"keep-clear volume {i + 1} is empty")
-
-    stl = Path(a.model).with_suffix(".stl")
-    if stl.exists():
-        area, low, m = overhangs(stl, a.overhang)
-        report(area <= a.max_overhang_area,
-               f"overhangs past {a.overhang:.0f} deg in {stl.name}: {area:.0f} mm2"
-               + (f", lowest at z = {low:.1f}" if low is not None else ""))
-        print(f"     print size {m.extents[0]:.1f} x {m.extents[1]:.1f} x {m.extents[2]:.1f} mm")
-    else:
-        print(f"     no {stl.name} next to the model, overhangs not checked")
 
     print(f"\n{len(fails)} problem(s)" if fails else "\nall checks passed")
     sys.exit(1 if fails else 0)

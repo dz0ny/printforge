@@ -1,0 +1,18 @@
+Use your image generation tool to create three PNG images and save them in the current directory. Do not edit any other files.
+
+The attached CAD renders show version 3 of a 3D-printed push-button cocoa dispenser for latte art with a ratchet tapper. It has seven printed parts, no bought parts:
+- Stand: a thick flat ring (112 mm) that rests on a cup rim, with a slot open to the front for the stencil, and a short chamber ring on top whose inner edge is a 45-degree cone.
+- Stencil: a thin disc (90 mm) with a heart cut-out in the centre, a 3 mm lip around its edge like a tray, a gap in the lip at the back, and a pull tab with a round finger hole.
+- Body: a cylinder hopper (72 mm wide, 75 mm tall) on a wide flat flange (104 mm). Its floor is a fine sieve: about a thousand 0.8 mm holes on a hex grid over the whole floor, with a 45-degree cone up to the bore.
+- Rod: a long straight square rod (6 mm) with a row of small triangular teeth (a rack) on one face near its middle, and a flat 20 mm disc foot at its bottom.
+- Lid: a flat disc that pushes into the top of the body, with a square centre hole in a round hub and a shallow ring recess for the spring; in the hub, a thin finger (the striker tongue) hangs in a slot beside the square hole.
+- Spring: a small printed wave spring (22 mm wide, 38 mm tall): stacked wavy rings touching at their crests.
+- Button: a small cylinder cap (32 mm) with a shallow finger dimple on top.
+
+1. v3_parts_flatlay.png (1600x1000): photo-realistic top-down flat-lay of all seven parts laid out neatly on a light oak counter, printed in chocolate-brown PETG with visible layer lines; the stencil, the spring and the lid in cream PETG. Order left to right: stand, stencil, body (tilted so the sieve floor with its fine holes is visible), rod with its rack and foot, lid, spring, button. Soft daylight, no text.
+
+2. v3_assembled.png (1200x1600): photo-realistic shot of the assembled dispenser standing on a white cappuccino cup on a cafe counter, a hand pressing the button, a faint cloud of cocoa dust falling inside; the stencil's tab sticks out at the front. Neutral light grey studio background, no text.
+
+3. v3_tongue.png (1600x1000): photo-realistic macro close-up of the lid seen from below with the rod through its square hole, showing the thin cream striker tongue in its slot with its small nub resting in the teeth of the brown rod's rack, as in ref_tongue.png. Shallow depth of field, no text.
+
+Keep every part's shape faithful to the attached renders.

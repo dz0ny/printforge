@@ -1,70 +1,86 @@
-# Cocoa dispenser with stencil and shutter
+# Cocoa dispenser with stencil and ratchet tapper
 
 Push-button cocoa duster for latte art, all parts printed. Put it on the cup, slide a
-stencil in, press the button. The press turns a sieve plate open for one dose and the
-printed spring turns it closed again. Nothing falls out at rest.
+stencil in, press the button. The press clicks a toothed rack past a striker tongue
+in the lid: every click is one tap on the body, and the taps shake a fine, even dust
+of cocoa through the sieve floor. No shutter: the fine holes hold the cocoa at rest,
+it bridges over them, the way the LatteShot works.
 
-![in use (AI image of version 1)](renders/in_use.png)
-![exploded](views/exploded_iso.png)
-![shutter closed at rest, open at full press](views/shutter_top_rest_pressed.png)
-![rotor](views/rotor.png)
+![assembled](renders/v3/v3_assembled.png)
+![parts](renders/v3/v3_parts_flatlay.png)
+![tongue on the rack](renders/v3/v3_tongue.png)
 ![section, rest and pressed](views/section_rest_pressed.png)
+![tongue close-up](views/tongue_closeup.png)
 ![views](views/sheet.png)
 
-The photos in `renders/` are AI images made with Codex from the version 1 CAD views
-(`renders/prompt.txt`); the CAD views are the truth.
+The photos in `renders/v3/` are AI images made with Codex from the CAD views
+(`renders/v3/prompt.txt`); `renders/v2/` and `renders/` hold the earlier versions.
+The CAD views are the truth.
 
-## How the shutter works
+## How the tapper works
 
-- The body floor is the **sieve plate**: 1.0 mm holes in six 30-degree sectors, solid
-  between them.
-- The **rotor** lies on the sieve plate and turns on the **pivot post** (a printed plain
-  bearing). Its six solid sectors cover the holes at rest. A **keeper** ridge on the cone
-  holds it down; the rotor snaps under it.
-- The **rod** is square. Its lower 16 mm are twisted 48 degrees. The rotor boss has a thin
-  square **follower**. Pushing the rod 10 mm through the follower turns the rotor 30
-  degrees: the open sectors line up with the holes. The upper rod is straight and runs in
-  the lid's square hole, so the rod cannot turn itself. This is a push drill.
-- Two **vanes** on the rotor stir the cocoa over the holes while it turns.
-- Dose: one press = one 30-degree sweep open and back. Press 2 to 4 times. Fewer holes
-  (`SIEVE_PITCH`) or a narrower open sector (`OPEN_SHRINK`) give a smaller dose.
+- The body floor is the **sieve**: 0.8 mm holes on a 1.7 mm hex grid over the whole
+  floor, about 1,000 of them, with a 45° cone up to the hopper bore. Cocoa bridges
+  over 0.8 mm holes and stays put until something shakes it.
+- The **rod** is square and straight. One face carries a **rack**: 11 triangular teeth,
+  1.5 mm pitch, 0.8 mm deep, placed so the tongue is on the rack over the whole stroke.
+  A 20 mm **foot** at the rod's bottom stirs the cocoa 2 mm above the sieve at full press.
+- The **lid** has a square guide hole, so the rack face always faces the tongue, and
+  the **striker tongue**: a 0.9 mm thick, 4 mm wide, 8 mm long finger hanging in a
+  pocket of the hub, with a 45° nub at its tip that reaches 0.5 mm into the teeth.
+  Each tooth bends the tongue 0.5 mm out and lets it snap back: one tap into the lid,
+  which is push-fit into the body, which carries the sieve.
+- One press of 10 mm = about 7 taps down and 7 up. Press once for a light dust,
+  two or three times for a full heart.
+- **Dose**: `SIEVE_HOLE` sets the grain (0.8 cocoa, 0.6 to 0.7 cinnamon, which wants
+  a 0.2 mm nozzle or a test print), the number of presses sets the amount, and the
+  cocoa in the hopper sets the pressure on the sieve: more cocoa, bigger dose. Fill
+  it 20 to 30 mm deep for a steady dose.
+- `SIEVE_SEPARATE = True` makes the sieve a drop-in disc with a lifting peg on a ring
+  ledge, so discs with different holes can be swapped. Off by default: 7 parts.
 
 ## Parts
 
 | Part | Print orientation | Notes |
 |---|---|---|
-| Stand | flat, as used | sits on the cup rim; stencil slot open on top |
-| Stencil | flat | heart cut-out, 1.2 mm, with a 1.5 mm lip: a tray for the spill |
-| Body | flange down | sieve plate prints as the first 6 layers; keeper ridge and pivot post inside |
-| Rotor | plate down | six open sectors, boss with the square follower on top |
-| Rod | standing, square end down | twisted part at the bottom. Use a brim. |
-| Lid | upside down | push-fit plug, square guide hole, spring seat |
+| Stand | flat, as used | sits on the cup rim; stencil slot open to the front; 15 mm drop chamber above it, its roof a 45° cone |
+| Stencil | flat | heart cut-out, 1.2 mm, with a 3 mm lip: a tray for the spill, pour spout at the back |
+| Body | flange down | the sieve floor prints as the first 6 layers; nothing moves inside |
+| Rod | standing on its foot | the rack faces +X; the foot is its base, no brim needed |
+| Lid | upside down | push-fit plug, square guide hole, spring seat, the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
 | Spring | flat | PETG wave spring, 8 rings; 38 mm free, 36 at rest, 26 pressed |
 
-No bought parts. Print the spring, the rotor and the rod in PETG: PLA creeps and the
-rotor wears. Set `PRINT_SPRING = False` for a bought metal spring (OD 9-10 mm,
-free length about 25 mm).
+No bought parts. Print the spring, the rod and the lid in PETG: the tongue and the
+spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
+`PRINT_SPRING = False` for a bought metal spring (OD 9 to 10 mm, free length about
+25 mm).
 
 ## Assembly
 
-1. Rotor into the body: boss up, press its edge under the keeper ridge, turn it to feel
-   it run on the post.
-2. Rod through the lid's square hole from below, twisted end down, straight part in the lid.
-3. Spring over the rod into the lid seat; press the button onto the rod top (glue drop).
-4. Fill the body with cocoa. Push the lid in: the rod's twisted end enters the rotor boss.
-   If it does not enter, turn the rotor a little by hand through the cocoa.
-5. Stand on the cup, stencil into the slot, body onto the stand. Press.
+1. Rod through the lid's square hole from below, foot down, with the rack face
+   toward the tongue (the side of the hub with the slot). It should click as it goes.
+2. Spring over the rod into the lid seat; press the button onto the rod top (glue drop).
+3. Fill the body with cocoa, 20 to 30 mm. Push the lid in.
+4. Stand on the cup, stencil into the slot, body onto the stand. Press.
+
+## Test first
+
+Rebuilt, not printed. Print the lid and the rod alone and click the rack past the
+tongue by hand. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
+three lines thick; if the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
+body over paper: nothing should fall at rest with 0.8 mm holes.
 
 ## Files
 
 - `cocoa_dispenser.py` the model; `uv run cocoa_dispenser.py` writes everything below.
-  `cocoa_dispenser_v1.py.bak` is version 1 (up-and-down agitator, no shutter).
+  `cocoa_dispenser_v1.py.bak` is version 1 (agitator, no shutter),
+  `cocoa_dispenser_v2.py.bak` version 2 (rotating shutter), `cocoa_dispenser_v2chamber.py.bak`
+  version 2 with the drop chamber and aperture disc.
 - `cocoa_dispenser.step` assembly at rest, `cocoa_dispenser_pressed.step` at full press.
-- `stand.stl` ... `spring.stl`: eight parts in print orientation.
-- `cocoa_dispenser_plate.stl` and `cocoa_dispenser.3mf`: all eight on one 256 mm plate.
+- `stand.stl` ... `spring.stl`: seven parts in print orientation.
+- `cocoa_dispenser_plate.stl` and `cocoa_dispenser.3mf`: all seven on one 256 mm plate.
+- `sections.py` draws `views/section_rest_pressed.png` and `views/tongue_closeup.png`.
+- `uv run check_part.py cocoa_dispenser.py --max-overhang-area 400` checks each part
+  and the assembly; the heart's cusp counts as a knife edge, which is the shape.
 - `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768.
-
-Rebuilt, not printed. Test first: the rotor snaps under the keeper and turns freely;
-the rod slides through the follower (0.35 mm clearance) without binding; the shutter is
-closed at rest (shake it over paper); the lid push fit (0.2 mm per side).

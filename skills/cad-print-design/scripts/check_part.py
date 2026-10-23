@@ -61,8 +61,9 @@ def thin_walls(mesh, min_wall, samples=4000, seed=0):
     almost no area; a real sliver or a blocked channel gives area.
     """
     rng = np.random.default_rng(seed)
-    n = len(mesh.faces)
-    idx = rng.choice(n, size=min(samples, n), replace=False, p=mesh.area_faces / mesh.area)
+    good = np.flatnonzero(mesh.area_faces > 0)  # Degenerate triangles cannot be sampled.
+    idx = rng.choice(good, size=min(samples, len(good)), replace=False,
+                     p=mesh.area_faces[good] / mesh.area_faces[good].sum())
     origins = mesh.triangles_center[idx] - mesh.face_normals[idx] * 1e-3
     dirs = -mesh.face_normals[idx]
     locs, ray_ids, _ = mesh.ray.intersects_location(origins, dirs, multiple_hits=False)
@@ -124,6 +125,7 @@ def main():
     ap.add_argument("--overhang", type=float, default=45.0, help="degrees from vertical")
     ap.add_argument("--max-thin-area", type=float, default=5.0, help="mm2 of surface with a wall under --min-wall allowed")
     ap.add_argument("--max-overlap", type=float, default=0.05, help="cm3 the part may share with the device or a keep-clear volume")
+    ap.add_argument("--skip", default="", help="comma-separated part names to leave out, e.g. a printed spring that bends by design")
     ap.add_argument("--max-overhang-area", type=float, default=100.0, help="mm2 of unsupported faces allowed")
     a = ap.parse_args()
 
@@ -168,8 +170,15 @@ def main():
     stem = Path(a.model).with_suffix("")
     parts = ns.get("parts")
     if callable(parts):
+        skip = {n.strip() for n in a.skip.split(",") if n.strip()}
         for name, shape in parts().items():
-            check_shape(shape, f"{name}: ", Path(f"{stem}_{name}.stl"))
+            if name in skip:
+                print(f"     {name}: skipped")
+                continue
+            stl = Path(f"{stem}_{name}.stl")
+            if not stl.exists() and (stem.parent / f"{name}.stl").exists():
+                stl = stem.parent / f"{name}.stl"  # Models that export plain <name>.stl per part.
+            check_shape(shape, f"{name}: ", stl)
         abb = part.val().BoundingBox()
         print(f"     assembly size {abb.xlen:.1f} x {abb.ylen:.1f} x {abb.zlen:.1f} mm")
     else:
