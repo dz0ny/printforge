@@ -145,6 +145,7 @@ How it evolved, one plain-language request at a time:
 | "The width is now too narrow" | Mixer width 190 mm measured, inside width 186 → 191 mm |
 | "Lips should gently touch the edge" and "this would print in air, go back" | A lip with its tip lowest prints in air; reverted, lesson in the pitfalls |
 | "The mixer is a bit oval, can we do something so the sleeve fits nicely" (with a photo) | Cavity, lips and fills follow a spline through three measured widths; the ghost too |
+| "Perfect print" | The barrel-shaped sleeve printed and fits; noted in the project README |
 | "See if we can have a script that spots these" | `check_part.py`: thin walls, knife edges, device overlap, keep-clear volumes, overhangs. It found a funnel outlet blocked by its own collar, and a mixer that could not pass under its own lips |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.

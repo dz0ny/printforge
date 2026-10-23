@@ -9,6 +9,11 @@ reachable through the open front, and the rear jacks stay free at the top.
   <img src="./views/sheet.png" alt="Labeled views of the mixer sleeve" width="900" />
 </p>
 
+**Printed and fitted on 2026-10-23**, at commit d45bee2: 190/188/189 mm
+widths, 34 mm walls, 3.4 mm lips, 80 mm lip-free zone. The first print at
+191 mm straight walls had side play and a wall broke off; this one is the
+keeper.
+
 ## Files
 
 | File | What it is |
