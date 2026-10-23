@@ -40,7 +40,8 @@ LINE = 0.45          # Line width, about 1.1 x the nozzle.
 LAYER = 0.2
 
 # 🧱 Bracket. One side profile extruded across BRK_W, two ribs, a tilted stub.
-T = 6.0              # Thickness of the base plate, the arm, the stub and the plate halves. [4:12]
+T = 6.0              # Thickness of the plate and the ledge. [4:12]
+ARM_T = 20.0         # Thickness of the base plate and the arm against the panel: the screws bear on all of it. [6:30]
 BRK_W = 50.0         # Bracket width across the keyboard, its pair of holes centred in it. [30:100]
 BASE_DOWN = 20.0     # Base plate below the holes. [10:60]
 LEDGE = 15.0         # A ledge from the arm rests on the keyboard's top, over the rear edge. [0:40]
@@ -86,10 +87,10 @@ def bracket_profile():
     top_front = (PLATE_L * math.cos(ANG), UNDER_REAR_Z - PLATE_L * math.sin(ANG))
     under_front = (top_front[0] + DOWN[0] * T, top_front[1] + DOWN[1] * T)
     under_rear = (0.0, UNDER_REAR_Z - T / math.cos(ANG))
-    pts = [(-T, -BASE_DOWN), (0.0, -BASE_DOWN), (0.0, PANEL_TOP), (LEDGE, PANEL_TOP), (LEDGE, PANEL_TOP + T),
-           (0.0, PANEL_TOP + T), under_rear, under_front, top_front, top_rear, (-T, UNDER_REAR_Z)]
+    pts = [(-ARM_T, -BASE_DOWN), (0.0, -BASE_DOWN), (0.0, PANEL_TOP), (LEDGE, PANEL_TOP), (LEDGE, PANEL_TOP + T),
+           (0.0, PANEL_TOP + T), under_rear, under_front, top_front, top_rear, (-ARM_T, UNDER_REAR_Z)]
     if LEDGE <= 0:
-        pts = [(-T, -BASE_DOWN), (0.0, -BASE_DOWN), under_rear, under_front, top_front, top_rear, (-T, UNDER_REAR_Z)]
+        pts = [(-ARM_T, -BASE_DOWN), (0.0, -BASE_DOWN), under_rear, under_front, top_front, top_rear, (-ARM_T, UNDER_REAR_Z)]
     return cq.Workplane("XZ").polyline(pts).close()
 
 
@@ -110,7 +111,7 @@ def side_piece(right=False):
     body = body.translate((0, PLATE_MARGIN - bb.ymin, 0))
     if ROUND > 0:
         try:
-            body = body.edges("|Y").edges(cq.selectors.BoxSelector((-T - 1, -1, -BASE_DOWN - 1), (1, 400, -BASE_DOWN + 1))) \
+            body = body.edges("|Y").edges(cq.selectors.BoxSelector((-ARM_T - 1, -1, -BASE_DOWN - 1), (1, 400, -BASE_DOWN + 1))) \
                 .fillet(ROUND)
         except Exception as e:
             print(f"round skipped on the base plate's bottom: {e}")
@@ -122,7 +123,7 @@ def side_piece(right=False):
         body = body.union(cq.Workplane("XZ", origin=(0, y, 0)).polyline(tri).close().extrude(-RIB_T))
     # The pair of panel screws, through the base plate.
     for y in (PLATE_MARGIN + BRK_W / 2 - PITCH / 2, PLATE_MARGIN + BRK_W / 2 + PITCH / 2):
-        body = body.cut(cq.Workplane("YZ", origin=(-T - 1, y, 0)).circle(SCREW_D / 2 + 0.25).extrude(T + 2))
+        body = body.cut(cq.Workplane("YZ", origin=(-ARM_T - 1, y, 0)).circle(SCREW_D / 2 + 0.25).extrude(ARM_T + 2))
     # The plate: the bracket's stub continued across to the middle, with the tongue,
     # drawn flat in the slope's plane and cut by the socket and the sleeve holes.
     plane = slope_plane()
@@ -181,10 +182,10 @@ def features():
     mid = (PLATE_L / 2 * c, UNDER_REAR_Z - PLATE_L / 2 * s + T * c)  # Plate top, middle of the slope: (x, z).
     up = (s, 0, c)
     return {
-        "Base plate": {"at": (-T - 0.5, -YC, 0), "normal": (-1, 0, 0), "params": ["T", "BRK_W", "BASE_DOWN"]},
-        "Panel screws": {"at": (-T - 0.5, -YC + PITCH / 2, 0), "normal": (-1, 0, 0),
+        "Base plate": {"at": (-ARM_T - 0.5, -YC, 0), "normal": (-1, 0, 0), "params": ["ARM_T", "BRK_W", "BASE_DOWN"]},
+        "Panel screws": {"at": (-ARM_T - 0.5, -YC + PITCH / 2, 0), "normal": (-1, 0, 0),
                          "params": ["OUTER", "INNER", "SCREW_D", "HEAD_D"]},
-        "Arm": {"at": (-T - 0.5, -YC, UNDER_REAR_Z / 2), "normal": (-1, 0, 0), "params": ["PANEL_TOP", "EDGE_GAP"]},
+        "Arm": {"at": (-ARM_T - 0.5, -YC, UNDER_REAR_Z / 2), "normal": (-1, 0, 0), "params": ["ARM_T", "PANEL_TOP", "EDGE_GAP"]},
         "Ledge": {"at": (LEDGE / 2, -YC, PANEL_TOP + T + 0.5), "normal": (0, 0, 1), "params": ["LEDGE", "PANEL_TOP"]},
         "Rib": {"at": ((EDGE_GAP - T) / 4, -YC - BRK_W / 2 - 0.5, UNDER_REAR_Z - T - (EDGE_GAP - T) / 3), "normal": (0, -1, 0),
                 "params": ["RIB_T", "EDGE_GAP"]},

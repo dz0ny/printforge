@@ -49,7 +49,7 @@ uv run mixer_riser.py --serve --lan --port 8767
 
 ## Assembly
 
-1. Screw each piece to its pair of holes, M5, ledge resting on the keyboard's top.
+1. Screw each piece to its pair of holes with M5 screws at least 20 mm longer than the panel's thread depth, ledge resting on the keyboard's top.
 2. Push the two plate halves together in the middle: each has a dovetail tongue
    and a socket, so they only go one way.
 3. Set the sleeve on the plate and drive its four M4 screws into the sleeve's
@@ -59,9 +59,9 @@ uv run mixer_riser.py --serve --lan --port 8767
 
 | Name | Where it is |
 |---|---|
-| Base plate | The vertical plate against the rear panel, with its pair of screw holes |
+| Base plate | The 20 mm thick block against the rear panel, with its pair of screw holes bearing on the full thickness |
 | Panel screws | Two M5 clearance holes 30 mm apart, heads on the rear face |
-| Arm | The base plate continuing up past the panel's top edge |
+| Arm | The base plate continuing up past the panel's top edge, 20 mm thick |
 | Ledge | A tab from the arm that rests on the keyboard's top, over the rear edge, taking the weight |
 | Rib | Two ribs flush with the bracket's side faces, bracing the plate down to the ledge |
 | Plate | The piece's half of the 90 mm deep plate, from the bracket to the middle, 6 mm thick |
@@ -78,7 +78,7 @@ uv run mixer_riser.py --serve --lan --port 8767
 | `EDGE_GAP` | 20 mm | Gap between the rear edge and the plate's underside: a thumb |
 | `LEDGE` | 15 mm | How far the ledge reaches over the keyboard's top |
 | `TILT`, `PLATE_L` | 15°, 90 mm | Slope toward the player and the plate's depth along it |
-| `T`, `BRK_W` | 6 mm, 50 mm | Profile thickness and bracket width; two M5 heads 30 mm apart need 49 |
+| `T`, `ARM_T`, `BRK_W` | 6, 20, 50 mm | Plate thickness, arm thickness, bracket width; two M5 heads 30 mm apart need 49 |
 | `JOINT`, `JOINT_W`, `JOINT_FLARE`, `JOINT_FIT` | 14, 30, 3, 0.2 mm | The dovetail: length, root width, flare per side, clearance per side |
 | `PATTERN`, `SLEEVE_SCREW_D` | 80 mm, M4 | The sleeve's mount pattern and its screws |
 | `TOP_TILT` | 8° | The keyboard top's own slope, for the ghost only |
