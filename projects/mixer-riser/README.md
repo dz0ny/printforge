@@ -6,7 +6,8 @@ rear panel has four threaded holes in a row near its top edge, an outer pair
 330 mm apart and an inner pair 270 mm apart, so each side has two holes 30 mm
 apart. Each side piece screws into its pair with M5 screws, hooks over the
 keyboard's rear edge with a ledge, and carries its half of the tilted plate in
-the same print. The two halves meet in the middle with a dovetail puzzle joint
+the same print; the plate reaches 90 mm forward of the arm and 80 mm back over
+it, a T from the side, so the 213 mm sleeve rests on 170 mm of plate. The two halves meet in the middle with a dovetail puzzle joint
 that drops together; the sleeve bolted on top with its own four M4 screws then
 holds both halves down. The plate's underside sits a thumb, 20 mm, above the
 rear edge. The span is wider than a 256 mm bed, which is why it is two pieces.
@@ -63,8 +64,8 @@ uv run mixer_riser.py --serve --lan --port 8767
 | Panel screws | Two M5 clearance holes 30 mm apart, heads on the rear face |
 | Arm | The base plate continuing up past the panel's top edge, 20 mm thick |
 | Ledge | A tab from the arm that rests on the keyboard's top, over the rear edge, taking the weight |
-| Rib | Two ribs flush with the bracket's side faces, bracing the plate down to the ledge |
-| Plate | The piece's half of the 90 mm deep plate, from the bracket to the middle, 6 mm thick |
+| Gusset | A full-width wedge from the plate's underside down to the ledge |
+| Plate | The piece's half of the plate: 90 mm forward of the arm and 80 mm back over it, a T from the side, 6 mm thick |
 | Puzzle joint | A 14 mm dovetail tongue and a matching socket at the middle, 0.2 mm clearance |
 | Sleeve screws | The sleeve's 80 × 80 pattern, M4, two holes per piece |
 
@@ -77,7 +78,7 @@ uv run mixer_riser.py --serve --lan --port 8767
 | `PANEL_TOP` | 25 mm | Height of the panel's top edge above the holes, measured |
 | `EDGE_GAP` | 20 mm | Gap between the rear edge and the plate's underside: a thumb |
 | `LEDGE` | 15 mm | How far the ledge reaches over the keyboard's top |
-| `TILT`, `PLATE_L` | 15°, 90 mm | Slope toward the player and the plate's depth along it |
+| `TILT`, `PLATE_L`, `PLATE_BACK` | 15°, 90, 80 mm | Slope toward the player, the plate's reach forward of the arm and back over it |
 | `T`, `ARM_T`, `BRK_W` | 6, 20, 50 mm | Plate thickness, arm thickness, bracket width; two M5 heads 30 mm apart need 49 |
 | `JOINT`, `JOINT_W`, `JOINT_FLARE`, `JOINT_FIT` | 14, 30, 3, 0.2 mm | The dovetail: length, root width, flare per side, clearance per side |
 | `PATTERN`, `SLEEVE_SCREW_D` | 80 mm, M4 | The sleeve's mount pattern and its screws |

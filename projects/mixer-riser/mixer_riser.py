@@ -47,8 +47,9 @@ BASE_DOWN = 20.0     # Base plate below the holes. [10:60]
 LEDGE = 15.0         # A ledge from the arm rests on the keyboard's top, over the rear edge. [0:40]
 EDGE_GAP = 20.0      # Gap between the keyboard's top edge and the plate's underside: a thumb. [14:60]
 TILT = 15.0          # Slope toward the player, degrees from horizontal. [0:40]
-PLATE_L = 90.0       # Depth of the stub and the plate along the slope: the pattern plus 5 mm each side. [85:200]
-RIB_T = 4 * LINE     # Thickness of the two ribs bracing the stub down to the ledge, 4 lines. [1.2:8]
+PLATE_L = 90.0       # Plate reach forward from the arm along the slope. [60:200]
+PLATE_BACK = 80.0    # Plate reach backward over and behind the arm, so the side view is a T. [0:150]
+GUSSET = True        # A full-width gusset from the plate's underside down to the ledge. [0:1]
 ROUND = 1.5          # Radius on the base plate's bottom corners. [0:4]
 
 # 🪢 Puzzle joint. The two halves meet in the middle with a dovetail tongue and socket.
@@ -61,10 +62,11 @@ PLATE_MARGIN = 0.0   # Plate reach beyond the bracket's outer face. Keep 0: prin
 ANG = math.radians(TILT)
 PITCH = (OUTER - INNER) / 2                   # The two holes of one side.
 YC = (OUTER + INNER) / 4                      # Bracket centre, each side.
-UNDER_REAR_Z = PANEL_TOP + EDGE_GAP           # The plate's underside at the arm.
+UNDER_REAR_Z = PANEL_TOP + EDGE_GAP           # The plate's underside at the arm's front face.
+S_MID = (PLATE_L - PLATE_BACK) / 2            # The plate's middle along the slope, where the sleeve sits.
 HALF_Y = YC + BRK_W / 2 + PLATE_MARGIN         # From the plate's outer end to the keyboard's middle.
 DOWN = (-math.sin(ANG), -math.cos(ANG))       # Downward normal of the slope, (x, z).
-assert min(T, RIB_T) >= 2 * LINE, "a wall is thinner than two lines"
+assert T >= 2 * LINE, "a wall is thinner than two lines"
 
 
 def check_design():
@@ -73,6 +75,7 @@ def check_design():
     assert PITCH + HEAD_D + 10 <= BRK_W, "the bracket is narrower than its pair of screws"
     assert EDGE_GAP > T / math.cos(ANG) + T + 2, "the ledge needs room under the stub: raise EDGE_GAP"
     assert 2 * JOINT_W + 2 * JOINT_FLARE + 20 <= PLATE_L, "the plate is too short for the tongue and the socket"
+    assert PLATE_L + PLATE_BACK >= PATTERN + 10, "the plate is shorter than the sleeve's pattern"
     assert HALF_Y + JOINT <= 250, "a side piece is taller than the bed when printed on its side"
 
 
@@ -82,15 +85,13 @@ def slope_plane(origin=(0.0, 0.0, UNDER_REAR_Z)):
 
 
 def bracket_profile():
-    """Side profile in XZ: base plate, arm with its ledge, and the tilted stub."""
-    top_rear = (0.0, UNDER_REAR_Z)
-    top_front = (PLATE_L * math.cos(ANG), UNDER_REAR_Z - PLATE_L * math.sin(ANG))
-    under_front = (top_front[0] + DOWN[0] * T, top_front[1] + DOWN[1] * T)
-    under_rear = (0.0, UNDER_REAR_Z - T / math.cos(ANG))
+    """Side profile in XZ of the bracket alone: base plate, arm with its ledge, the arm's
+    top cut to the slope. The plate is a separate slab in the slope's plane."""
+    arm_top_rear = (-ARM_T, UNDER_REAR_Z + ARM_T * math.tan(ANG))  # The plate's underside at the arm's rear face.
     pts = [(-ARM_T, -BASE_DOWN), (0.0, -BASE_DOWN), (0.0, PANEL_TOP), (LEDGE, PANEL_TOP), (LEDGE, PANEL_TOP + T),
-           (0.0, PANEL_TOP + T), under_rear, under_front, top_front, top_rear, (-ARM_T, UNDER_REAR_Z)]
+           (0.0, PANEL_TOP + T), (0.0, UNDER_REAR_Z), arm_top_rear]
     if LEDGE <= 0:
-        pts = [(-ARM_T, -BASE_DOWN), (0.0, -BASE_DOWN), under_rear, under_front, top_front, top_rear, (-ARM_T, UNDER_REAR_Z)]
+        pts = [(-ARM_T, -BASE_DOWN), (0.0, -BASE_DOWN), (0.0, UNDER_REAR_Z), arm_top_rear]
     return cq.Workplane("XZ").polyline(pts).close()
 
 
@@ -115,12 +116,12 @@ def side_piece(right=False):
                 .fillet(ROUND)
         except Exception as e:
             print(f"round skipped on the base plate's bottom: {e}")
-    # Two ribs flush with the bracket's side faces, from the plate's underside down to the ledge.
-    under_rear_z = UNDER_REAR_Z - T / math.cos(ANG)
-    reach = under_rear_z - (PANEL_TOP + T)
-    for y in (PLATE_MARGIN, PLATE_MARGIN + BRK_W - RIB_T):
-        tri = [(0.0, under_rear_z), (0.0, PANEL_TOP + T), (reach * math.cos(ANG), under_rear_z - reach * math.sin(ANG))]
-        body = body.union(cq.Workplane("XZ", origin=(0, y, 0)).polyline(tri).close().extrude(-RIB_T))
+    # A gusset the full bracket width, from the plate's underside down to the ledge.
+    # Thin ribs would have a side facing down in the print; the gusset has none.
+    if GUSSET:
+        reach = UNDER_REAR_Z - (PANEL_TOP + T)
+        tri = [(0.0, UNDER_REAR_Z), (0.0, PANEL_TOP + T), (reach * math.cos(ANG), UNDER_REAR_Z - reach * math.sin(ANG))]
+        body = body.union(cq.Workplane("XZ", origin=(0, PLATE_MARGIN, 0)).polyline(tri).close().extrude(-BRK_W))
     # The pair of panel screws, through the base plate.
     for y in (PLATE_MARGIN + BRK_W / 2 - PITCH / 2, PLATE_MARGIN + BRK_W / 2 + PITCH / 2):
         body = body.cut(cq.Workplane("YZ", origin=(-ARM_T - 1, y, 0)).circle(SCREW_D / 2 + 0.25).extrude(ARM_T + 2))
@@ -131,14 +132,14 @@ def side_piece(right=False):
     tongue_x, socket_x = (x_high, x_low) if right else (x_low, x_high)
     tx = joint_shape(tongue_x, JOINT, JOINT_W, JOINT_W + 2 * JOINT_FLARE)
     # Walk the outline: bottom edge, right edge up to the middle, the tongue, the left edge.
-    outline = [(0.0, 0.0), (PLATE_L, 0.0), (PLATE_L, HALF_Y), (tx[1][0], HALF_Y), (tx[2][0], HALF_Y + JOINT),
-               (tx[3][0], HALF_Y + JOINT), (tx[0][0], HALF_Y), (0.0, HALF_Y)]
+    outline = [(-PLATE_BACK, 0.0), (PLATE_L, 0.0), (PLATE_L, HALF_Y), (tx[1][0], HALF_Y), (tx[2][0], HALF_Y + JOINT),
+               (tx[3][0], HALF_Y + JOINT), (tx[0][0], HALF_Y), (-PLATE_BACK, HALF_Y)]
     plate = cq.Workplane(plane).polyline(outline).close().extrude(T)
     socket = joint_shape(socket_x - JOINT_FIT, JOINT + JOINT_FIT,
                          JOINT_W + 2 * JOINT_FIT, JOINT_W + 2 * JOINT_FLARE + 2 * JOINT_FIT)
     sock = cq.Workplane(plane).workplane(offset=-1).polyline([(x, HALF_Y - y) for x, y in socket]).close().extrude(T + 2)
     plate = plate.cut(sock)
-    holes = [(PLATE_L / 2 + sx * PATTERN / 2, HALF_Y - PATTERN / 2) for sx in (-1, 1)]
+    holes = [(S_MID + sx * PATTERN / 2, HALF_Y - PATTERN / 2) for sx in (-1, 1)]
     plate = plate.cut(cq.Workplane(plane).workplane(offset=-1).pushPoints(holes).circle(SLEEVE_SCREW_D / 2 + 0.25).extrude(T + 2))
     return body.union(plate)
 
@@ -173,13 +174,13 @@ def device():
                                        (TOP_DEPTH, PANEL_TOP - drop - 6), (0.5, PANEL_TOP - 6)]).close() \
         .extrude(span / 2, both=True)
     plane = slope_plane()
-    sleeve = cq.Workplane(plane).workplane(offset=T).center(PLATE_L / 2, 0).rect(SLEEVE_L, SLEEVE_W).extrude(SLEEVE_T)
+    sleeve = cq.Workplane(plane).workplane(offset=T).center(S_MID, 0).rect(SLEEVE_L, SLEEVE_W).extrude(SLEEVE_T)
     return panel.union(top).union(sleeve)
 
 
 def features():
     c, s = math.cos(ANG), math.sin(ANG)
-    mid = (PLATE_L / 2 * c, UNDER_REAR_Z - PLATE_L / 2 * s + T * c)  # Plate top, middle of the slope: (x, z).
+    mid = (S_MID * c, UNDER_REAR_Z - S_MID * s + T * c)  # Plate top, middle of the slope: (x, z).
     up = (s, 0, c)
     return {
         "Base plate": {"at": (-ARM_T - 0.5, -YC, 0), "normal": (-1, 0, 0), "params": ["ARM_T", "BRK_W", "BASE_DOWN"]},
@@ -187,9 +188,11 @@ def features():
                          "params": ["OUTER", "INNER", "SCREW_D", "HEAD_D"]},
         "Arm": {"at": (-ARM_T - 0.5, -YC, UNDER_REAR_Z / 2), "normal": (-1, 0, 0), "params": ["ARM_T", "PANEL_TOP", "EDGE_GAP"]},
         "Ledge": {"at": (LEDGE / 2, -YC, PANEL_TOP + T + 0.5), "normal": (0, 0, 1), "params": ["LEDGE", "PANEL_TOP"]},
-        "Rib": {"at": ((EDGE_GAP - T) / 4, -YC - BRK_W / 2 - 0.5, UNDER_REAR_Z - T - (EDGE_GAP - T) / 3), "normal": (0, -1, 0),
-                "params": ["RIB_T", "EDGE_GAP"]},
-        "Plate": {"at": (mid[0], -YC, mid[1] + 0.5), "normal": up, "params": ["TILT", "PLATE_L", "PLATE_MARGIN", "T"]},
+        "Gusset": {"at": ((EDGE_GAP - T) / 4, -YC - BRK_W / 2 - 0.5, UNDER_REAR_Z - (EDGE_GAP - T) / 3), "normal": (0, -1, 0),
+                   "params": ["GUSSET", "EDGE_GAP"]},
+        "Plate": {"at": (mid[0], -YC, mid[1] + 0.5), "normal": up, "params": ["TILT", "PLATE_L", "PLATE_BACK", "T"]},
+        "Back wing": {"at": (-PLATE_BACK * 0.6 * c, -YC, UNDER_REAR_Z + PLATE_BACK * 0.6 * s - 0.5), "normal": (-s, 0, -c),
+                      "params": ["PLATE_BACK"]},
         "Puzzle joint": {"at": (mid[0], 0, mid[1] + 0.5), "normal": up, "params": ["JOINT", "JOINT_W", "JOINT_FLARE", "JOINT_FIT"]},
         "Sleeve screws": {"at": (mid[0] + PATTERN / 2 * c, PATTERN / 2, mid[1] - PATTERN / 2 * s + 0.5), "normal": up,
                           "params": ["PATTERN", "SLEEVE_SCREW_D"]},

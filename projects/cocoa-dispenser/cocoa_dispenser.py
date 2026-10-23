@@ -1,13 +1,14 @@
 """Cocoa duster for latte art: press the button on top, cocoa falls through a sieve
 and a slide-in stencil (a heart by default) onto the cup. Made with CadQuery.
 
-Six printed parts and one bought spring:
+Seven printed parts (or six and a bought metal spring, PRINT_SPRING = False):
   Stand    sits on the cup rim, holds the stencil in a slot and centres the body.
   Stencil  slides into the stand from the front, with a tab to pull it out.
   Body     the cocoa hopper, with the sieve printed into its floor.
   Lid      push-fit on the hopper, guides the plunger rod, seats the spring.
   Plunger  rod with a spoked agitator just above the sieve and a stop collar.
   Button   push-fit on the rod top; its skirt hides the spring and is the end stop.
+  Spring   PETG wave spring: rings that touch at their crests, around the rod.
 
 Use frame: Z up, z = 0 is the cup rim (the stand's underside), the stencil tab
 points to -Y (the front). One press moves the agitator STROKE mm down through the
@@ -68,25 +69,44 @@ SPOKES = 4           # Agitator spokes. [3:8]
 SPOKE_W = 3.0        # Spoke width. [1.5:6]
 COLLAR_D = 11.0      # Stop collar under the lid hub. [8:16]
 COLLAR_T = 3.0       # Collar height. [2:6]
-LID_T = 12 * LAYER   # Lid plate thickness. [1.6:4]
+LID_T = 16 * LAYER   # Lid plate thickness. [1.6:5]
 LID_PLUG = 6.0       # Depth of the lid plug inside the hopper. [3:12]
 LID_FIT = 0.2        # Clearance per side of the lid plug in the hopper. [0.05:0.5]
 HUB_D = 13.0         # Lid guide hub diameter. [10:20]
-SEAT_D = 11.0        # Spring seat in the lid top. [6:16]
-SEAT_DEPTH = 8 * LAYER  # Spring seat depth. [0.8:3]
-BTN_D = 26.0         # Button diameter. [16:40]
-BTN_CAV_D = 14.0     # Button skirt inside, around the spring. [10:24]
-BTN_CAV = 10.0       # Skirt depth. [5:20]
+SEAT_DEPTH = 8 * LAYER  # Spring seat depth in the lid top. [0.8:3]
+SPRING_PLAY = 1.0    # Clearance per side around the spring in the seat and the button skirt. [0.3:2]
+BTN_WALL = 9 * LINE  # Button skirt wall. [1.2:6]
 BTN_TOP = 8.0        # Solid cap above the skirt; holds the rod socket. [5:14]
 SOCKET = 6.0         # Rod depth in the button. [3:10]
 ROD_PRESS = 0.05     # Socket clearance per side; tight, add a drop of glue. [0:0.2]
 
-# 🌀 Spring. Buy one: OD 9-10 mm, wire 0.6-0.8 mm, free length about 25 mm.
-SPRING_OD = 10.0     # Spring outside diameter. [6:13]
-SPRING_L = 25.0      # Spring free length. [15:40]
-SPRING_SOLID = 8.0   # Spring fully compressed length. [4:14]
+# 🌀 Spring. A printed PETG wave spring, or a bought metal one.
+PRINT_SPRING = True  # True: print the wave spring. False: buy a metal spring.
+PRELOAD = 2.0        # Spring compression at rest, so the button does not rattle. [0.5:5]
+WS_D = 20.0          # Wave spring mean diameter. Larger is softer. [12:30]
+WS_B = 4 * LINE      # Band width, radial, 4 lines. [1.2:4]
+WS_T = 4 * LAYER     # Band thickness, vertical, 4 layers. Thinner is much softer. [0.6:2]
+WS_H = 4.0           # Wave height, crest to trough. [2:8]
+WS_WAVES = 3         # Waves per ring. Fewer is softer but the underside overhang gets flatter. [2:6]
+WS_RINGS = 8         # Number of wave rings. More is softer and longer. [4:16]
+WS_END = 6 * LAYER   # Flat end ring thickness. [0.8:3]
+WS_JOIN = 0.3        # Overlap where the rings touch, so they print as one part. [0.1:0.6]
+METAL_OD = 10.0      # Bought spring outside diameter: OD 9-10, wire 0.6-0.8 mm. [6:13]
+METAL_L = 25.0       # Bought spring free length. [15:40]
+METAL_SOLID = 8.0    # Bought spring fully compressed length. [4:14]
 
 # Derived values.
+if PRINT_SPRING:
+    SPRING_OD = WS_D + WS_B
+    WS_PITCH = WS_H + WS_T - WS_JOIN
+    SPRING_L = 2 * WS_END - WS_JOIN + WS_RINGS * WS_PITCH
+    SPRING_SOLID = 2 * WS_END + WS_RINGS * WS_T
+else:
+    SPRING_OD, SPRING_L, SPRING_SOLID = METAL_OD, METAL_L, METAL_SOLID
+SEAT_D = SPRING_OD + 2 * SPRING_PLAY
+BTN_CAV_D = SPRING_OD + 2 * SPRING_PLAY
+BTN_D = BTN_CAV_D + 2 * BTN_WALL
+BTN_CAV = SPRING_L - PRELOAD - STROKE - SEAT_DEPTH   # Skirt depth: the spring at rest fits exactly.
 HOP_ID = HOP_D - 2 * WALL
 SLOT_H = STENCIL_T + SLOT_PLAY
 STAND_TOP = STAND_BASE + SLOT_H
@@ -119,6 +139,13 @@ def check_design():
     assert SPRING_REST < SPRING_L, "no spring preload: shorten BTN_CAV or use a longer spring"
     assert SPRING_PRESSED > SPRING_SOLID + 0.5, "the spring goes solid before the button lands"
     assert ROD_TOP - BTN_Z + BTN_TOP - SOCKET > 0
+    assert BTN_CAV > 3, "the spring is too short for this stroke"
+    assert SEAT_D < HOP_D - 6, "the spring seat is wider than the lid"
+    assert SPRING_OD - 2 * (WS_B if PRINT_SPRING else 0.8) > ROD_D + 2, "the rod does not fit inside the spring"
+    if PRINT_SPRING:
+        per_ring = (SPRING_L - SPRING_PRESSED) / WS_RINGS
+        assert per_ring <= 0.5 * (WS_H - WS_JOIN), "each ring bends more than half its wave: add rings"
+        assert WS_B >= 2 * LINE and WS_T >= 3 * LAYER, "the wave band is too thin to print"
 
 
 def cyl(d, h, z=0.0):
@@ -226,9 +253,44 @@ def button(press=0.0):
     return b.translate((0, 0, BODY_Z + BTN_Z - press))
 
 
+def wave_ring(base, sign, h=WS_H, n=72):
+    """One wave ring: a band WS_B wide and WS_T thick whose height follows a cosine.
+    Made as a ruled loft through radial rectangles; spline sweeps gave invalid booleans."""
+    r0, r1 = WS_D / 2 - WS_B / 2, WS_D / 2 + WS_B / 2
+    wires = []
+    for k in range(n + 1):
+        th = 2 * math.pi * (k % n) / n
+        z = base + h / 2 * (1 + sign * math.cos(WS_WAVES * th))
+        c, s = math.cos(th), math.sin(th)
+        wires.append(cq.Wire.makePolygon(
+            [cq.Vector(r * c, r * s, zz) for r, zz in ((r0, z), (r1, z), (r1, z + WS_T), (r0, z + WS_T))], close=True))
+    return cq.Solid.makeLoft(wires, ruled=True)
+
+
+def wave_spring(length=None):
+    """The wave spring standing on z = 0. With length, the pitch shrinks to show it compressed."""
+    length = SPRING_L if length is None else length
+    pitch = (length - 2 * WS_END + WS_JOIN) / WS_RINGS
+    h = pitch - WS_T + WS_JOIN  # A compressed spring has flatter waves.
+    end = lambda z: cq.Workplane("XY").workplane(offset=z).circle(SPRING_OD / 2).circle(WS_D / 2 - WS_B / 2).extrude(WS_END).val()
+    s = end(0.0)
+    for i in range(WS_RINGS):
+        s = s.fuse(wave_ring(WS_END - WS_JOIN + i * pitch, -1 if i % 2 == 0 else 1, h)).clean()
+    s = s.fuse(end(length - WS_END)).clean()
+    return cq.Workplane("XY").newObject([s])
+
+
+def spring(press=0.0):
+    length = SPRING_REST - press
+    return wave_spring(length).translate((0, 0, BODY_Z + LID_TOP - SEAT_DEPTH))
+
+
 def parts(press=0.0):
-    return {"stand": stand(), "stencil": stencil(), "body": body(), "lid": lid(),
-            "plunger": plunger(press), "button": button(press)}
+    ps = {"stand": stand(), "stencil": stencil(), "body": body(), "lid": lid(),
+          "plunger": plunger(press), "button": button(press)}
+    if PRINT_SPRING:
+        ps["spring"] = spring(press)
+    return ps
 
 
 def build():
@@ -238,8 +300,10 @@ def build():
 
 
 def device():
-    """The cup and the bought spring, for the ghost view."""
+    """The cup, and the bought spring when there is one, for the ghost view."""
     cup = cyl(CUP_D, CUP_H, -CUP_H).cut(cyl(CUP_D - 6, CUP_H, -CUP_H + 4))
+    if PRINT_SPRING:
+        return cup
     spring = cyl(SPRING_OD, SPRING_REST, BODY_Z + LID_TOP - SEAT_DEPTH).cut(
         cyl(SPRING_OD - 1.6, SPRING_REST + 2, BODY_Z + LID_TOP - SEAT_DEPTH - 1))
     return cup.union(spring)
@@ -268,6 +332,8 @@ def features():
                    "params": ["STROKE", "BTN_D", "BTN_CAV", "BTN_TOP"]},
         "Sieve": {"at": (SIEVE_D / 2 - 6, 0, zb - 0.5), "normal": (0, 0, -1),
                   "params": ["SIEVE_D", "SIEVE_HOLE", "SIEVE_PITCH"]},
+        "Spring": {"at": (SPRING_OD / 2 + 0.5, 0, zb + LID_TOP + STROKE / 2), "normal": (1, 0, 0),
+                   "params": ["PRINT_SPRING", "WS_D", "WS_T", "WS_H", "WS_WAVES", "WS_RINGS"]},
     }
 
 
@@ -279,7 +345,8 @@ def labels():
 
 
 # Print orientation per part: True = flip it upside down.
-PRINT_FLIP = {"stand": False, "stencil": False, "body": False, "lid": True, "plunger": False, "button": True}
+PRINT_FLIP = {"stand": False, "stencil": False, "body": False, "lid": True, "plunger": False, "button": True,
+              "spring": False}
 
 
 def for_print(p, flip):
@@ -350,8 +417,10 @@ if __name__ == "__main__":
     # Each part on its own, then one plate STL from those meshes, so the sieve
     # (about 700 holes) is tessellated only once: it needs ~2.7 GB as it is.
     layout = {"stand": (2, 2), "body": (112, 2), "stencil": (2, 112), "lid": (92, 112),
-              "plunger": (170, 112), "button": (170, 176)}
+              "plunger": (170, 112), "button": (170, 176), "spring": (212, 176)}
     boxes = []
+    if PRINT_SPRING:
+        ps["spring"] = wave_spring()  # Printed at its free length.
     for name, p in ps.items():
         solid = p.val()
         assert solid.isValid(), f"{name}: invalid solid"
@@ -372,5 +441,9 @@ if __name__ == "__main__":
     pmax = (max(b[2] for b in boxes), max(b[3] for b in boxes))
     bb = asm.val().BoundingBox()
     print(f"assembled {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm; plate {pmax[0]:.0f} x {pmax[1]:.0f} mm")
-    print(f"spring {SPRING_REST:.1f} mm at rest, {SPRING_PRESSED:.1f} mm pressed (free {SPRING_L})")
-    print("wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, 6 part STLs, cocoa_dispenser_plate.stl, labels.json")
+    print(f"spring {SPRING_REST:.1f} mm at rest, {SPRING_PRESSED:.1f} mm pressed (free {SPRING_L:.1f}, solid {SPRING_SOLID:.1f})")
+    if PRINT_SPRING:
+        # Crest-to-crest wave spring estimate, PETG E about 2000 MPa. Test it: printed parts vary.
+        k = 2000 * WS_B * WS_T ** 3 * WS_WAVES ** 4 / (2.4 * WS_D ** 3) / WS_RINGS
+        print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.0f} N at rest, {k * (PRELOAD + STROKE):.0f} N pressed")
+    print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json")
