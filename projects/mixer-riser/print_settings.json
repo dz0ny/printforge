@@ -1,0 +1,13 @@
+{
+  "_why": "0.2 mm layers and 4 wall loops; 30% gyroid infill because the bracket carries a 1.3 kg mixer on two screws. Prints on its side, every wall vertical, no supports. PETG or ASA for a part under load for years.",
+  "layer_height": "0.2",
+  "initial_layer_print_height": "0.2",
+  "wall_loops": "4",
+  "top_shell_layers": "5",
+  "bottom_shell_layers": "5",
+  "sparse_infill_density": "30%",
+  "sparse_infill_pattern": "gyroid",
+  "enable_support": "0",
+  "brim_type": "outer_only",
+  "seam_position": "aligned"
+}

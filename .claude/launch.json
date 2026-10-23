@@ -26,6 +26,20 @@
         "8766"
       ],
       "port": 8766
+    },
+    {
+      "name": "mixer-riser",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "projects/mixer-riser",
+        "projects/mixer-riser/mixer_riser.py",
+        "--serve",
+        "--port",
+        "8767"
+      ],
+      "port": 8767
     }
   ]
 }
