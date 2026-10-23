@@ -66,7 +66,7 @@ uv run mixer_riser.py --serve --lan --port 8767
 | Ledge | A tab from the arm that rests on the keyboard's top, over the rear edge, taking the weight |
 | Stub | The bracket's tilted top, 90 mm along the slope, with two M4 holes for the plate half |
 | Rib | Two ribs flush with the bracket's side faces, bracing the stub down to the ledge |
-| Plate half | One of the two 221 × 90 mm plates, 6 mm thick |
+| Plate half | One of the two 226 × 90 mm plates, 6 mm thick |
 | Lap joint | The 92 mm overlap in the middle, each half thinned to 3 mm, clamped by the sleeve's screws |
 | Sleeve screws | The sleeve's 80 × 80 pattern, M4, through both halves |
 
