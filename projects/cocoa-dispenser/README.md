@@ -6,9 +6,9 @@ in the lid: every click is one tap on the body, and the taps shake a fine, even 
 of cocoa through the sieve floor. No shutter: the fine holes hold the cocoa at rest,
 it bridges over them, the way the LatteShot works.
 
-![assembled](renders/v3/v3_assembled.png)
+![in use](renders/v3/v3_cafe.png)
+![the result](renders/v3/v3_result.png)
 ![parts](renders/v3/v3_parts_flatlay.png)
-![tongue on the rack](renders/v3/v3_tongue.png)
 ![section, rest and pressed](views/section_rest_pressed.png)
 ![tongue close-up](views/tongue_closeup.png)
 ![views](views/sheet.png)
