@@ -2,11 +2,11 @@
 
 Four printed parts that hold the [mixer sleeve](../mixer-sleeve) above a Tyros 3,
 tilted 15° toward the player. The Tyros rear panel has four threaded holes in a
-row near its top edge, an outer pair 295 mm apart and an inner pair 274 mm apart,
-so each side has two holes 10.5 mm apart. One identical bracket per side screws
+row near its top edge, an outer pair 330 mm apart and an inner pair 270 mm apart,
+so each side has two holes 30 mm apart. One identical bracket per side screws
 into its pair with M5 screws, hooks over the keyboard's rear edge with a ledge,
 and carries a stub tilted 15°. Two identical plate halves lie on the stubs,
-overlap 100 mm in the middle with a half-lap joint, and are clamped together by
+overlap 92 mm in the middle with a half-lap joint, and are clamped together by
 the sleeve's own four M4 screws on its 80 × 80 pattern. The plate's underside
 sits a thumb, 20 mm, above the rear edge. The span is wider than a 256 mm bed,
 which is why it is four parts.
@@ -61,27 +61,27 @@ uv run mixer_riser.py --serve --lan --port 8767
 | Name | Where it is |
 |---|---|
 | Base plate | The vertical plate against the rear panel, with its pair of screw holes |
-| Panel screws | Two M5 clearance holes 10.5 mm apart, heads on the rear face |
+| Panel screws | Two M5 clearance holes 30 mm apart, heads on the rear face |
 | Arm | The base plate continuing up past the panel's top edge |
 | Ledge | A tab from the arm that rests on the keyboard's top, over the rear edge, taking the weight |
-| Stub | The bracket's tilted top, 110 mm along the slope, with two M4 holes for the plate half |
+| Stub | The bracket's tilted top, 90 mm along the slope, with two M4 holes for the plate half |
 | Rib | Two ribs flush with the bracket's side faces, bracing the stub down to the ledge |
-| Plate half | One of the two 227 × 110 mm plates, 6 mm thick |
-| Lap joint | The 100 mm overlap in the middle, each half thinned to 3 mm, clamped by the sleeve's screws |
+| Plate half | One of the two 221 × 90 mm plates, 6 mm thick |
+| Lap joint | The 92 mm overlap in the middle, each half thinned to 3 mm, clamped by the sleeve's screws |
 | Sleeve screws | The sleeve's 80 × 80 pattern, M4, through both halves |
 
 ## Main settings
 
 | Setting | Value | Meaning |
 |---|---|---|
-| `OUTER`, `INNER` | 295, 274 mm | The outer and inner pairs of panel holes, measured |
+| `OUTER`, `INNER` | 330, 270 mm | The outer and inner pairs of panel holes, measured 33 and 27 cm |
 | `SCREW_D`, `HEAD_D` | M5, 9 mm | Panel screws; the two heads of a pair must not touch |
 | `PANEL_TOP` | 25 mm | Height of the panel's top edge above the holes, measured |
 | `EDGE_GAP` | 20 mm | Gap between the rear edge and the plate's underside: a thumb |
 | `LEDGE` | 15 mm | How far the ledge reaches over the keyboard's top |
-| `TILT`, `PLATE_L` | 15°, 110 mm | Slope toward the player and the plate's depth along it |
+| `TILT`, `PLATE_L` | 15°, 90 mm | Slope toward the player and the plate's depth along it |
 | `T`, `BRK_W` | 6 mm, 50 mm | Profile thickness and bracket width |
-| `OVERLAP`, `PLATE_MARGIN` | 100 mm, 10 mm | The half-lap length and the plate's reach beyond the bracket |
+| `OVERLAP`, `PLATE_MARGIN` | 92 mm, 5 mm | The half-lap length and the plate's reach beyond the bracket |
 | `PATTERN`, `SLEEVE_SCREW_D` | 80 mm, M4 | The sleeve's mount pattern and its screws |
 | `TOP_TILT` | 8° | The keyboard top's own slope, for the ghost only |
 

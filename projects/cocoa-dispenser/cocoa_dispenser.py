@@ -298,7 +298,28 @@ def slab_test(p, name, want_bottom_heavy=True):
     assert bb.xlen <= BED and bb.ylen <= BED, f"{name}: does not fit the bed"
 
 
+def merge_stls(items, out):
+    """Join binary STLs into one, each moved by (dx, dy). Keeps the parts as separate shells."""
+    import struct
+    tris = []
+    for path, (dx, dy) in items:
+        data = open(path, "rb").read()
+        n = struct.unpack("<I", data[80:84])[0]
+        for i in range(n):
+            o = 84 + i * 50
+            v = list(struct.unpack("<12f", data[o:o + 48]))
+            for k in (3, 6, 9):
+                v[k] += dx
+                v[k + 1] += dy
+            tris.append(struct.pack("<12fH", *v, 0))
+    with open(out, "wb") as f:
+        f.write(b"cocoa dispenser plate".ljust(80, b" "))
+        f.write(struct.pack("<I", len(tris)))
+        f.writelines(tris)
+
+
 if __name__ == "__main__":
+    import gc
     import json
     import sys
     if "--serve" in sys.argv:
@@ -326,30 +347,30 @@ if __name__ == "__main__":
                 v = pp[a].intersect(pp[b]).val().Volume() if pp[a].intersect(pp[b]).vals() else 0.0
                 assert v < 0.5, f"{state}: {a} and {b} overlap by {v:.2f} mm3"
 
-    plate = []
+    # Each part on its own, then one plate STL from those meshes, so the sieve
+    # (about 700 holes) is tessellated only once: it needs ~2.7 GB as it is.
     layout = {"stand": (2, 2), "body": (112, 2), "stencil": (2, 112), "lid": (92, 112),
               "plunger": (170, 112), "button": (170, 176)}
+    boxes = []
     for name, p in ps.items():
         solid = p.val()
         assert solid.isValid(), f"{name}: invalid solid"
         assert len(p.solids().vals()) == 1, f"{name}: not one solid"
         pr = for_print(p, PRINT_FLIP[name])
         slab_test(pr, name)
-        cq.exporters.export(pr, f"{name}.stl", tolerance=0.03, angularTolerance=0.1)
-        x, y = layout[name]
-        plate.append(pr.translate((x, y, 0)).val())
+        cq.exporters.export(pr, f"{name}.stl", tolerance=0.05, angularTolerance=0.2)
         pb = pr.val().BoundingBox()
+        x, y = layout[name]
+        boxes.append((x, y, x + pb.xlen, y + pb.ylen))
         print(f"{name:8s} print {pb.xlen:6.1f} x {pb.ylen:6.1f} x {pb.zlen:6.1f} mm, {solid.Volume() / 1000:5.1f} cm3")
-    pl = cq.Compound.makeCompound(plate)
-    pbb = pl.BoundingBox()
-    assert pbb.xmax <= BED and pbb.ymax <= BED, f"plate {pbb.xmax:.0f} x {pbb.ymax:.0f} does not fit the bed"
-    for i, a in enumerate(plate):
-        for b in plate[i + 1:]:
-            assert a.BoundingBox().xmax < b.BoundingBox().xmin or b.BoundingBox().xmax < a.BoundingBox().xmin \
-                or a.BoundingBox().ymax < b.BoundingBox().ymin or b.BoundingBox().ymax < a.BoundingBox().ymin, \
-                "parts overlap on the plate"
-    cq.exporters.export(cq.Workplane("XY").newObject([pl]), "cocoa_dispenser_plate.stl", tolerance=0.03, angularTolerance=0.1)
+        gc.collect()
+    for i, a in enumerate(boxes):
+        assert a[2] <= BED and a[3] <= BED, "a part sticks off the bed"
+        for b in boxes[i + 1:]:
+            assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], "parts overlap on the plate"
+    merge_stls([(f"{n}.stl", layout[n]) for n in ps], "cocoa_dispenser_plate.stl")
+    pmax = (max(b[2] for b in boxes), max(b[3] for b in boxes))
     bb = asm.val().BoundingBox()
-    print(f"assembled {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm; plate {pbb.xmax:.0f} x {pbb.ymax:.0f} mm")
+    print(f"assembled {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm; plate {pmax[0]:.0f} x {pmax[1]:.0f} mm")
     print(f"spring {SPRING_REST:.1f} mm at rest, {SPRING_PRESSED:.1f} mm pressed (free {SPRING_L})")
     print("wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, 6 part STLs, cocoa_dispenser_plate.stl, labels.json")

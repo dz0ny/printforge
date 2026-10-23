@@ -97,7 +97,7 @@ collar and a mixer that could not pass under its own lips.
 |---|---|---|---|
 | [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 190 mm wide | `uv run mixer_sleeve.py --serve` |
 | [`projects/gutter-outlet`](./projects/gutter-outlet) | Outlet funnel from a half-round gutter to a round downpipe, no inner lip anywhere | NW 280 gutter, 127 mm inside, to a 58 mm pipe | `uv run gutter_outlet.py --serve` |
-| [`projects/mixer-riser`](./projects/mixer-riser) | Two brackets and a two-piece lapped plate that hold the mixer sleeve above a keyboard, tilted 15° toward the player | Yamaha Tyros 3, four M5 holes, outer pair 295 mm and inner pair 274 mm apart | `uv run mixer_riser.py --serve` |
+| [`projects/mixer-riser`](./projects/mixer-riser) | Two brackets and a two-piece lapped plate that hold the mixer sleeve above a keyboard, tilted 15° toward the player | Yamaha Tyros 3, four M5 holes, outer pair 330 mm and inner pair 270 mm apart | `uv run mixer_riser.py --serve` |
 
 Each project is a folder with the model script, the STEP, the print-ready STL
 and 3MF, labeled views and a README. Every one has a launcher in

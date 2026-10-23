@@ -18,8 +18,8 @@ import math
 import cadquery as cq
 
 # 🎹 Keyboard. The four threaded holes on the Tyros 3 rear panel, in one row.
-OUTER = 295.0        # Distance between the two outer holes, measured. [100:400]
-INNER = 274.0        # Distance between the two inner holes, measured. [80:380]
+OUTER = 330.0        # Distance between the two outer holes, measured 33 cm. [100:400]
+INNER = 270.0        # Distance between the two inner holes, measured 27 cm. [80:380]
 SCREW_D = 5.0        # Screw thread, M5. The holes get 0.5 mm clearance. [3:8]
 HEAD_D = 9.0         # Screw head diameter, so the two heads of a pair do not touch. [5:14]
 PANEL_TOP = 25.0     # Height of the panel's top edge above the holes, measured. [0:150]
@@ -45,14 +45,14 @@ BASE_DOWN = 20.0     # Base plate below the holes. [10:60]
 LEDGE = 15.0         # A ledge from the arm rests on the keyboard's top, over the rear edge. [0:40]
 EDGE_GAP = 20.0      # Gap between the keyboard's top edge and the plate's underside: a thumb. [14:60]
 TILT = 15.0          # Slope toward the player, degrees from horizontal. [0:40]
-PLATE_L = 110.0      # Depth of the stub and the plate along the slope. [90:200]
+PLATE_L = 90.0       # Depth of the stub and the plate along the slope: the pattern plus 5 mm each side. [85:200]
 RIB_T = 4 * LINE     # Thickness of the two ribs bracing the stub down to the ledge, 4 lines. [1.2:8]
 STUB_SCREW_D = 4.0   # Screws through each plate half into its stub, M4, two per side. [3:6]
 ROUND = 1.5          # Radius on the base plate's bottom corners. [0:4]
 
 # 🪢 Plate halves. Two identical flat plates, overlapping in the middle.
-OVERLAP = 100.0      # Length of the half-lap overlap, centred on the keyboard. [60:160]
-PLATE_MARGIN = 10.0  # Plate reach beyond the bracket's outer face. [0:30]
+OVERLAP = 92.0       # Length of the half-lap overlap, centred on the keyboard. [60:160]
+PLATE_MARGIN = 5.0   # Plate reach beyond the bracket's outer face. [0:30]
 
 ANG = math.radians(TILT)
 PITCH = (OUTER - INNER) / 2                   # The two holes of one side.
@@ -111,7 +111,7 @@ def bracket():
     for y in (-PITCH / 2, PITCH / 2):
         body = body.cut(cq.Workplane("YZ", origin=(-T - 1, y, 0)).circle(SCREW_D / 2 + 0.25).extrude(T + 2))
     # Two screws through the stub, for the plate half, along the slope.
-    pts = [(PLATE_L / 2 - 30, 0), (PLATE_L / 2 + 30, 0)]
+    pts = [(PLATE_L / 2 - 25, 0), (PLATE_L / 2 + 25, 0)]
     body = body.cut(cq.Workplane(slope_plane()).workplane(offset=-T - 1).pushPoints(pts)
                     .circle(STUB_SCREW_D / 2 + 0.25).extrude(T + 2))
     return body
@@ -126,7 +126,7 @@ def plate_half():
     plate = plate.cut(cq.Workplane("XY").box(PLATE_L + 2, OVERLAP, T, centered=(False, False, False))
                       .translate((-1, HALF_Y - OVERLAP, T / 2)))
     yb = PLATE_MARGIN + BRK_W / 2  # The bracket's centre line, in this frame.
-    stub = [(PLATE_L / 2 - 30, yb), (PLATE_L / 2 + 30, yb)]
+    stub = [(PLATE_L / 2 - 25, yb), (PLATE_L / 2 + 25, yb)]
     plate = plate.cut(cq.Workplane("XY").workplane(offset=-1).pushPoints(stub).circle(STUB_SCREW_D / 2 + 0.25).extrude(T + 2))
     yc = HALF_Y - OVERLAP / 2  # The keyboard's middle, in this frame.
     pattern = [(PLATE_L / 2 + sx * PATTERN / 2, yc + sy * PATTERN / 2) for sx in (-1, 1) for sy in (-1, 1)]
