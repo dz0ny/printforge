@@ -97,7 +97,7 @@ collar and a mixer that could not pass under its own lips.
 |---|---|---|---|
 | [`projects/mixer-sleeve`](./projects/mixer-sleeve) | Wall sleeve with lips, hex vents and a low end stop | Behringer Xenyx 1002SFX mixer, 190 mm wide | `uv run mixer_sleeve.py --serve` |
 | [`projects/gutter-outlet`](./projects/gutter-outlet) | Outlet funnel from a half-round gutter to a round downpipe, no inner lip anywhere | NW 280 gutter, 127 mm inside, to a 58 mm pipe | `uv run gutter_outlet.py --serve` |
-| [`projects/mixer-riser`](./projects/mixer-riser) | Bracket that hooks over a keyboard's rear edge and holds the mixer sleeve tilted 15° toward the player | Yamaha Tyros 3, two M5 holes 63 mm apart | `uv run mixer_riser.py --serve` |
+| [`projects/mixer-riser`](./projects/mixer-riser) | Two brackets and a two-piece lapped plate that hold the mixer sleeve above a keyboard, tilted 15° toward the player | Yamaha Tyros 3, four M5 holes, outer pair 295 mm and inner pair 274 mm apart | `uv run mixer_riser.py --serve` |
 
 Each project is a folder with the model script, the STEP, the print-ready STL
 and 3MF, labeled views and a README. Every one has a launcher in
@@ -147,6 +147,7 @@ How it evolved, one plain-language request at a time:
 | "Lips should gently touch the edge" and "this would print in air, go back" | A lip with its tip lowest prints in air; reverted, lesson in the pitfalls |
 | "The mixer is a bit oval, can we do something so the sleeve fits nicely" (with a photo) | Cavity, lips and fills follow a spline through three measured widths; the ghost too |
 | "Perfect print" | The barrel-shaped sleeve printed and fits; noted in the project README |
+| "Create a design that will angle another mixer at 15 degrees, with a photo and three laser readings" | The mixer riser: two side brackets and a lapped two-piece plate, since the holes span more than the bed |
 | "See if we can have a script that spots these" | `check_part.py`: thin walls, knife edges, device overlap, keep-clear volumes, overhangs. It found a funnel outlet blocked by its own collar, and a mixer that could not pass under its own lips |
 
 Every row was rebuilt, rendered and checked as a single solid before it was sent.

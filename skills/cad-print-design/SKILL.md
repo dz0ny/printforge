@@ -118,6 +118,8 @@ It builds the model and reports, with an exit code for scripts:
 - `keep_clear()` volumes: a list of shapes that must stay empty, such as a water channel, a screw's access, or the path a plug travels. Define it in the model next to `device()`,
 - overhangs in the print orientation, read from the exported STL.
 
+A part that is several prints, because it spans more than the bed or prints better in pieces, defines `parts()` returning `{name: shape}` in print orientation while `build()` returns the assembly as one compound; the checker then checks each part on its own and the device against the assembly, and the script exports one STL per part.
+
 Model the device honestly: feet, edge radii, beads and hooks. The gutter outlet's bead and the mixer's rubber feet both changed what the checks found. When a check fails, fix the geometry, not the threshold; a per-part threshold is fine when the part really needs it, and the README says so.
 
 ## 6b. Interactive configurator

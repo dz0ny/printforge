@@ -1,0 +1,14 @@
+[project]
+name = "cocoa-dispenser"
+description = "Push-button cocoa duster with a slide-in latte-art stencil, made with CadQuery"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cadquery>=2.8.0",
+    "printforge-configurator",
+]
+
+# The configurator lives in this repo. Other projects take it from git:
+# uv add "printforge-configurator @ git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator"
+[tool.uv.sources]
+printforge-configurator = { path = "../../skills/cad-print-design/configurator", editable = true }
