@@ -13,6 +13,16 @@ holds both halves down. The plate's underside sits a thumb, 20 mm, above the
 rear edge. The span is wider than a 256 mm bed, which is why it is two pieces.
 
 <p align="center">
+  <img src="../../assets/riser_hero.jpg" alt="Illustration: the two-piece riser on the back of a Tyros 3, holding the mixer sleeve tilted toward the player" width="900" />
+</p>
+
+<p align="center"><sub>Illustration generated from the model's renders. Not printed yet.</sub></p>
+
+<p align="center">
+  <img src="../../assets/riser_parts.jpg" alt="Illustration: the left and right pieces side by side, tongue and socket of the dovetail joint visible" width="900" />
+</p>
+
+<p align="center">
   <img src="./views/sheet.png" alt="Labeled views of the mixer riser assembly" width="900" />
 </p>
 

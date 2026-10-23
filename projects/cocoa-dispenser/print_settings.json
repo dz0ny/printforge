@@ -1,5 +1,5 @@
 {
-  "_why": "0.2 mm layers to match the layer counts in the script (sieve 6 layers, stencil 6 layers). 3 wall loops so the 2.25 mm hopper wall is pure perimeters. Every part prints in its flat orientation with 45 degree undersides only, so no supports. 15% infill: no part carries load. Food contact: use PETG or PLA from a food-safe filament line.",
+  "_why": "0.2 mm layers to match the layer counts in the script (sieve plate and rotor 6 layers, follower 6 layers). 3 wall loops so the 2.25 mm hopper wall is pure perimeters. Every part prints flat or standing with 45 degree undersides only: no supports. The rod stands 106 mm tall on a 6 mm square: add a brim to it in the slicer. 15% infill. PETG for the spring, rotor and rod; food-safe PETG or PLA for the rest.",
   "layer_height": "0.2",
   "initial_layer_print_height": "0.2",
   "wall_loops": "3",

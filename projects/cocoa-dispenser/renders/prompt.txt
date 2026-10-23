@@ -1,0 +1,18 @@
+Use your image generation tool to create three PNG images and save them in the current directory. Do not edit any other files.
+
+The attached CAD renders show a 3D-printed push-button cocoa dispenser for latte art. It has seven printed parts:
+- Stand: a flat ring (105 mm) that rests on a cup rim. It has a shallow slot open to the front for the stencil, and a low rim around the top edge with a gap at the front.
+- Stencil: a thin flat disc (82 mm) with a heart-shaped cut-out in the centre and a pull tab with a round finger hole.
+- Body: a cylinder hopper (72 mm wide, 75 mm tall) on a wide flat flange (98 mm). Its floor is a fine sieve of many small round holes.
+- Lid: a flat disc that pushes into the top of the body, with a centre hole and a shallow round recess for the spring.
+- Plunger: a long thin rod with a small collar, and a flat round agitator at the bottom (a ring with four spokes).
+- Spring: a small printed wave spring (22 mm wide, 38 mm tall): stacked wavy rings that touch at their crests, with a flat ring at each end.
+- Button: a small cylinder cap (32 mm) with a shallow finger dimple on top.
+
+1. parts_flatlay.png (1600x1000): photo-realistic top-down flat-lay of all seven parts laid out neatly on a light oak kitchen counter, 3D printed in chocolate-brown PETG with visible layer lines; the stencil and the spring in cream PETG. Arrange them in assembly order from left to right as in ref_exploded.png. Soft daylight, no text, no logos.
+
+2. exploded.png (1200x1600): photo-realistic exploded product shot, the parts floating in a vertical line above a cappuccino cup exactly as in ref_exploded.png (stand at the bottom, stencil pulled out to the front, then body, plunger, lid, spring, button at the top). Same materials, neutral light grey studio background, no text.
+
+3. in_use.png (1600x1000): photo-realistic shot of the assembled dispenser (as in ref_assembled.png) standing on a white cappuccino cup on a café counter, the stencil tab sticking out at the front, a finger pressing the button, a fine cloud of cocoa falling. Next to it, a second cup shows a crisp cocoa heart on milk foam. Shallow depth of field, warm café light, no text, no logos.
+
+Keep every part's shape faithful to the attached renders: proportions, the flange, the heart cut-out, the wave spring, the four-spoke agitator.

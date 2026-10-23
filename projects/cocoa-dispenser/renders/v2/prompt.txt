@@ -1,0 +1,19 @@
+Use your image generation tool to create three PNG images and save them in the current directory. Do not edit any other files.
+
+The attached CAD renders show version 2 of a 3D-printed push-button cocoa dispenser for latte art with a rotating shutter. It has eight printed parts, no bought parts:
+- Stand: a flat ring (105 mm) that rests on a cup rim, with a slot open to the front for the stencil and a low rim on top.
+- Stencil: a thin disc (82 mm) with a heart cut-out in the centre, a 1.5 mm lip around its edge, and a pull tab with a round finger hole.
+- Body: a cylinder hopper (72 mm wide, 75 mm tall) on a wide flat flange (98 mm). Its floor is a sieve plate with small round holes in six wedge-shaped sectors (like six pie slices), solid between them. In the centre a short round post.
+- Rotor: a thin disc (47 mm) with six open wedge sectors and six solid ones, a tall round boss in the centre with a square hole on top, and two low radial vanes. It lies on the sieve plate.
+- Rod: a long square rod (6 mm), its lower part visibly twisted like a push drill, the upper part straight.
+- Lid: a flat disc that pushes into the top of the body, with a square centre hole and a shallow round recess for the spring.
+- Spring: a small printed wave spring (22 mm wide, 38 mm tall): stacked wavy rings touching at their crests.
+- Button: a small cylinder cap (32 mm) with a shallow finger dimple on top.
+
+1. v2_parts_flatlay.png (1600x1000): photo-realistic top-down flat-lay of all eight parts laid out neatly on a light oak counter, printed in chocolate-brown PETG with visible layer lines; the stencil, the rotor and the spring in cream PETG. Order left to right: stand, stencil, body (tilted so the six hole sectors in its floor are visible), rotor, rod, lid, spring, button. Soft daylight, no text.
+
+2. v2_exploded.png (1200x1600): photo-realistic exploded shot, the parts floating in a vertical line above a cappuccino cup exactly as in ref_exploded.png: stand at the bottom, stencil pulled out to the front, body, rotor above the body, the twisted rod, lid, spring, button at the top. Neutral light grey studio background, no text.
+
+3. v2_shutter.png (1600x1000): photo-realistic close-up macro of the body seen from above with the lid off, cocoa removed, showing the cream rotor lying on the brown sieve plate, split image: left half the rotor's solid sectors cover the holes (closed), right half the rotor turned 30 degrees so the holes show through the open sectors (open), as in ref_shutter.png. The twisted square rod stands in the centre boss. No text.
+
+Keep every part's shape faithful to the attached renders.
