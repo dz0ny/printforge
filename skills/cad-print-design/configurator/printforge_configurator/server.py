@@ -585,18 +585,34 @@ class Handler(BaseHTTPRequestHandler):
 PAGE = Path(__file__).resolve().parent / "configurator.html"
 
 
-def serve(model, port=8765, page=None, open_browser=False):
+def lan_ip():
+    """This machine's address on the local network, for a phone to reach the page."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return None
+
+
+def serve(model, port=8765, page=None, open_browser=False, host="127.0.0.1"):
     """Serve the configurator for a model script until Ctrl-C.
 
     `model` is the script's path, usually `__file__`. The call blocks.
+    `host="0.0.0.0"` opens it to the local network, for a phone or a tablet.
     """
     model = Path(model).resolve()
     if not model.is_file():
         raise FileNotFoundError(f"no such model: {model}")
     page = Path(page).resolve() if page else PAGE
-    srv = Server(("127.0.0.1", port), Handler, model, page)
+    srv = Server((host, port), Handler, model, page)
     url = f"http://127.0.0.1:{port}/"
     print(f"serving {model.name} at {url}", flush=True)
+    if host == "0.0.0.0" and lan_ip():
+        print(f"on the local network: http://{lan_ip()}:{port}/", flush=True)
     if open_browser:
         import webbrowser
         webbrowser.open(url)
@@ -620,9 +636,10 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--page", default=None, help="an HTML page to serve at / instead of the built-in one")
     ap.add_argument("--open", action="store_true", help="open the page in the default browser")
+    ap.add_argument("--host", default="127.0.0.1", help="0.0.0.0 to reach it from a phone on the same network")
     a = ap.parse_args(argv)
     try:
-        serve(a.model, port=a.port, page=a.page, open_browser=a.open)
+        serve(a.model, port=a.port, page=a.page, open_browser=a.open, host=a.host)
     except FileNotFoundError as e:
         ap.error(str(e))
 

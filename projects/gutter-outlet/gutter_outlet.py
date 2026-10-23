@@ -219,7 +219,8 @@ if __name__ == "__main__":
     if "--serve" in sys.argv:
         from printforge_configurator import serve
         port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8765
-        serve(__file__, port=port, open_browser="--open" in sys.argv)
+        host = "0.0.0.0" if "--lan" in sys.argv else "127.0.0.1"  # --lan: reachable from a phone.
+        serve(__file__, port=port, open_browser="--open" in sys.argv, host=host)
         sys.exit()
 
     part = build()
