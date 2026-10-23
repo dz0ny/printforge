@@ -499,6 +499,14 @@ def save_values(srv, values):
 class Handler(BaseHTTPRequestHandler):
     server_version = "CadConfigurator/1.0"
 
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (ConnectionResetError, BrokenPipeError, OSError):
+            # A client that dropped the connection, or a connection the macOS
+            # firewall cut off: nothing to serve, nothing to print.
+            self.close_connection = True
+
     def _send(self, code, body, ctype, headers=None):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
