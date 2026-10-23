@@ -1,6 +1,6 @@
 Use your image generation tool to create two PNG images and save them in the current directory. Do not edit any other files.
 
-The attached CAD renders show a 3D-printed push-button cocoa dispenser for latte art: a wide flat stand ring resting on a cappuccino cup, a slide-in stencil with a heart cut-out and a pull tab sticking out at the front, a cylinder hopper body on a flange, a flat lid, a small printed wave spring and a round button on top. Printed in chocolate-brown PETG with cream parts (stencil, lid, spring), visible fine layer lines.
+The attached CAD renders show a 3D-printed push-button cocoa dispenser for latte art: a wide flat stand ring resting on a cappuccino cup, a slide-in stencil with a heart cut-out and a pull tab sticking out at the front, a cylinder hopper body with twelve rounded vertical grip ribs on a flange with a rounded edge, a flat lid, a small printed wave spring and a round button on top. Printed in chocolate-brown PETG with cream parts (stencil, lid, spring), visible fine layer lines.
 
 1. v3_cafe.png (1600x1000): a photo-realistic cafe scene, the dispenser standing on a white cappuccino cup on a wooden bar, a barista's hand pressing the button from above, warm morning light from a window, blurred espresso machine in the background. The stencil's tab points toward the camera. Product-photography quality, no text, no logos.
 

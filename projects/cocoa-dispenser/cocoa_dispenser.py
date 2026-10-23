@@ -45,6 +45,11 @@ HOP_H = 75.0         # Body height from the sieve face to the hopper rim. [40:13
 WALL = 5 * LINE      # Hopper wall, 5 lines. [1.2:4]
 FLANGE_D = 104.0     # Flange diameter; it covers the stencil slot. [90:130]
 FLANGE_T = 15 * LAYER  # Flange thickness. [1.6:6]
+FLANGE_R = 1.5       # Round on the flange's outer edges. [0:3]
+GRIP_RIBS = 12       # Vertical grip ribs around the hopper, rounded rods half sunk into the wall. [0:24]
+GRIP_D = 3.0         # Rib diameter. [2:5]
+GRIP_PROUD = 1.8     # How far the ribs stand out from the hopper. [0.8:2.5]
+GRIP_GAP = 8.0       # Rib ends this far from the flange and from the hopper rim. [4:20]
 
 # 🕳️ Sieve. The body floor: fine holes over the whole floor, vertical in the print.
 SIEVE_D = 60.0       # Sieve diameter; a 45 degree cone leads up to the hopper bore. [30:62]
@@ -79,6 +84,7 @@ STAND_BASE = 17 * LAYER  # Floor under the stencil. [2:6]
 WINDOW_D = 70.0      # Opening under the stencil, over the cup. [40:85]
 RIM_H = 3.0          # Locating rim around the body flange. [1:8]
 RIM_PLAY = 0.5       # Clearance per side between the rim and the flange. [0.2:1.5]
+STAND_R = 1.5        # Round on the stand's outer edges, top and bottom. [0:3]
 
 # 🌫️ Drop chamber. The cocoa falls DROP_H so the hole pattern mixes into an even cloud.
 DROP_H = 15.0        # Height of the chamber between the stencil and the sieve. [8:40]
@@ -90,6 +96,7 @@ ROD_PLAY = 0.3       # Clearance per side of the rod in the lid's square guide. 
 LID_T = 16 * LAYER   # Lid plate thickness. [1.6:5]
 LID_PLUG = 6.0       # Depth of the lid plug inside the hopper. [3:12]
 LID_FIT = 0.2        # Clearance per side of the lid plug in the hopper. [0.05:0.5]
+LID_R = 1.0          # Round on the lid's top edge. [0:2]
 HUB_D = 16.0         # Lid guide hub diameter; it holds the tongue's pocket with two lines of wall left. [10:20]
 HUB_DOWN = 4.0       # Hub reach below the plug, into the hopper: a longer guide and room for the tongue. [0:12]
 SEAT_DEPTH = 8 * LAYER  # Spring seat depth in the lid top. [0.8:3]
@@ -212,6 +219,49 @@ def cyl(d, h, z=0.0):
     return cq.Workplane("XY").workplane(offset=z).circle(d / 2).extrude(h)
 
 
+# A disk cache of built parts, so a change to one setting rebuilds only the parts that
+# use it. The key is the builder's source plus the values of the settings it names.
+CACHE_DIR = __import__("pathlib").Path(__file__).resolve().parent / ".cache"
+USE_CACHE = True
+KEYS = {}
+
+
+def part_key(name, deps, builder, args=()):
+    import hashlib
+    import inspect
+    import json
+    g = globals()
+    payload = json.dumps([name, inspect.getsource(builder), [g[d] for d in deps], list(args), NOZZLE, LINE, LAYER],
+                         sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+
+def rounded(wp, pick, r, what):
+    """Fillet the edges `pick` selects, only when the result is a valid solid; else leave them sharp."""
+    try:
+        out = pick(wp).fillet(r)
+        if out.val().isValid() and len(out.solids().vals()) == 1:
+            return out
+        print(f"{what}: round left sharp, the fillet made an invalid solid")
+    except Exception as e:
+        print(f"{what}: round left sharp: {e}")
+    return wp
+
+
+def cached(name, deps, builder, *args):
+    """Build a part through the cache: a .brep per key under .cache/."""
+    key = part_key(name, deps, builder, args)
+    KEYS[name] = key
+    f = CACHE_DIR / f"{name}-{key}.brep"
+    if USE_CACHE and f.exists():
+        return cq.Workplane("XY").newObject([cq.Shape.importBrep(str(f))])
+    shape = builder(*args)
+    if USE_CACHE:
+        CACHE_DIR.mkdir(exist_ok=True)
+        shape.val().exportBrep(str(f))
+    return shape
+
+
 def hex_points(r_max, pitch):
     pts = []
     rows = int(r_max / (pitch * math.sqrt(3) / 2)) + 1
@@ -258,7 +308,15 @@ def stadium(wp):
     return wp.moveTo(rs, 0).threePointArc((0, rs), (-rs, 0)).lineTo(-rs, -STAND_D).lineTo(rs, -STAND_D).close()
 
 
+STAND_DEPS = ["STAND_D", "STAND_BASE", "WINDOW_D", "RIM_H", "RIM_PLAY", "STAND_R", "DROP_H", "CHAMBER_D",
+              "STENCIL_D", "STENCIL_T", "STENCIL_LIP", "SLOT_PLAY", "SLOT_SIDE", "FLANGE_D"]
+
+
 def stand():
+    return cached("stand", STAND_DEPS, stand_build)
+
+
+def stand_build():
     """Base ring with the stencil slot, the drop chamber above it, the locating rim.
 
     The slot's roof is the stadium outline tapered inward at 45 degrees as it rises, so
@@ -280,10 +338,24 @@ def stand():
         horn = cq.Workplane("XY").workplane(offset=-1).center(sx * (rs + 10), -(y_t - 2) - 30) \
             .rect(20, 60).extrude(STAND_TOP + RIM_H + 2)
         s = s.cut(horn)
+    if STAND_R > 0:  # The outer bottom edge, then the rim's outer top edge.
+        big = cq.selectors.RadiusNthSelector(0, directionMax=True)
+        s = rounded(s, lambda w: w.edges(cq.selectors.BoxSelector((-ro - 1, -ro - 1, -0.1), (ro + 1, ro + 1, 0.1)))
+                    .edges("%CIRCLE").edges(big), STAND_R, "stand bottom")
+        s = rounded(s, lambda w: w.edges(cq.selectors.BoxSelector((-ro - 1, -ro - 1, STAND_TOP + RIM_H - 0.1),
+                                                                    (ro + 1, ro + 1, STAND_TOP + RIM_H + 0.1)))
+                    .edges("%CIRCLE").edges(big), STAND_R, "stand top")
     return s
 
 
+STENCIL_DEPS = ["STENCIL_D", "STENCIL_T", "STENCIL_LIP", "SPOUT_W", "HEART_W", "TAB_W", "TAB_L", "STAND_D", "STAND_BASE"]
+
+
 def stencil():
+    return cached("stencil", STENCIL_DEPS, stencil_build)
+
+
+def stencil_build():
     reach = STAND_D / 2 + TAB_L
     st = cq.Workplane("XY").circle(STENCIL_D / 2).extrude(STENCIL_T).union(
         cq.Workplane("XY").center(0, -reach / 2).rect(TAB_W, reach).extrude(STENCIL_T))
@@ -303,9 +375,32 @@ def sieve_holes(r_max):
     return [(x, y) for x, y in hex_points(r_max, SIEVE_PITCH) if math.hypot(x, y) <= r_max - SIEVE_HOLE / 2 - LINE]
 
 
-def body():
-    """Hopper, flange and the sieve floor with the 45 degree cone up to the bore."""
+FLOOR_DEPS = ["SIEVE_D", "SIEVE_T", "SIEVE_HOLE", "SIEVE_PITCH"]
+SHELL_DEPS = ["HOP_D", "HOP_H", "WALL", "FLANGE_D", "FLANGE_T", "FLANGE_R", "GRIP_RIBS", "GRIP_D", "GRIP_PROUD", "GRIP_GAP",
+              "SIEVE_D", "SIEVE_T", "SIEVE_SEPARATE", "SIEVE_LEDGE"]
+
+
+def floor_build():
+    """The sieve floor alone: a disc with the hex grid of holes, one radius of overlap into the shell."""
+    r0 = SIEVE_D / 2
+    f = cyl(SIEVE_D + 2.0, SIEVE_T)
+    pts = sieve_holes(r0)
+    return f.cut(cq.Workplane("XY").workplane(offset=-1).pushPoints(pts).circle(SIEVE_HOLE / 2).extrude(SIEVE_T + 2))
+
+
+def shell_build():
+    """Hopper, flange, grip ribs and the cone, with the floor left open for the sieve disc."""
     b = cyl(FLANGE_D, FLANGE_T).union(cyl(HOP_D, HOP_H))
+    if FLANGE_R > 0:
+        b = rounded(b, lambda w: w.edges(cq.selectors.BoxSelector((-FLANGE_D, -FLANGE_D, -0.1), (FLANGE_D, FLANGE_D, FLANGE_T + 0.1)))
+                    .edges("%CIRCLE").edges(cq.selectors.RadiusNthSelector(0, directionMax=True)), FLANGE_R, "flange")
+    if GRIP_RIBS > 0:
+        # Rounded vertical rods half sunk into the hopper wall: easy to hold, nothing to support.
+        rc = HOP_D / 2 - GRIP_D / 2 + GRIP_PROUD
+        z0, z1 = FLANGE_T + GRIP_GAP, HOP_H - GRIP_GAP
+        for k in range(GRIP_RIBS):
+            a = 2 * math.pi * k / GRIP_RIBS
+            b = b.union(cyl(GRIP_D, z1 - z0, z0).translate((rc * math.cos(a), rc * math.sin(a), 0)))
     r0, r1 = SIEVE_D / 2, HOP_ID / 2
     cavity = cq.Workplane("XZ").polyline(
         [(0, SIEVE_T), (r0, SIEVE_T), (r1, SIEVE_T + (r1 - r0)), (r1, HOP_H + 1), (0, HOP_H + 1)]
@@ -316,9 +411,15 @@ def body():
         b = b.cut(cyl(SIEVE_D - 2 * SIEVE_LEDGE, SIEVE_T + 2, -1))
         b = b.cut(cyl(SIEVE_D + 0.6, SIEVE_T, 0.001).cut(cyl(SIEVE_D - 2 * SIEVE_LEDGE - 1, SIEVE_T + 2, -1)))
     else:
-        pts = sieve_holes(r0)
-        holes = cq.Workplane("XY").workplane(offset=-1).pushPoints(pts).circle(SIEVE_HOLE / 2).extrude(SIEVE_T + 2)
-        b = b.cut(holes)
+        b = b.cut(cyl(SIEVE_D, SIEVE_T + 2, -1))  # The floor opening the sieve disc fills.
+    return b
+
+
+def body():
+    """Hopper, flange and the sieve floor with the 45 degree cone up to the bore."""
+    b = cached("shell", SHELL_DEPS, shell_build)
+    if not SIEVE_SEPARATE:
+        b = b.union(cached("floor", FLOOR_DEPS, floor_build))
     return b.translate((0, 0, BODY_Z))
 
 
@@ -362,6 +463,9 @@ def lid(with_tongue=True):
     l = l.cut(pocket)
     if with_tongue:
         l = l.union(tongue_solid())
+    if LID_R > 0:
+        l = rounded(l, lambda w: w.edges(cq.selectors.BoxSelector((-HOP_D, -HOP_D, LID_TOP - 0.1), (HOP_D, HOP_D, LID_TOP + 0.1)))
+                    .edges("%CIRCLE").edges(cq.selectors.RadiusNthSelector(0, directionMax=True)), LID_R, "lid")
     return l.translate((0, 0, BODY_Z))
 
 
@@ -412,13 +516,24 @@ def wave_spring(length=None):
     return cq.Workplane("XY").newObject([s])
 
 
+SPRING_DEPS = ["WS_D", "WS_B", "WS_T", "WS_H", "WS_WAVES", "WS_RINGS", "WS_END", "WS_JOIN", "SPRING_OD"]
+
+
 def spring(press=0.0):
     length = SPRING_REST - press
-    return wave_spring(length).translate((0, 0, BODY_Z + LID_TOP - SEAT_DEPTH))
+    return cached("spring", SPRING_DEPS, wave_spring, length).translate((0, 0, BODY_Z + LID_TOP - SEAT_DEPTH))
+
+
+FIXED = {}
 
 
 def parts(press=0.0):
-    ps = {"stand": stand(), "stencil": stencil(), "body": body(), "lid": lid(), "rod": rod(press), "button": button(press)}
+    """All parts in the use frame. The parts the press does not move are built once per run."""
+    for name, fn in (("stand", stand), ("stencil", stencil), ("body", body), ("lid", lid)):
+        if name not in FIXED:
+            FIXED[name] = fn()
+    ps = {"stand": FIXED["stand"], "stencil": FIXED["stencil"], "body": FIXED["body"], "lid": FIXED["lid"],
+          "rod": rod(press), "button": button(press)}
     if SIEVE_SEPARATE:
         ps["sieve"] = sieve()
     if PRINT_SPRING:
@@ -543,6 +658,9 @@ if __name__ == "__main__":
         serve(__file__, port=port, open_browser="--open" in sys.argv, host=host)
         sys.exit()
 
+    if "--no-cache" in sys.argv:
+        USE_CACHE = False
+    t_run = __import__("time").monotonic()
     check_design()
     ps = parts()
     asm = build()
@@ -575,8 +693,13 @@ if __name__ == "__main__":
         pp = dict(pp)
         pp["lid"] = lid(with_tongue=False)
         names = list(pp)
+        bbs = {k: v.val().BoundingBox() for k, v in pp.items()}
         for i, a in enumerate(names):
             for b in names[i + 1:]:
+                A, B = bbs[a], bbs[b]
+                if (A.xmax < B.xmin or B.xmax < A.xmin or A.ymax < B.ymin or B.ymax < A.ymin
+                        or A.zmax < B.zmin or B.zmax < A.zmin):
+                    continue  # Boxes apart: no boolean needed.
                 v = pp[a].intersect(pp[b]).val().Volume() if pp[a].intersect(pp[b]).vals() else 0.0
                 assert v < 0.5, f"{state}: {a} and {b} overlap by {v:.2f} mm3"
         gc.collect()
@@ -593,8 +716,40 @@ if __name__ == "__main__":
         assert solid.isValid(), f"{name}: invalid solid"
         assert len(p.solids().vals()) == 1, f"{name}: not one solid"
         pr = for_print(p, PRINT_FLIP[name])
-        slab_test(pr, name)
-        cq.exporters.export(pr, f"{name}.stl", tolerance=0.05, angularTolerance=0.2)
+        # The STL and the slab test are cached with the part: the body's 1,000 holes
+        # take ten seconds to mesh, and nothing changed when the key is the same.
+        stl_key = KEYS.get(name)
+        if name == "body":
+            stl_key = (KEYS.get("shell", "") + KEYS.get("floor", "")) or None
+        if name == "spring":
+            stl_key = part_key("spring-free", SPRING_DEPS, wave_spring)
+        cached_stl = CACHE_DIR / f"{name}-{stl_key}-{int(PRINT_FLIP[name])}.stl" if (USE_CACHE and stl_key) else None
+        if cached_stl and cached_stl.exists():
+            __import__("shutil").copyfile(cached_stl, f"{name}.stl")
+        elif name == "body" and not SIEVE_SEPARATE and USE_CACHE:
+            # The body's mesh is its shell and its sieve floor meshed apart and joined as
+            # two overlapping shells (slicers union them): the floor's thousand holes are
+            # meshed once and a grip change costs only the shell.
+            slab_test(pr, name)
+            bb = p.val().BoundingBox()
+            move = (-bb.xmin, -bb.ymin, -bb.zmin)
+            pieces = []
+            for piece, pkey in (("shell", KEYS["shell"]), ("floor", KEYS["floor"])):
+                f = CACHE_DIR / f"{piece}-{pkey}.stl"
+                if not f.exists():
+                    shape = cq.Workplane("XY").newObject([cq.Shape.importBrep(str(CACHE_DIR / f"{piece}-{pkey}.brep"))])
+                    # Twelve facets per 0.8 mm hole are plenty; 0.2 rad would give thirty and a 14 MB mesh.
+                    ang = 0.5 if piece == "floor" else 0.2
+                    cq.exporters.export(shape.translate((0, 0, BODY_Z)).translate(move), str(f), tolerance=0.05, angularTolerance=ang)
+                pieces.append((str(f), (0, 0)))
+            merge_stls(pieces, f"{name}.stl")
+            if cached_stl:
+                __import__("shutil").copyfile(f"{name}.stl", cached_stl)
+        else:
+            slab_test(pr, name)
+            cq.exporters.export(pr, f"{name}.stl", tolerance=0.05, angularTolerance=0.2)
+            if cached_stl:
+                __import__("shutil").copyfile(f"{name}.stl", cached_stl)
         pb = pr.val().BoundingBox()
         x, y = layout[name]
         boxes.append((x, y, x + pb.xlen, y + pb.ylen))
@@ -613,4 +768,5 @@ if __name__ == "__main__":
         # Crest-to-crest wave spring estimate, PETG E about 2000 MPa. Test it: printed parts vary.
         k = 2000 * WS_B * WS_T ** 3 * WS_WAVES ** 4 / (2.4 * WS_D ** 3) / WS_RINGS
         print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.0f} N at rest, {k * (PRELOAD + STROKE):.0f} N pressed")
-    print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json")
+    print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json "
+          f"in {__import__('time').monotonic() - t_run:.0f} s" + ("" if USE_CACHE else " without the cache"))

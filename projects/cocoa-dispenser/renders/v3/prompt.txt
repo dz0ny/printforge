@@ -3,7 +3,7 @@ Use your image generation tool to create three PNG images and save them in the c
 The attached CAD renders show version 3 of a 3D-printed push-button cocoa dispenser for latte art with a ratchet tapper. It has seven printed parts, no bought parts:
 - Stand: a thick flat ring (112 mm) that rests on a cup rim, with a slot open to the front for the stencil, and a short chamber ring on top whose inner edge is a 45-degree cone.
 - Stencil: a thin disc (90 mm) with a heart cut-out in the centre, a 3 mm lip around its edge like a tray, a gap in the lip at the back, and a pull tab with a round finger hole.
-- Body: a cylinder hopper (72 mm wide, 75 mm tall) on a wide flat flange (104 mm). Its floor is a fine sieve: about a thousand 0.8 mm holes on a hex grid over the whole floor, with a 45-degree cone up to the bore.
+- Body: a cylinder hopper (72 mm wide, 75 mm tall) with twelve rounded vertical grip ribs around it, on a wide flat flange (104 mm) with a rounded edge. Its floor is a fine sieve: about a thousand 0.8 mm holes on a hex grid over the whole floor, with a 45-degree cone up to the bore.
 - Rod: a long straight square rod (6 mm) with a row of small triangular teeth (a rack) on one face near its middle, and a flat 20 mm disc foot at its bottom.
 - Lid: a flat disc that pushes into the top of the body, with a square centre hole in a round hub and a shallow ring recess for the spring; in the hub, a thin finger (the striker tongue) hangs in a slot beside the square hole.
 - Spring: a small printed wave spring (22 mm wide, 38 mm tall): stacked wavy rings touching at their crests.

@@ -1,0 +1,12 @@
+Use your image generation tool to create one PNG image and save it in the current directory. Do not edit any other files.
+
+The attached CAD renders show version 3 of a 3D-printed push-button cocoa dispenser for latte art. Seven printed parts:
+- Stand: a thick flat ring (112 mm) with rounded edges that rests on a cup rim, a slot open to the front for the stencil, a short chamber ring on top.
+- Stencil: a thin disc (90 mm) with a heart cut-out, a 3 mm lip like a tray, a gap in the lip at the back, a pull tab with a round finger hole.
+- Body: a cylinder hopper (72 mm wide, 75 mm tall) with twelve rounded vertical grip ribs around it, on a wide flat flange (104 mm) with a rounded edge. Its floor is a fine sieve of about a thousand 0.8 mm holes.
+- Rod: a long straight square rod (6 mm) with a row of small triangular teeth on one face near its middle and a flat 20 mm disc foot at its bottom.
+- Lid: a flat disc with a rounded top edge, a square centre hole in a round hub, a shallow ring recess; a thin finger hangs in a slot beside the square hole.
+- Spring: a small printed wave spring (22 mm wide, 38 mm tall).
+- Button: a small cylinder cap (32 mm) with a shallow finger dimple on top.
+
+v3_parts_flatlay.png (1600x1000): photo-realistic top-down flat-lay of all seven parts laid out neatly on a light oak counter, printed in chocolate-brown PETG with visible layer lines; the stencil, the spring and the lid in cream PETG. Order left to right: stand, stencil, body (tilted so the ribs and the sieve floor are visible), rod, lid, spring, button. Soft daylight, no text. Keep every part's shape faithful to the attached renders.

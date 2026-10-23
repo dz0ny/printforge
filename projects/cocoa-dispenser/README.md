@@ -45,7 +45,7 @@ The CAD views are the truth.
 |---|---|---|
 | Stand | flat, as used | sits on the cup rim; stencil slot open to the front; 15 mm drop chamber above it, its roof a 45° cone |
 | Stencil | flat | heart cut-out, 1.2 mm, with a 3 mm lip: a tray for the spill, pour spout at the back |
-| Body | flange down | the sieve floor prints as the first 6 layers; nothing moves inside |
+| Body | flange down | the sieve floor prints as the first 6 layers; twelve rounded grip ribs around the hopper, rounded flange edge |
 | Rod | standing on its foot | the rack faces +X; the foot is its base, no brim needed |
 | Lid | upside down | push-fit plug, square guide hole, spring seat, the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
@@ -70,6 +70,14 @@ Rebuilt, not printed. Print the lid and the rod alone and click the rack past th
 tongue by hand. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
 three lines thick; if the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
 body over paper: nothing should fall at rest with 0.8 mm holes.
+
+## Rebuilding fast
+
+Parts are cached on disk in `.cache/` as BREP, keyed by the settings each part uses
+and the builder's own source, and so are their STLs and slab tests. A change to a
+grip or flange setting rebuilds the body's shell and unions the cached sieve floor
+into it; the thousand holes are cut once. `--no-cache` builds everything from
+scratch; delete `.cache/` to start over.
 
 ## Files
 
