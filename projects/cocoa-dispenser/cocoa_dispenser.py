@@ -61,7 +61,7 @@ SIEVE_LEDGE = 3.0    # Ring ledge the drop-in disc rests on, when separate. [2:5
 
 # 🦷 Rod and rack. The tapper.
 ROD_SQ = 6.0         # Rod square side. [5:9]
-RACK_PITCH = 1.5     # Tooth pitch along the rod: one tap per tooth. [1:3]
+RACK_PITCH = 2.4     # Tooth pitch along the rod: one tap per tooth. Longer is a gentler flank for the spring to climb. [1:3]
 RACK_DEPTH = 0.8     # Tooth depth into the rod face. [0.5:1.5]
 AGI_FOOT = True      # A flat disc at the rod's bottom that stirs the cocoa above the sieve. [0:1]
 FOOT_D = 20.0        # Agitator foot diameter. [10:30]
@@ -113,13 +113,15 @@ TONGUE_W = 4.0       # Tongue width. [2:6]
 TONGUE_BITE = 0.5    # How far the tip reaches into the teeth: the deflection per tooth. [0.3:1]
 TONGUE_FLEX = 1.2    # Free room behind the tongue, so it can swing out. [0.8:2]
 TONGUE_ROOT = 2.0    # Solid lid above the tongue's root. [1.2:4]
+TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG, for the return rule. [0.2:0.5]
+PETG_E = 2000.0      # Printed PETG modulus, MPa, for the force estimates; tongue and spring both scale with it. [1500:2500]
 
 # 🌀 Spring. A printed PETG wave spring, or a bought metal one.
 PRINT_SPRING = True  # True: print the wave spring. False: buy a metal spring.
-PRELOAD = 2.0        # Spring compression at rest, so the button does not rattle. [0.5:5]
+PRELOAD = 4.0        # Spring compression at rest: no rattle, and force to climb the last tooth on the way back. [0.5:6]
 WS_D = 20.0          # Wave spring mean diameter. Larger is softer. [12:30]
 WS_B = 4 * LINE      # Band width, radial, 4 lines. [1.2:4]
-WS_T = 4 * LAYER     # Band thickness, vertical, 4 layers. Thinner is much softer. [0.6:2]
+WS_T = 3 * LAYER     # Band thickness, vertical, 3 layers: half the rate of 4. [0.6:2]
 WS_H = 4.0           # Wave height, crest to trough. [2:8]
 WS_WAVES = 3         # Waves per ring. Fewer is softer but the underside overhang gets flatter. [2:6]
 WS_RINGS = 8         # Number of wave rings. More is softer and longer. [4:16]
@@ -161,10 +163,27 @@ SPRING_REST = CEIL_Z - (LID_TOP - SEAT_DEPTH)
 SPRING_PRESSED = SPRING_REST - STROKE
 TIP_Z = LID_TOP - TONGUE_ROOT - TONGUE_L  # Tongue tip height, body frame; the root is TONGUE_ROOT under the lid top.
 RACK_Z0 = TIP_Z - ROD_BOT - 3.0         # Rack start, rod frame: the tip is on the rack over the whole stroke.
-RACK_L = STROKE + 6.0
+RACK_TEETH = int(round((STROKE + 6.0) / RACK_PITCH))  # Whole teeth over the stroke plus 3 mm each way.
+RACK_L = RACK_TEETH * RACK_PITCH
 BED = 256.0
 
 assert min(WALL, 4 * LINE) >= 2 * LINE, "a wall is thinner than two lines"
+
+
+def spring_rate():
+    """Printed wave spring rate, N/mm: crest-to-crest estimate. Test it, printed parts vary."""
+    return PETG_E * WS_B * WS_T ** 3 * WS_WAVES ** 4 / (2.4 * WS_D ** 3) / WS_RINGS
+
+
+def return_budget():
+    """Forces at the last tooth before rest: what the spring has, what the tongue costs.
+    The tongue is a cantilever bent TONGUE_BITE; pushing its tip up a tooth flank of angle
+    `flank` from the rod axis with friction costs tip_force * tan(flank + atan(mu))."""
+    tip_force = 3 * PETG_E * (TONGUE_W * TONGUE_T ** 3 / 12) * TONGUE_BITE / TONGUE_L ** 3
+    flank = math.atan(RACK_DEPTH / (RACK_PITCH / 2))
+    climb = tip_force * math.tan(flank + math.atan(TOOTH_MU))
+    have = spring_rate() * (PRELOAD + RACK_PITCH) if PRINT_SPRING else float("nan")
+    return have, climb, math.degrees(flank)
 
 
 def check_design():
@@ -193,7 +212,10 @@ def check_design():
     if PRINT_SPRING:
         per_ring = (SPRING_L - SPRING_PRESSED) / WS_RINGS
         assert per_ring <= 0.5 * (WS_H - WS_JOIN), "each ring bends more than half its wave: add rings"
-        assert WS_B >= 2 * LINE and WS_T >= 3 * LAYER, "the wave band is too thin to print"
+        assert WS_B >= 2 * LINE - 0.01 and WS_T >= 3 * LAYER - 0.01, "the wave band is too thin to print"
+        have, climb, flank = return_budget()
+        assert have >= 1.3 * climb, (f"the spring has {have:.1f} N at the last tooth but the tongue needs {climb:.1f} N to climb "
+                                     f"a {flank:.0f} degree flank: raise PRELOAD or RACK_PITCH, or lower TONGUE_BITE")
     # The rack and the tongue.
     assert TONGUE_BITE < RACK_DEPTH, "the tongue bites deeper than the teeth"
     assert TONGUE_L >= 6, "a tongue under 6 mm is too stiff to flex"
@@ -278,7 +300,7 @@ def hex_points(r_max, pitch):
 def rack_profile():
     """Sawtooth teeth as (x, z) points in the rod frame, cut into the +X face."""
     face = ROD_SQ / 2
-    n = int(round(RACK_L / RACK_PITCH))
+    n = RACK_TEETH
     pts = [(face + 1.0, RACK_Z0)]
     for k in range(n):
         z = RACK_Z0 + k * RACK_PITCH
@@ -669,7 +691,7 @@ if __name__ == "__main__":
     cq.exporters.export(cq.Workplane("XY").newObject([cq.Compound.makeCompound(
         [p.val() for p in pressed.values()])]), "cocoa_dispenser_pressed.step")
     taps = STROKE / RACK_PITCH
-    print(f"one press: about {taps:.0f} taps down and {taps:.0f} up; rack {RACK_L:.0f} mm, {int(round(RACK_L / RACK_PITCH))} teeth")
+    print(f"one press: about {taps:.0f} taps down and {taps:.0f} up; rack {RACK_L:.1f} mm, {RACK_TEETH} teeth")
     with open("labels.json", "w") as f:
         json.dump(labels(), f, indent=1)
 
@@ -766,7 +788,10 @@ if __name__ == "__main__":
     print(f"spring {SPRING_REST:.1f} mm at rest, {SPRING_PRESSED:.1f} mm pressed (free {SPRING_L:.1f}, solid {SPRING_SOLID:.1f})")
     if PRINT_SPRING:
         # Crest-to-crest wave spring estimate, PETG E about 2000 MPa. Test it: printed parts vary.
-        k = 2000 * WS_B * WS_T ** 3 * WS_WAVES ** 4 / (2.4 * WS_D ** 3) / WS_RINGS
-        print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.0f} N at rest, {k * (PRELOAD + STROKE):.0f} N pressed")
+        k = spring_rate()
+        have, climb, flank = return_budget()
+        print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.1f} N at rest, {k * (PRELOAD + STROKE):.1f} N pressed")
+        print(f"return: {have:.1f} N at the last tooth against {climb:.1f} N to climb its {flank:.0f} degree flank "
+              f"({have / climb:.1f}x); press peak about {k * (PRELOAD + STROKE) + climb:.0f} N")
     print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json "
           f"in {__import__('time').monotonic() - t_run:.0f} s" + ("" if USE_CACHE else " without the cache"))

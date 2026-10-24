@@ -1,0 +1,9 @@
+Use your image generation tool to create two PNG images and save them in the current directory. Do not edit any other files.
+
+The attached CAD renders show the mechanism of a 3D-printed push-button cocoa dispenser: a small printed PETG wave spring (ref_spring.png: 22 mm wide, 36 mm tall, eight stacked wavy rings of a thin flat band that touch at their crests, with a flat ring at each end), and the striker tongue in the lid riding on the rod's rack (ref_tongue.png: a thin cream finger in a slot beside the square hole, its small nub resting in a row of triangular teeth cut into one face of a square brown rod). The spring sits in a shallow ring recess on the lid top, around the rod, under the button's skirt. v3_assembled.png shows the whole dispenser.
+
+1. v3_spring.png (1600x1000): a photo-realistic macro product shot on a light oak counter: the cream wave spring standing upright in the foreground, slightly compressed between a thumb and forefinger so the waves visibly flatten, with the brown rod lying beside it and the lid behind, soft window light, shallow depth of field, visible fine layer lines on every part. No text, no logos.
+
+2. v3_mechanism.png (1600x1000): a photo-realistic cutaway-style shot of the lid, spring, rod and button assembled, cut in half along the rod so the inside shows: the spring around the rod between the lid recess and the button ceiling, the tongue's nub sitting in the rack teeth just below the lid, chocolate-brown rod and button, cream lid and spring, on a neutral grey studio background. No text, no labels.
+
+Keep every part's shape faithful to the attached renders.

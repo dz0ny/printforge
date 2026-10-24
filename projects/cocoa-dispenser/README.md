@@ -9,12 +9,14 @@ it bridges over them, the way the LatteShot works.
 ![in use](renders/v3/v3_cafe.png)
 ![the result](renders/v3/v3_result.png)
 ![parts](renders/v3/v3_parts_flatlay.png)
+![the wave spring](renders/v3/v3_spring.png)
+![mechanism cutaway](renders/v3/v3_mechanism.png)
 ![section, rest and pressed](views/section_rest_pressed.png)
 ![tongue close-up](views/tongue_closeup.png)
 ![views](views/sheet.png)
 
 The photos in `renders/v3/` are AI images made with Codex from the CAD views
-(`renders/v3/prompt.txt`); `renders/v2/` and `renders/` hold the earlier versions.
+(`renders/v3/prompt.txt`, `prompt_photos.txt`, `prompt_spring.txt`); `renders/v2/` and `renders/` hold the earlier versions.
 The CAD views are the truth.
 
 ## How the tapper works
@@ -30,7 +32,7 @@ The CAD views are the truth.
   pocket of the hub, with a 45° nub at its tip that reaches 0.5 mm into the teeth.
   Each tooth bends the tongue 0.5 mm out and lets it snap back: one tap into the lid,
   which is push-fit into the body, which carries the sieve.
-- One press of 10 mm = about 7 taps down and 7 up. Press once for a light dust,
+- One press of 10 mm = about 4 taps down and 4 up. Press once for a light dust,
   two or three times for a full heart.
 - **Dose**: `SIEVE_HOLE` sets the grain (0.8 cocoa, 0.6 to 0.7 cinnamon, which wants
   a 0.2 mm nozzle or a test print), the number of presses sets the amount, and the
@@ -49,7 +51,7 @@ The CAD views are the truth.
 | Rod | standing on its foot | the rack faces +X; the foot is its base, no brim needed |
 | Lid | upside down | push-fit plug, square guide hole, spring seat, the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
-| Spring | flat | PETG wave spring, 8 rings; 38 mm free, 36 at rest, 26 pressed |
+| Spring | flat | PETG wave spring, 8 rings of a 3-layer band; 36.5 mm free, 32.5 at rest, 22.5 pressed; about 0.4 N/mm |
 
 No bought parts. Print the spring, the rod and the lid in PETG: the tongue and the
 spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
@@ -68,7 +70,9 @@ spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
 
 Rebuilt, not printed. Print the lid and the rod alone and click the rack past the
 tongue by hand. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
-three lines thick; if the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
+three lines thick, and watch the return rule: the spring has to push the tongue back up
+the last tooth on its own, so a stronger tongue wants more `PRELOAD` or a longer
+`RACK_PITCH` (the build prints both forces). If the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
 body over paper: nothing should fall at rest with 0.8 mm holes.
 
 ## Rebuilding fast
@@ -89,6 +93,9 @@ scratch; delete `.cache/` to start over.
 - `stand.stl` ... `spring.stl`: seven parts in print orientation.
 - `cocoa_dispenser_plate.stl` and `cocoa_dispenser.3mf`: all seven on one 256 mm plate.
 - `sections.py` draws `views/section_rest_pressed.png` and `views/tongue_closeup.png`.
-- `uv run check_part.py cocoa_dispenser.py --max-overhang-area 400` checks each part
-  and the assembly; the heart's cusp counts as a knife edge, which is the shape.
+- `uv run check_part.py cocoa_dispenser.py --max-overhang-area 400 --skip spring` checks
+  each part and the assembly; the heart's cusp counts as a knife edge, which is the shape.
+  The spring is skipped by design: its band is three layers, the rings meet tangentially,
+  and each wave underside is a bridge of about 10 mm, which prints fine but reads as overhang.
+  The lid's thin-wall finding is the tongue, two lines by design.
 - `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768.
