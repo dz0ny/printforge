@@ -67,7 +67,7 @@ Use these names when you ask for a change.
 | Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily |
 | Open end | The top, where the mixer slides in |
 | End stop | The low 16 mm stop at the bottom that carries the mixer |
-| Bottom slope | The 45° run from the walls down to the end stop |
+| Corner triangles | At each wall the end stop keeps the wall's full 34 mm and runs down to 16 mm over 20 mm, a triangle that ties the stop to the wall so the corner cannot fold |
 | Back vents | 11.5 mm hexes in the back. The side walls are solid since the first print broke there |
 | Floor fillet | The 6 mm rounding between the walls and the back plate |
 | Gussets | Optional 10 mm ribs at 45° on the outside of each wall, off by default (`GUSSETS`) |
@@ -89,7 +89,8 @@ Use these names when you ask for a change.
 | `BASE` | 3.08 mm | 11 layers at 0.28 mm |
 | `LIP`, `LIP_T` | 3.4 mm, 1.96 mm | Lip reach and thickness: at a 36 mm wall, 4.4 mm is the room for a 45° fill above the mixer |
 | `LIP_FREE` | 80 mm | No lip on this length at the open end |
-| `END_H` | 16 mm | End stop height, low for the mixer's curved edge |
+| `END_H` | 16 mm | End stop height in the middle, low for the mixer's curved edge |
+| `END_TRI` | 20 mm | Width of the corner triangles; 0 brings back the 45° bottom slope from the walls down to the stop |
 | `HOLE_PATTERN` | 80 × 80 mm | Mount screw spacing |
 | `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |

@@ -37,6 +37,7 @@ ROUND = 1.0       # Radius on the outer edges and lip tips.
 END = 6 * LINE    # End stop thickness, 6 lines: 3 wall loops on each side, no infill.
 END_H = 16.0      # End stop height, low for the curved mixer edge.
 END_FILLET = 2.0  # Fillet at the end stop. Keep it small for the mixer corners.
+END_TRI = 20.0    # Corner triangles: the end stop rises from END_H to the wall top over this width at each wall, so the stop and the walls brace each other. 0 for the plain bottom slope. [0:60]
 
 # 🪝 Lips. They hold the mixer in, with a 45 degree fill underneath so the part prints flat.
 LIP = 3.4         # Lip reach over the mixer edge. At a 36 mm wall this is the room for a 45 degree fill.
@@ -221,12 +222,20 @@ def build():
         fill = slab.cut(core).intersect(box(LIP_FREE, -1, zt - FILL - 1, lip_end, OUT_D + 1, zt + 1))
         part = part.union(fill)
 
-    # Lower the end stop. The walls and lips run down to it at 45 degrees.
     top = OUT_H + 10
-    wedge = [(TOTAL_LEN + 1, END_H - 1), (TOTAL_LEN + 1, top), (TOTAL_LEN - (top - END_H), top)]
-    cutter = cq.Workplane("XZ", origin=(0, OUT_D / 2, 0)).polyline(wedge).close() \
-        .extrude(OUT_D / 2 + 1, both=True)
-    part = part.cut(cutter)
+    if END_TRI > 0:
+        # Lower the end stop in the middle only. At each wall it keeps the wall's full
+        # height and runs down to END_H over END_TRI: a triangle tying stop and wall.
+        yb0, yb1 = y0 + BOW, y1 - BOW  # The stop's inner face meets the walls here.
+        prof = [(yb0, OUT_H), (yb0 + END_TRI, END_H), (yb1 - END_TRI, END_H), (yb1, OUT_H), (yb1, top), (yb0, top)]
+        cutter = cq.Workplane("YZ", origin=(LEN - 1, 0, 0)).polyline(prof).close().extrude(END + 2)
+        part = part.cut(cutter)
+    else:
+        # Lower the end stop. The walls and lips run down to it at 45 degrees.
+        wedge = [(TOTAL_LEN + 1, END_H - 1), (TOTAL_LEN + 1, top), (TOTAL_LEN - (top - END_H), top)]
+        cutter = cq.Workplane("XZ", origin=(0, OUT_D / 2, 0)).polyline(wedge).close() \
+            .extrude(OUT_D / 2 + 1, both=True)
+        part = part.cut(cutter)
 
     # Inner fillets: long floor edges, then the end stop edges.
     b = BOW + 0.5
@@ -359,11 +368,14 @@ def features():
         "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1), ["LIP_FREE"]),
         "Bottom slope": ((TOTAL_LEN - (OUT_H - END_H) / 2, WALL / 2, (OUT_H + END_H) / 2),
                          (0.7, 0, 0.7), ["END_H", "WALL_H", "LIP_SLOPE_GAP"]),
+        "Corner triangle": ((TOTAL_LEN + 0.5, WALL + BOW + END_TRI / 3, END_H + (OUT_H - END_H) / 3),
+                            (1, 0, 0), ["END_TRI", "END_H", "WALL_H"]),
         "Floor": ((TOTAL_LEN * 0.3, OUT_D / 2, BASE + 0.5), (0, 0, 1),
                   ["BASE", "CLEAR", "MIX_W", "MIX_H"]),
         "Mixer": ((LEN - MIX_D / 2, OUT_D / 2, BASE + MIX_H + 0.5), (0, 0, 1),
                   ["MIX_W", "MIX_W_BOTTOM", "MIX_W_TOP", "MIX_W_AT", "MIX_D", "MIX_H", "FOOT_H", "EDGE_R", "CLEAR", "CLEAR_TOP"]),
     }
+    del f["Corner triangle" if END_TRI <= 0 else "Bottom slope"]
     if GUSSETS:
         f["Gusset"] = ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7),
                        ["GUSSETS", "GUSSET", "GUSSET_T", "GUSSET_PITCH", "GUSSET_FIRST"])
