@@ -18,7 +18,7 @@ keeper.
 
 | File | What it is |
 |---|---|
-| `mixer_sleeve.py` | The parametric CadQuery model. Every size is a named setting at the top |
+| `mixer_sleeve.py` | The parametric smlibpy model. Every size is a named setting at the top |
 | `mixer_sleeve.stl` | Print-ready mesh, already lying flat on its back |
 | `mixer_sleeve.step` | Editable CAD file, standing upright as mounted |
 | `mixer_sleeve.3mf` | Bambu Studio project with the recommended print settings, ready to slice |
@@ -27,7 +27,7 @@ keeper.
 | `make_3mf.py` | Builds the 3MF from the STL, the settings and the template |
 | `labels.json` | Named anchor points that `render_views.py` draws as tags |
 | `render_views.py` | Renders the labeled views in `views/` |
-| `check_part.py` | The checker; the mixer passes with the defaults |
+| `check_part.py` | The checker. With `LIP` 6.8 and `LIP_FILL_SLACK` 4.5 it flags about 1,000 mm² of overhang: the 19° ramp under the lips, which may sag printed flat |
 | `device()`, `features()` in `mixer_sleeve.py` | The mixer body as a ghost for the configurator, and the named features with the settings behind each, used for the view tags and for click-to-highlight |
 | `sections.png` | Cross-sections through the lip and the end stop |
 
@@ -63,7 +63,7 @@ Use these names when you ask for a change.
 | Back plate / Mount face | The flat back that screws to the wall mount |
 | Mount marks M1–M4 | Small marks for the mount screws, 80 × 80 mm apart, each in a solid pad |
 | Left wall, Right wall | The long sides that grip the mixer. Their inner faces bow to follow the body, from a spline through the three measured widths |
-| Left lip, Right lip | 4.4 mm lips over the mixer's front edge, with a 45° fill underneath |
+| Left lip, Right lip | 6.8 mm lips over the mixer's front edge, with a fill underneath that is only 2.4 mm deep at a 34 mm wall, a 19° ramp |
 | Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily |
 | Open end | The top, where the mixer slides in |
 | End stop | The low 16 mm stop at the bottom that carries the mixer |
@@ -81,13 +81,14 @@ Use these names when you ask for a change.
 | `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
 | `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 34 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to 1 mm less than `LIP` is fine, beyond that `build()` says what to change |
+| `WALL_H` | 34 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to `LIP_FILL_SLACK` less than `LIP` is accepted, beyond that `build()` says what to change |
 | `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
 | `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
 | `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
 | `GUSSETS` | off | Ribs on the outside of each wall, 10 mm at 45°, 40 mm apart, for a stiffer wall joint |
 | `BASE` | 3.08 mm | 11 layers at 0.28 mm |
-| `LIP`, `LIP_T` | 3.4 mm, 1.96 mm | Lip reach and thickness: at a 36 mm wall, 4.4 mm is the room for a 45° fill above the mixer |
+| `LIP`, `LIP_T` | 6.8 mm, 1.96 mm | Lip reach and thickness. At a 34 mm wall there is 2.4 mm above the mixer for the fill, so the lips' underside is a 19° ramp |
+| `LIP_FILL_SLACK` | 4.5 mm | How much shallower than `LIP` the fill under the lips may be. 1.0 keeps a 45° fill, which at 6.8 mm lips needs `WALL_H` 38 |
 | `LIP_FREE` | 80 mm | No lip on this length at the open end |
 | `END_H` | 16 mm | End stop height in the middle, low for the mixer's curved edge |
 | `END_TRI` | 20 mm | Width of the corner triangles; 0 brings back the 45° bottom slope from the walls down to the stop |
@@ -105,5 +106,6 @@ Outside size: 198.2 × 34 × 213.5 mm.
 - 0.4 mm nozzle, 0.28 mm layers (0.2 mm first layer), 4 wall loops
 - 15% gyroid sparse infill, 4 top and 3 bottom shell layers, aligned seam, auto brim
 
-On a P1S this slices to 110 layers, about 3 h 06 min and 127 g of PLA. The template uses PLA;
+On a P1S this slices to 122 layers, about 3 h 14 min and 153 g of PLA.
+The floor edge at the open end stays sharp: smlibpy cannot round it where it runs into the floor fillets. The template uses PLA;
 for a part that holds weight on a wall for years, switch the filament to PETG or ASA.

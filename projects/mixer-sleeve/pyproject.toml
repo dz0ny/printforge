@@ -1,10 +1,10 @@
 [project]
 name = "mixer-sleeve"
-description = "Slide-in wall sleeve for the Behringer Xenyx 1002SFX, made with CadQuery"
+description = "Slide-in wall sleeve for the Behringer Xenyx 1002SFX, made with smlibpy"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "cadquery>=2.8.0",
+    "smlibpy==0.6.2",
     "matplotlib>=3.11.2",
     "printforge-configurator",
 ]

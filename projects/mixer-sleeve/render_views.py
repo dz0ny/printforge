@@ -1,23 +1,25 @@
 # /// script
-# dependencies = ["cadquery", "pillow"]
+# dependencies = ["smlibpy==0.6.2", "pillow", "numpy"]
 # ///
-"""Render labeled views of a STEP model for review.
+"""Render labeled views of a STEP model for review, with smlibpy.
 
 Usage: `uv run render_views.py model.step [--labels labels.json] [--out views]`.
 The labels file maps a name to {"at": [x, y, z], "normal": [nx, ny, nz]}.
-A view shows a label only when its surface faces the camera and nothing hides it.
+A view shows a label only when its surface faces the camera.
+A ray from the label to the camera must also hit nothing.
 The key "_views" maps a view key to a title, for example {"left": "Mount face"}.
 The output is one PNG per view and a `sheet.png` with all views.
 """
 import argparse
+import io
 import json
 from pathlib import Path
 
-import cadquery as cq
-import vtk
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from smlibpy import import_step, render
 
-# Camera direction is the direction from the model centre to the camera.
+# Direction from the model to the camera, and the screen's up direction.
 VIEWS = [
     ("iso", "Iso (front-right-top)", (1, -1, 0.8), (0, 0, 1)),
     ("front", "Front (from -Y)", (0, -1, 0), (0, 0, 1)),
@@ -25,85 +27,54 @@ VIEWS = [
     ("left", "Left (from -X)", (-1, 0, 0), (0, 0, 1)),
     ("right", "Right (from +X)", (1, 0, 0), (0, 0, 1)),
     ("top", "Top (from +Z)", (0, 0, 1), (0, 1, 0)),
-    ("bottom", "Bottom (from -Z)", (0, 0, -1), (0, 1, 0)),
+    ("bottom", "Bottom (from -Z)", (0, 0, -1), (0, -1, 0)),
     ("iso_back", "Iso (back-left-bottom)", (-1, 1, -0.8), (0, 0, 1)),
 ]
 SIZE = 900
 
 
-def model_actors(shape):
-    poly = shape.toVtkPolyData(0.05, 0.1, True)
-    mapper = vtk.vtkPolyDataMapper()
-    mapper.SetInputData(poly)
-    body = vtk.vtkActor()
-    body.SetMapper(mapper)
-    body.GetProperty().SetColor(0.78, 0.80, 0.84)
-    body.GetProperty().SetSpecular(0.2)
-
-    edges = vtk.vtkFeatureEdges()
-    edges.SetInputData(poly)
-    edges.BoundaryEdgesOn()
-    edges.FeatureEdgesOn()
-    edges.SetFeatureAngle(35)
-    edges.ManifoldEdgesOff()
-    edges.NonManifoldEdgesOff()
-    emap = vtk.vtkPolyDataMapper()
-    emap.SetInputConnection(edges.GetOutputPort())
-    emap.ScalarVisibilityOff()
-    lines = vtk.vtkActor()
-    lines.SetMapper(emap)
-    lines.GetProperty().SetColor(0.15, 0.15, 0.18)
-    lines.GetProperty().SetLineWidth(1.2)
-    return [body, lines]
+def unit(v):
+    v = np.asarray(v, float)
+    return v / np.linalg.norm(v)
 
 
-def render_view(shape, labels, direction, up, path):
-    ren = vtk.vtkRenderer()
-    ren.SetBackground(1, 1, 1)
-    for a in model_actors(shape):
-        ren.AddActor(a)
-    win = vtk.vtkRenderWindow()
-    win.SetOffScreenRendering(1)
-    win.SetSize(SIZE, SIZE)
-    win.AddRenderer(ren)
+def screen_axes(to_cam, up):
+    """Return the screen right and up directions in model space."""
+    d = unit(to_cam)
+    right = unit(np.cross(up, d))
+    return right, np.cross(d, right)
 
-    bb = shape.BoundingBox()
-    c = bb.center
-    cam = ren.GetActiveCamera()
-    cam.ParallelProjectionOn()
-    cam.SetFocalPoint(c.x, c.y, c.z)
-    cam.SetPosition(c.x + direction[0] * 1000, c.y + direction[1] * 1000, c.z + direction[2] * 1000)
-    cam.SetViewUp(*up)
-    ren.ResetCamera()
-    cam.Zoom(0.85)
-    win.Render()
 
-    # Keep only the labels that the camera can see.
+def label_visible(pieces, at, normal, to_cam):
+    """Return True when the label faces the camera and the ray to the camera hits no piece."""
+    if np.dot(unit(normal), unit(to_cam)) <= 0.05:
+        return False
+    for piece in pieces:
+        try:
+            if piece.raycast(tuple(float(c) for c in at), tuple(float(c) for c in unit(to_cam))):
+                return False
+        except Exception:
+            continue
+    return True
+
+
+def render_view(part, labels, to_cam, up):
+    """Render one shaded view. Return the image and the visible labels as (name, px, py)."""
+    pieces = list(part) if isinstance(part, (list, tuple)) else [part]
+    pic = render(pieces, view={"direction": tuple(-unit(to_cam)), "up": up},
+                 size=(SIZE, SIZE), edges=True)
+    img = Image.open(io.BytesIO(bytes(pic))).convert("RGB")
+    fr = pic.frame
+    right, upv = screen_axes(to_cam, up)
     visible = []
-    zbuf = vtk.vtkFloatArray()
-    win.GetZbufferData(0, 0, SIZE - 1, SIZE - 1, zbuf)
-    for name, spec in labels.items():
-        p = spec["at"] if isinstance(spec, dict) else spec
-        n = spec.get("normal") if isinstance(spec, dict) else None
-        if n and sum(a * b for a, b in zip(n, direction)) <= 0.2:
+    for name, lab in labels.items():
+        at = np.asarray(lab["at"], float)
+        if not label_visible(pieces, at, lab.get("normal", to_cam), to_cam):
             continue
-        ren.SetWorldPoint(*p, 1.0)
-        ren.WorldToDisplay()
-        x, y, depth = ren.GetDisplayPoint()
-        if not (0 <= x < SIZE and 0 <= y < SIZE):
-            continue
-        if depth <= zbuf.GetValue(int(y) * SIZE + int(x)) + 0.0005:
-            visible.append((name, x, SIZE - 1 - y))
-
-    grab = vtk.vtkWindowToImageFilter()
-    grab.SetInput(win)
-    grab.Update()
-    writer = vtk.vtkPNGWriter()
-    writer.SetFileName(str(path))
-    writer.SetInputConnection(grab.GetOutputPort())
-    writer.Write()
-    win.Finalize()
-    return visible
+        x = SIZE / 2 + (float(at @ right) - fr["mid_x"]) * fr["scale"]
+        y = SIZE / 2 - (float(at @ upv) - fr["mid_y"]) * fr["scale"]
+        visible.append((name, x, y))
+    return img, visible
 
 
 def font(size):
@@ -116,8 +87,7 @@ def font(size):
     return ImageFont.load_default()
 
 
-def annotate(path, title, visible):
-    img = Image.open(path).convert("RGB")
+def annotate(img, title, visible):
     d = ImageDraw.Draw(img)
     f, ft = font(18), font(24)
     d.text((14, 10), title, fill=(20, 20, 20), font=ft)
@@ -133,7 +103,6 @@ def annotate(path, title, visible):
         d.line((x, y, tx - 2, ty + 11), fill=(220, 50, 40), width=2)
         d.rectangle((tx - 4, ty - 2, tx + w + 4, ty + 22), fill=(255, 255, 255), outline=(220, 50, 40))
         d.text((tx, ty), name, fill=(150, 20, 15), font=f)
-    img.save(path)
     return img
 
 
@@ -145,7 +114,9 @@ def main():
     ap.add_argument("--only", help="comma separated view names, for example front,iso")
     a = ap.parse_args()
 
-    shape = cq.importers.importStep(a.step).val()
+    part = import_step(a.step)  # One part, or a list of parts for a STEP with several bodies.
+    if not isinstance(part, (list, tuple)) and hasattr(part, "__len__") and not hasattr(part, "volume"):
+        part = list(part)
     labels = json.loads(Path(a.labels).read_text()) if a.labels else {}
     titles = labels.pop("_views", {})
     out = Path(a.out)
@@ -153,15 +124,16 @@ def main():
     only = set(a.only.split(",")) if a.only else None
 
     tiles = []
-    for key, title, direction, up in VIEWS:
+    for key, title, to_cam, up in VIEWS:
         if only and key not in only:
             continue
-        path = out / f"{key}.png"
-        visible = render_view(shape, labels, direction, up, path)
+        img, visible = render_view(part, labels, to_cam, up)
         if key in titles:
             title = f"{titles[key]} - {title}"
-        tiles.append(annotate(path, title, visible))
-        print(f"{path}: {len(visible)} labels visible")
+        img = annotate(img, title, visible)
+        img.save(out / f"{key}.png")
+        tiles.append(img)
+        print(f"{out / key}.png: {', '.join(v[0] for v in visible) or 'no labels'}")
 
     cols = 4 if len(tiles) > 4 else len(tiles)
     rows = (len(tiles) + cols - 1) // cols
