@@ -225,7 +225,21 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 #sheetMsg.err { color: var(--err); }
 #sheetMsg .spin { display: inline-block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
-#viewer.drawing #ftip, #viewer.drawing .dimlabel { display: none !important; }
+#viewer.drawing #ftip, #viewer.drawing .dimlabel,
+#viewer.section > canvas, #viewer.section #tools, #viewer.section #readout, #viewer.section #flabel,
+#viewer.section #ftip, #viewer.section .dimlabel { display: none !important; }
+/* Section view: a rendered cut through the assembly, with each part named on its cut face */
+#secView { position: absolute; inset: 0; background: #fff; }
+#secBar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 10px; }
+#secPos { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
+#secPos input { width: 180px; }
+#secAt { min-width: 74px; font-variant-numeric: tabular-nums; }
+#secImg { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; width: 100%; height: calc(100% - 52px); object-fit: contain; }
+#secMsg {
+  position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
+}
+#secMsg.err { color: var(--err); }
 #readout {
   position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-start;
   gap: 8px; padding: 12px; max-width: calc(100% - 24px); pointer-events: none;
@@ -262,6 +276,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
   <div class="seg" id="modeSeg" role="group" aria-label="View mode">
     <button type="button" data-mode="3d" aria-pressed="true">3D</button>
     <button type="button" data-mode="drawing" aria-pressed="false">Drawing</button>
+    <button type="button" data-mode="section" aria-pressed="false">Section</button>
   </div>
   <button id="rebuild" disabled><span class="spin"></span>Rebuild</button>
   <div class="dd" id="viewWrap">
@@ -320,6 +335,18 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
         <button type="button" id="z1">1:1</button>
         <label class="check" id="allWrap"><input type="checkbox" id="showAll"> Show all</label>
       </div>
+    </section>
+    <section id="secView" hidden>
+      <div id="secBar">
+        <div class="seg" id="secCut" role="group" aria-label="Section cut">
+          <button type="button" data-cut="front" aria-pressed="true">Front</button>
+          <button type="button" data-cut="side" aria-pressed="false">Side</button>
+          <button type="button" data-cut="top" aria-pressed="false">Top</button>
+        </div>
+        <label id="secPos">Cut at <input type="range" id="secSlider" min="1" max="99" step="1" value="50"> <span id="secAt">50 %</span></label>
+      </div>
+      <img id="secImg" alt="Section through the assembly">
+      <div id="secMsg" hidden></div>
     </section>
   </section>
 </main>
@@ -393,6 +420,7 @@ async function build() {
       if (v) await v.show(res);
       select(state.selected); // re-anchor the same feature, or clear if it is gone
       if (drawingMode) ensureDrawing();
+      if (sectionMode) ensureSection();
     }
   } catch (e) {
     showLog(String(e), true);
@@ -1513,10 +1541,59 @@ document.addEventListener('keydown', (e) => {
 });
 document.querySelectorAll('#pager button').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
 
+// ---- Section view: a PNG per build key and cut, rendered by the server
+let sectionMode = false, secCut = 'front', secSeq = 0;
+const secPct = { front: 50, side: 50, top: 50 };  // The slider place per cut, in percent of the assembly.
+const secCache = new Map();
+function showSecMsg(text, bad) {
+  const m = $('secMsg');
+  m.hidden = !text;
+  m.className = bad ? 'err' : '';
+  m.textContent = text || '';
+}
+async function ensureSection() {
+  const pct = secPct[secCut];
+  const key = `${state.buildKey}|${secCut}|${pct}`;
+  if (secCache.has(key)) { const c = secCache.get(key); $('secImg').src = c.url; $('secAt').textContent = c.at; showSecMsg(''); return; }
+  const seq = ++secSeq;
+  showSecMsg('Cutting the section…', false);
+  try {
+    const r = await fetch(`/api/section?cut=${secCut}&pct=${pct}`);
+    if (seq !== secSeq) return;
+    if ((r.headers.get('Content-Type') || '').startsWith('image/')) {
+      const url = URL.createObjectURL(await r.blob());
+      const axis = { front: 'y', side: 'x', top: 'z' }[secCut];
+      const at = `${axis} ${r.headers.get('X-Cut-At')} mm`;
+      secCache.set(`${r.headers.get('X-Build-Key')}|${secCut}|${pct}`, { url, at });
+      $('secImg').src = url;
+      $('secAt').textContent = at;
+      showSecMsg('');
+    } else {
+      const data = await r.json().catch(() => ({ log: `HTTP ${r.status}` }));
+      showSecMsg(data.log || data.error || 'Section failed', true);
+    }
+  } catch (e) {
+    if (seq === secSeq) showSecMsg(String(e), true);
+  }
+}
+document.querySelectorAll('#secCut button').forEach((b) => b.addEventListener('click', () => {
+  secCut = b.dataset.cut;
+  for (const x of document.querySelectorAll('#secCut button')) x.setAttribute('aria-pressed', String(x === b));
+  $('secSlider').value = secPct[secCut];
+  ensureSection();
+}));
+// The label follows the slider while it moves, and the cut renders when it is let go.
+$('secSlider').addEventListener('input', (e) => { $('secAt').textContent = `${e.target.value} %`; });
+$('secSlider').addEventListener('change', (e) => { secPct[secCut] = Number(e.target.value); ensureSection(); });
+
 function setMode(mode) {
   drawingMode = mode === 'drawing';
+  sectionMode = mode === 'section';
   $('viewer').classList.toggle('drawing', drawingMode);
+  $('viewer').classList.toggle('section', sectionMode);
   $('sheet').hidden = !drawingMode;
+  $('secView').hidden = !sectionMode;
+  if (sectionMode) ensureSection();
   for (const b of document.querySelectorAll('#modeSeg button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
   if (drawingMode) {
     if (!zoom.fitted) fitSheet();
