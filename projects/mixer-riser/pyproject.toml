@@ -1,10 +1,10 @@
 [project]
 name = "mixer-riser"
-description = "Bracket that screws to a Yamaha Tyros 3 rear panel and holds the mixer sleeve tilted 15 degrees, made with CadQuery"
+description = "Bracket that screws to a Yamaha Tyros 3 rear panel and holds the mixer sleeve tilted 15 degrees, made with smlibpy"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "cadquery>=2.8.0",
+    "smlibpy==0.6.2",
     "printforge-configurator",
 ]
 

@@ -1,8 +1,7 @@
 # /// script
-# requires-python = ">=3.11"
-# dependencies = ["cadquery", "numpy", "trimesh", "rtree"]
+# dependencies = ["smlibpy==0.6.2", "numpy", "trimesh", "rtree"]
 # ///
-"""Spot the things a render hides: thin walls, knife edges, device collisions, overhangs.
+"""Spot the things a render hides in a smlibpy model: thin walls, knife edges, collisions, overhangs.
 
 Usage: `uv run check_part.py model.py [--min-wall 0.9] [--knife 150] [--overhang 45]`.
 The script runs the model's build(), and device() when it exists, and prints a report:
@@ -30,9 +29,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-import cadquery as cq
 import numpy as np
 import trimesh
+from smlibpy import export_stl
 
 
 def load_model(path):
@@ -45,11 +44,50 @@ def load_model(path):
     return ns
 
 
+def as_part(shape):
+    """Return one smlibpy part. Fuse a list of parts into one part."""
+    if isinstance(shape, (list, tuple)):
+        out = shape[0]
+        for s in shape[1:]:
+            out = out + s
+        return out
+    return shape
+
+
 def to_trimesh(shape, tol=0.05):
     with tempfile.TemporaryDirectory() as d:
         f = os.path.join(d, "m.stl")
-        cq.exporters.export(shape, f, tolerance=tol, angularTolerance=0.2)
+        export_stl(shape, f, tolerance=tol, angle=12.0)
         return trimesh.load(f, force="mesh")
+
+
+def members(shape):
+    """Return the pieces of an assembly as a list. A single part gives a list of one part."""
+    return list(shape) if isinstance(shape, (list, tuple)) else [shape]
+
+
+def shared_volume(a, b):
+    """Return the volume in mm3 that a part or assembly shares with b, and the largest overlap box.
+
+    The check intersects each piece of an assembly alone and never fuses the pieces.
+    """
+    total, box, worst = 0.0, None, 0.0
+    for piece in members(a):
+        try:
+            inter = piece & b
+        except Exception:
+            continue
+        vol = float(getattr(inter, "volume", 0.0) or 0.0)
+        total += vol
+        if vol > worst:
+            worst, box = vol, inter.bbox()
+    return total, box
+
+
+def assembly_size(shape):
+    """Return the size of the box around all pieces of a part or an assembly."""
+    boxes = [p.bbox() for p in members(shape)]
+    return [max(b.max[i] for b in boxes) - min(b.min[i] for b in boxes) for i in range(3)]
 
 
 def thin_walls(mesh, min_wall, samples=4000, seed=0):
@@ -77,27 +115,23 @@ def thin_walls(mesh, min_wall, samples=4000, seed=0):
 
 
 def knife_edges(shape, limit_deg):
-    """Edges where the outward normals of the two faces differ by more than limit degrees."""
-    from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
-    from OCP.TopExp import TopExp
-    from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
-    amap = TopTools_IndexedDataMapOfShapeListOfShape()
-    TopExp.MapShapesAndAncestors_s(shape.wrapped, TopAbs_EDGE, TopAbs_FACE, amap)
+    """Return the edges where the outward normals of the two faces differ by more than limit degrees."""
     found = []
-    for e in shape.Edges():
-        if e.Length() < 0.2:
+    for e in shape.edges():
+        if e.length < 0.2:
             continue
-        faces = [cq.Face(f) for f in amap.FindFromKey(e.wrapped)]
+        faces = e.faces()
         if len(faces) != 2:
             continue
-        p = e.positionAt(0.5)
+        p = e.point_at(0.5)
         try:
-            n1, n2 = (f.normalAt(p) for f in faces)
+            n1, n2 = (np.asarray(tuple(f.normal_at(p)), float) for f in faces)
         except Exception:
             continue
-        ang = math.degrees(n1.getAngle(n2))
+        cos = float(np.dot(n1, n2) / (np.linalg.norm(n1) * np.linalg.norm(n2)))
+        ang = math.degrees(math.acos(max(-1.0, min(1.0, cos))))
         if ang > limit_deg:
-            found.append((ang, e.Length(), p))
+            found.append((ang, e.length, p))
     return sorted(found, key=lambda t: -t[0])
 
 
@@ -113,8 +147,13 @@ def overhangs(stl, limit_deg, bed_tol=0.3):
 
 
 def fmt_pt(p):
-    x, y, z = (float(v) for v in (p if isinstance(p, np.ndarray) else p.toTuple()))
+    x, y, z = (float(v) for v in tuple(p))
     return f"({x:.1f}, {y:.1f}, {z:.1f})"
+
+
+def fmt_box(bb):
+    lo, hi = tuple(bb.min), tuple(bb.max)
+    return f"x {lo[0]:.1f}..{hi[0]:.1f}, y {lo[1]:.1f}..{hi[1]:.1f}, z {lo[2]:.1f}..{hi[2]:.1f}"
 
 
 def main():
@@ -130,7 +169,7 @@ def main():
     a = ap.parse_args()
 
     ns = load_model(a.model)
-    part = ns["build"]()
+    part = ns["build"]()  # A part, or a list of separate pieces for an assembly.
     fails = []
 
     def report(ok, text):
@@ -139,12 +178,12 @@ def main():
             fails.append(text)
 
     def check_shape(shape, label, stl):
-        solid = shape.val()
-        report(solid.isValid(), f"{label}valid")
-        n_solids = len(shape.solids().vals())
+        shape = as_part(shape)
+        report(shape.is_valid(), f"{label}valid")
+        n_solids = len(shape.solids())
         report(n_solids == 1, f"{label}{n_solids} solid(s)")
-        bb = solid.BoundingBox()
-        print(f"     {label}size {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, volume {solid.Volume() / 1000:.1f} cm3")
+        sx, sy, sz = shape.bbox().size
+        print(f"     {label}size {sx:.1f} x {sy:.1f} x {sz:.1f} mm, volume {shape.volume / 1000:.1f} cm3")
         mesh = to_trimesh(shape)
         t, at, thin_area = thin_walls(mesh, a.min_wall)
         if t is None:
@@ -152,7 +191,7 @@ def main():
         else:
             report(thin_area <= a.max_thin_area,
                    f"{label}walls under {a.min_wall} mm cover about {thin_area:.0f} mm2; thinnest {t:.2f} mm at {fmt_pt(at)}")
-        knives = knife_edges(solid, a.knife)
+        knives = knife_edges(shape, a.knife)
         if knives:
             worst = knives[0]
             report(False, f"{label}{len(knives)} knife edge(s): worst {worst[0]:.0f} deg over {worst[1]:.1f} mm at {fmt_pt(worst[2])}")
@@ -179,19 +218,17 @@ def main():
             if not stl.exists() and (stem.parent / f"{name}.stl").exists():
                 stl = stem.parent / f"{name}.stl"  # Models that export plain <name>.stl per part.
             check_shape(shape, f"{name}: ", stl)
-        abb = part.val().BoundingBox()
-        print(f"     assembly size {abb.xlen:.1f} x {abb.ylen:.1f} x {abb.zlen:.1f} mm")
+        ax, ay, az = assembly_size(part)
+        print(f"     assembly size {ax:.1f} x {ay:.1f} x {az:.1f} mm")
     else:
         check_shape(part, "", stem.with_suffix(".stl"))
 
     device = ns.get("device")
     if callable(device):
-        inter = part.intersect(device())
-        vol = sum(s.Volume() for s in inter.solids().vals()) / 1000 if inter.solids().vals() else 0.0
+        vol, ib = shared_volume(part, as_part(device()))  # A device of several pieces may fuse.
+        vol /= 1000
         if vol > a.max_overlap:
-            ib = inter.val().BoundingBox()
-            report(False, f"part overlaps the device by {vol:.2f} cm3 in x {ib.xmin:.1f}..{ib.xmax:.1f}, "
-                          f"y {ib.ymin:.1f}..{ib.ymax:.1f}, z {ib.zmin:.1f}..{ib.zmax:.1f}")
+            report(False, f"part overlaps the device by {vol:.2f} cm3 in {fmt_box(ib)}")
         else:
             report(True, "no overlap with the device")
     else:
@@ -200,12 +237,10 @@ def main():
     clear = ns.get("keep_clear")
     if callable(clear):
         for i, shape in enumerate(clear()):
-            inter = part.intersect(shape)
-            vol = sum(s.Volume() for s in inter.solids().vals()) / 1000 if inter.solids().vals() else 0.0
+            vol, ib = shared_volume(part, as_part(shape))
+            vol /= 1000
             if vol > a.max_overlap:
-                ib = inter.val().BoundingBox()
-                report(False, f"keep-clear volume {i + 1} is blocked by {vol:.2f} cm3 in x {ib.xmin:.1f}..{ib.xmax:.1f}, "
-                              f"y {ib.ymin:.1f}..{ib.ymax:.1f}, z {ib.zmin:.1f}..{ib.zmax:.1f}")
+                report(False, f"keep-clear volume {i + 1} is blocked by {vol:.2f} cm3 in {fmt_box(ib)}")
             else:
                 report(True, f"keep-clear volume {i + 1} is empty")
 

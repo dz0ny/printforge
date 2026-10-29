@@ -30,7 +30,7 @@ rear edge. The span is wider than a 256 mm bed, which is why it is two pieces.
 
 | File | What it is |
 |---|---|
-| `mixer_riser.py` | The parametric CadQuery model: `build()` is the assembly, `parts()` the two printable pieces |
+| `mixer_riser.py` | The parametric smlibpy model: `build()` is the assembly as a list of the two separate pieces, `parts()` the two printable pieces |
 | `mixer_riser.step` | The assembly in the use orientation: panel plane at x = 0, player side +x, up +z |
 | `mixer_riser_left.stl`, `.3mf` | The left piece, standing on its bracket, every wall vertical |
 | `mixer_riser_right.stl`, `.3mf` | The right piece: the mirror, with tongue and socket swapped |
@@ -95,6 +95,7 @@ uv run mixer_riser.py --serve --lan --port 8767
 | `TOP_TILT` | 8° | The keyboard top's own slope, for the ghost only |
 
 Each piece prints standing on its bracket, 189 mm tall, with 4 walls and 30 %
-infill; no supports. It carries a 1.3 kg mixer for years, so print it in PETG
+infill; no supports. Sliced headless in Bambu Studio for a P1S, each piece is
+945 layers, about 5 h 10 min and 201 g of PLA. It carries a 1.3 kg mixer for years, so print it in PETG
 or ASA. If the dovetail is tight, raise `JOINT_FIT`; if it rattles, lower it.
 Not printed yet.
