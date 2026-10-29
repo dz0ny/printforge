@@ -1,4 +1,4 @@
-"""Serve a live parameter configurator for a CadQuery model script on 127.0.0.1.
+"""Serve a live parameter configurator for an smlibpy model script on 127.0.0.1.
 
 Two ways in:
 - `python -m printforge_configurator path/to/model.py [--port 8765]` for any script.
@@ -8,9 +8,9 @@ The page lists the top-level constants of the model, rebuilds the model with new
 values in a worker process, and serves the shell and device meshes. Save writes the
 values back into the model file and keeps each line's comment.
 
-The server itself needs no CadQuery. The worker runs with `uv run --project` in the
-model's own project (the folder with its pyproject.toml), so it builds with the
-same locked CadQuery as `uv run model.py`. Without a project it falls back to the
+The server itself needs no CAD library. The worker runs with `uv run --project` in
+the model's own project (the folder with its pyproject.toml), so it builds with the
+same locked smlibpy as `uv run model.py`. Without a project it falls back to the
 interpreter that runs the server.
 """
 import argparse
@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-RANGE = re.compile(r"\[\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*\]\s*$")
+RANGE = re.compile(r"\[\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*\]\s*\.?\s*$")
 DEF_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 
@@ -186,9 +186,81 @@ def worker_command(model):
     return [sys.executable]
 
 
-# ---- worker: a long-lived subprocess that imports CadQuery once and builds on request ----
+# ---- worker: a long-lived subprocess that loads the CAD library once and builds on request ----
 
-def build_once(cq, model, overrides, out):
+def is_smlibpy(shape):
+    """Return True for an smlibpy shape, or a list of smlibpy shapes."""
+    if isinstance(shape, (list, tuple)):
+        return bool(shape) and is_smlibpy(shape[0])
+    return type(shape).__module__.split(".")[0] == "smlibpy"
+
+
+class SmlibpyBackend:
+    """Export and measure smlibpy parts."""
+
+    def __init__(self):
+        import smlibpy
+        self.sm = smlibpy
+        self.meshes = {}  # The STL bytes of each piece, keyed by a hash of its exact body.
+
+    def pieces(self, shape):
+        """Return the pieces of an assembly as a list. The worker never fuses them."""
+        return list(shape) if isinstance(shape, (list, tuple)) else [shape]
+
+    def stl(self, shape, path):
+        """Write one binary STL of all pieces, from a mesh per piece.
+
+        The worker keeps the mesh of each piece in memory, keyed by a hash of its exact body.
+        A slider change thus meshes only the pieces it changed: the 1,000 sieve holes of the cocoa body take seconds.
+        The chord tolerance of 0.02 mm sets the smoothness, and the angle of 30 degrees only limits tiny holes.
+        """
+        import hashlib
+        import struct
+        tris, count = [], 0
+        for piece in self.pieces(shape):
+            key = hashlib.sha1(self.sm.to_smb(piece, ascii=False)).hexdigest()
+            data = self.meshes.get(key)
+            if data is None:
+                tmp = Path(path).with_suffix(".piece.stl")
+                self.sm.export_stl(piece, str(tmp), tolerance=0.02, angle=30.0)
+                data = tmp.read_bytes()
+                tmp.unlink()
+                self.meshes[key] = data
+                while len(self.meshes) > 64:
+                    del self.meshes[next(iter(self.meshes))]
+            n = struct.unpack("<I", data[80:84])[0]
+            tris.append(data[84:84 + 50 * n])
+            count += n
+        Path(path).write_bytes(b"printforge configurator".ljust(80, b" ") + struct.pack("<I", count) + b"".join(tris))
+
+    def step(self, shape, path):
+        self.sm.export_step(self.pieces(shape), str(path))
+
+    def info(self, shape):
+        ps = self.pieces(shape)
+        assert all(p.is_valid() for p in ps), "invalid solid"
+        boxes = [p.bbox() for p in ps]
+        size = [max(b.max[i] for b in boxes) - min(b.min[i] for b in boxes) for i in range(3)]
+        return size, sum(p.volume for p in ps) / 1000
+
+    def drawing(self, shape, out):
+        return smlibpy_drawing_views(self.sm, self.pieces(shape))
+
+
+_BACKEND = []
+
+
+def backend_for(shape):
+    """Return the smlibpy backend. Stop with a clear message for a shape from another library."""
+    if not is_smlibpy(shape):
+        raise TypeError(f"build() returned a {type(shape).__module__}.{type(shape).__name__}. "
+                        "The configurator builds smlibpy models only: return an smlibpy Part or a list of parts.")
+    if not _BACKEND:
+        _BACKEND.append(SmlibpyBackend())
+    return _BACKEND[0]
+
+
+def build_once(model, overrides, out):
     """Build the model with the overridden constants and export the meshes to out."""
     tree = ast.parse(model.read_text(encoding="utf-8"), filename=str(model))
     for node in head_nodes(tree):
@@ -199,16 +271,14 @@ def build_once(cq, model, overrides, out):
     ns = {"__name__": "model", "__file__": str(model)}
     exec(code, ns)
     part = ns["build"]()
-    solid = part.val()
-    assert solid.isValid(), "invalid solid"
-    cq.exporters.export(part, str(out / "shell.stl"), tolerance=0.02, angularTolerance=0.1)
+    be = backend_for(part)
+    size, volume = be.info(part)
+    be.stl(part, out / "shell.stl")
     device = ns.get("device")
     if callable(device):
-        cq.exporters.export(device(), str(out / "device.stl"), tolerance=0.02, angularTolerance=0.1)
-    bb = solid.BoundingBox()
-    info = {"bbox": [bb.xlen, bb.ylen, bb.zlen], "volume_cm3": solid.Volume() / 1000,
-            "features": feature_list(ns)}
-    return part, info, callable(device)
+        be.stl(device(), out / "device.stl")
+    info = {"bbox": size, "volume_cm3": volume, "features": feature_list(ns)}
+    return part, info, callable(device), ns
 
 
 def feature_list(ns):
@@ -236,19 +306,80 @@ DRAWING_VIEWS = {
 }
 
 
-def drawing_views(cq, part, out):
-    """Orthographic SVG projections with dashed hidden lines, as strings keyed by view."""
+def _iso_turn(sm, part, direction):
+    """Turn the part, or each piece of a list, so that the iso camera direction looks from the front (-Y)."""
+    if isinstance(part, (list, tuple)):
+        return [_iso_turn(sm, p, direction) for p in part]
+    x, y, z = direction
+    yaw = math.degrees(math.atan2(-x, -y))
+    turned = part.rotate(sm.Axis.Z, yaw)
+    tilt = math.degrees(math.atan2(z, math.hypot(x, y)))
+    return turned.rotate(sm.Axis.X, tilt)
+
+
+def _guard_child(fn, conn):
+    try:
+        conn.send(fn())
+    except Exception:
+        conn.send(None)
+    finally:
+        conn.close()
+
+
+def guarded(fn, timeout=60.0):
+    """Run fn() in a forked copy of this process and return its result.
+
+    Return None when the copy crashes, raises or takes longer than timeout.
+    The hidden-line step of the kernel can crash on some parts, and the worker must stay alive.
+    """
+    import multiprocessing as mp
+    ctx = mp.get_context("fork")
+    recv, send = ctx.Pipe(duplex=False)
+    proc = ctx.Process(target=_guard_child, args=(fn, send))
+    proc.start()
+    send.close()
+    result = None
+    try:
+        if recv.poll(timeout):
+            result = recv.recv()
+    except EOFError:
+        result = None  # The copy crashed before it sent an answer.
+    proc.join(1.0)
+    if proc.is_alive():
+        proc.kill()
+    return result
+
+
+# Iso directions to try in turn: the kernel often draws a near direction where it crashed on the first.
+ISO_TRIES = [(1, -1, 0.8), (1, -0.9, 0.8), (1, -1, 0.7)]
+
+
+def smlibpy_drawing_views(sm, part):
+    """Return smlibpy's own SVG of each hidden-line view, keyed by view.
+
+    The SVG has its viewBox in model mm, arcs as exact A commands and other curves as polylines.
+    It draws the hidden lines dashed, and the page reads this format directly.
+    Each view runs in a forked copy, because the hidden-line step can crash the process.
+    A view that fails is an empty string, and the page shows that view as unavailable.
+    """
+    def svg_of(shape, view):
+        dv = sm.drawing_views(shape, (view,))
+        return sm.to_svg(dv) if (dv[0].visible or dv[0].hidden) else ""
+
     views = {}
-    for name, (direction, up) in DRAWING_VIEWS.items():
-        f = out / f"{name}.svg"
-        cq.exporters.export(part, str(f), opt={
-            "projectionDir": direction, "showHidden": True, "width": 800, "height": 600,
-            "marginLeft": 20, "marginTop": 20, "strokeWidth": 0.5, "hiddenColor": (120, 120, 120)})
-        svg = f.read_text(encoding="utf-8")
-        # CadQuery writes width and height but no viewBox; the page needs one to fit the view.
-        if "viewBox" not in svg:
-            svg = svg.replace('height="600.0"', 'height="600.0" viewBox="0 0 800 600"', 1)
-        views[name] = svg
+    for name in DRAWING_VIEWS:
+        if name == "iso":
+            svg = None
+            for direction in ISO_TRIES:
+                t0 = time.monotonic()
+                svg = guarded(lambda d=direction: svg_of(_iso_turn(sm, part, d), "front"))
+                if svg is not None or time.monotonic() - t0 > 50:
+                    break  # A view that ran out of time on one direction runs out of time on the others too.
+        else:
+            svg = guarded(lambda n=name: svg_of(part, n))
+        if svg is None:
+            print(f"drawing: the {name} view failed in the kernel")
+        views[name] = svg or ""
     return views
 
 
@@ -265,12 +396,11 @@ def worker(model_path):
 
     proto = sys.stdout
     sys.stdout = sys.stderr  # Stray prints from imports must not corrupt the protocol.
-    import cadquery as cq
 
     model = Path(model_path).resolve()
     os.chdir(model.parent)
     sys.path.insert(0, str(model.parent))
-    last = None
+    last, last_ns = None, {}
     for line in sys.stdin:
         req = json.loads(line)
         buf = io.StringIO()
@@ -278,17 +408,20 @@ def worker(model_path):
         try:
             with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
                 if req["cmd"] == "build":
-                    last, info, has_device = build_once(cq, model, req["values"], Path(req["out"]))
+                    last, info, has_device, last_ns = build_once(model, req["values"], Path(req["out"]))
                     reply = {"ok": True, "info": info, "device": has_device}
                 elif req["cmd"] == "step":
                     if last is None:
                         raise RuntimeError("no build yet")
-                    cq.exporters.export(last, req["out"])
+                    backend_for(last).step(last, req["out"])
                     reply = {"ok": True}
                 elif req["cmd"] == "drawing":
                     if last is None:
                         raise RuntimeError("no build yet")
-                    reply = {"ok": True, "views": drawing_views(cq, last, Path(req["out"]))}
+                    # A model can give lighter shapes for the drawing, for example a sieve without its holes.
+                    hook = last_ns.get("drawing_shapes")
+                    shapes = hook() if callable(hook) else last
+                    reply = {"ok": True, "views": backend_for(shapes).drawing(shapes, Path(req["out"]))}
         except AssertionError as e:
             # A design rule from the model's own asserts: say it plainly, no traceback.
             buf.write(f"Design rule: {e}\n")
@@ -639,7 +772,7 @@ def main(argv=None):
         worker(argv[1])
         return
     ap = argparse.ArgumentParser(prog="printforge_configurator",
-                                 description="Serve a parameter configurator for a CadQuery model.")
+                                 description="Serve a parameter configurator for an smlibpy model.")
     ap.add_argument("model", help="the model script, for example mixer_sleeve.py")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--page", default=None, help="an HTML page to serve at / instead of the built-in one")

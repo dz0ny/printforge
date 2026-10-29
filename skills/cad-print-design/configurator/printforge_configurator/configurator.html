@@ -939,13 +939,43 @@ function parseXf(root) {
   const g = root.getElementsByTagName('g')[0];
   const t = g && g.getAttribute('transform');
   const m = t && t.match(/scale\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)\s*translate\(\s*([-\d.eE+]+)\s*,\s*([-\d.eE+]+)\s*\)/);
-  if (!m) return { SX: 1, SY: 1, TX: 0, TY: 0 };
+  // smlibpy's SVG has no scale group: its path coordinates are the viewBox units, model mm.
+  if (!m) return { SX: 1, SY: 1, TX: 0, TY: 0, mm: true };
   return { SX: parseFloat(m[1]), SY: parseFloat(m[2]), TX: parseFloat(m[3]), TY: parseFloat(m[4]) };
 }
 
-// Polylines (arrays of [x, y]) of an SVG path d with absolute or relative M/L and Z; other commands end the path.
+// Points along an SVG elliptical arc (endpoint form, SVG spec F.6.5), the start point left out.
+function arcPoints(x1, y1, rx, ry, phiDeg, large, sweep, x2, y2) {
+  if ((x1 === x2 && y1 === y2)) return [];
+  rx = Math.abs(rx); ry = Math.abs(ry);
+  if (!rx || !ry) return [[x2, y2]];
+  const phi = phiDeg * Math.PI / 180, c = Math.cos(phi), s = Math.sin(phi);
+  const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2;
+  const xp = c * dx + s * dy, yp = -s * dx + c * dy;
+  const lam = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+  if (lam > 1) { rx *= Math.sqrt(lam); ry *= Math.sqrt(lam); }
+  const num = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp;
+  let k = Math.sqrt(Math.max(0, num / (rx * rx * yp * yp + ry * ry * xp * xp)));
+  if (large === sweep) k = -k;
+  const cxp = k * (rx * yp) / ry, cyp = -k * (ry * xp) / rx;
+  const cx = c * cxp - s * cyp + (x1 + x2) / 2, cy = s * cxp + c * cyp + (y1 + y2) / 2;
+  const ang = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const t1 = ang(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
+  let dt = ang((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+  if (!sweep && dt > 0) dt -= 2 * Math.PI; else if (sweep && dt < 0) dt += 2 * Math.PI;
+  const n = Math.max(2, Math.ceil(Math.abs(dt) / (Math.PI / 36)));  // At most 5 degrees a step.
+  const pts = [];
+  for (let i = 1; i <= n; i++) {
+    const t = t1 + (dt * i) / n, ex = rx * Math.cos(t), ey = ry * Math.sin(t);
+    pts.push(i === n ? [x2, y2] : [c * ex - s * ey + cx, s * ex + c * ey + cy]);
+  }
+  return pts;
+}
+
+// Polylines (arrays of [x, y]) of an SVG path d with absolute or relative M/L/A and Z; arcs become short steps.
+// Other commands end the path.
 function parsePolylines(d) {
-  const toks = d.match(/[MLZmlz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || [];
+  const toks = d.match(/[MLAZmlaz]|[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || [];
   const isCmd = (t) => /[A-Za-z]/.test(t);
   const lines = [];
   let cur = null, x = 0, y = 0, sx = 0, sy = 0, cmd = '', i = 0;
@@ -953,6 +983,17 @@ function parsePolylines(d) {
     if (isCmd(toks[i])) cmd = toks[i++];
     const up = cmd.toUpperCase(), rel = cmd !== up;
     if (up === 'Z') { if (cur) cur.push([sx, sy]); x = sx; y = sy; cur = null; cmd = ''; continue; }
+    if (up === 'A') {
+      if (i + 6 >= toks.length || toks.slice(i, i + 7).some(isCmd)) break;
+      const a = toks.slice(i, i + 7).map(parseFloat); i += 7;
+      if (a.some(Number.isNaN)) break;
+      let [ex, ey] = [a[5], a[6]];
+      if (rel) { ex += x; ey += y; }
+      if (!cur) { cur = [[x, y]]; lines.push(cur); }
+      for (const p of arcPoints(x, y, a[0], a[1], a[2], a[3] !== 0, a[4] !== 0, ex, ey)) cur.push(p);
+      x = ex; y = ey;
+      continue;
+    }
     if (up !== 'M' && up !== 'L') break;
     if (i + 1 >= toks.length || isCmd(toks[i]) || isCmd(toks[i + 1])) break;
     let nx = parseFloat(toks[i++]), ny = parseFloat(toks[i++]);
@@ -1001,7 +1042,8 @@ function analyzeView(str) {
   const E = Math.max(x1 - x0, y1 - y0);
   if (!(E > 0)) throw new Error('degenerate drawing');
   // Half a display pixel, in mm, for "vertical" and "horizontal".
-  const tolV = 0.5 / Math.abs(xf.SX), tolH = 0.5 / Math.abs(xf.SY);
+  // smlibpy's lines are exact in mm, so 0.05 mm is "vertical" and "horizontal" there.
+  const tolV = xf.mm ? 0.05 : 0.5 / Math.abs(xf.SX), tolH = xf.mm ? 0.05 : 0.5 / Math.abs(xf.SY);
   const levels = (vertical, lo, hi) => {
     const pts = [];
     for (const [a1, b1, a2, b2] of runs) {

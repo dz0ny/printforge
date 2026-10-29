@@ -1,7 +1,7 @@
 [project]
 name = "printforge-configurator"
 version = "0.1.0"
-description = "A local web configurator for CadQuery model scripts: sliders for the device, the shell rebuilds"
+description = "A local web configurator for smlibpy model scripts: sliders for the device, the shell rebuilds"
 requires-python = ">=3.11"
 dependencies = []
 

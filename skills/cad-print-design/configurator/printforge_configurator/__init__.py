@@ -1,4 +1,4 @@
-"""Local web configurator for CadQuery model scripts.
+"""Local web configurator for smlibpy model scripts.
 
     from printforge_configurator import serve
     serve(__file__)                # blocks, serves http://127.0.0.1:8765/

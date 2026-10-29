@@ -10,14 +10,14 @@
 
 <p align="center">
   <img alt="Agent" src="https://img.shields.io/badge/agent-Claude%20Code-D97757" />
-  <img alt="CAD" src="https://img.shields.io/badge/CAD-CadQuery-2F6DB5" />
+  <img alt="CAD" src="https://img.shields.io/badge/CAD-smlibpy-2F6DB5" />
   <img alt="Python" src="https://img.shields.io/badge/python-uv-DE5FE9" />
   <img alt="Output" src="https://img.shields.io/badge/output-STEP%20%7C%20STL-F2C200" />
 </p>
 
 PrintForge is a Claude skill for designing holders, sleeves, mounts, brackets and
 enclosures you can 3D print. Describe the part, or send a photo of the device it
-has to hold. Claude writes a parametric CadQuery model, exports a STEP and a
+has to hold. Claude writes a parametric smlibpy model, exports a STEP and a
 print-ready STL, and renders labeled views of every side. Then you change it
 the way you would with a friend at the workbench: *"make the lip 8 mm"*,
 *"remove the lip from the top 6 cm"*, *"optimize for a 0.4 nozzle"*.
@@ -55,13 +55,14 @@ charge of the design, and you can rebuild it yourself with one command.
 - A technical drawing from the model: one view per page, dimensions traced from the geometry and shown on hover, zoomable, downloadable as SVG
 - A checker that spots what a render hides: thin walls, knife edges, a part that runs into its device, a channel that got blocked, overhangs
 - Design rules in the model itself, so a value that cannot work says what to change and to what
-- Always `uv` and CadQuery: no conda, no global installs, reproducible builds
-- A growing list of CadQuery pitfalls the skill already knows how to avoid
+- Always `uv` and [smlibpy](https://smlibpy.classcad.ch), exact NURBS solids on the open-source SMLib kernel: no conda, no global installs, reproducible builds
+- The smlibpy MCP server: Claude tries each step in a live session, checks it with drawings, sections and highlighted selections, and you can orbit the part in a live 3D view
+- A growing list of smlibpy pitfalls the skill already knows how to avoid
 
 ## The configurator
 
 Each project serves its own page, in the style of MakerWorld's Parametric
-Model Maker but with the CadQuery script as the source of truth:
+Model Maker but with the Python script as the source of truth:
 
 - **Settings** come straight from the script. A heading comment with an emoji is a group, the trailing comment is the description, a `[min:max]` makes a slider. Derived values stay hidden and recompute.
 - **The device** is a `device()` shape drawn as a ghost: the mixer on its feet, the gutter with its bead and hook, the downpipe. Click it and its sizes light up on the left.
@@ -92,6 +93,9 @@ the print STL. On the two examples it found a funnel blocked by its own
 collar and a mixer that could not pass under its own lips.
 
 ## Examples
+
+All four projects are smlibpy models. Each folder keeps its own copy of the
+scripts, and each one's README says what changed in the port.
 
 | Project | What it is | Device it fits | Live |
 |---|---|---|---|
@@ -157,7 +161,7 @@ Every row was rebuilt, rendered and checked as a single solid before it was sent
 
 1. Describe the part, or attach a photo of the device it holds.
 2. Claude asks for the real measurements, mount, nozzle, layer height and wall loops.
-3. It writes a parametric CadQuery script and builds it with `uv`.
+3. It tries the geometry step by step in the smlibpy MCP server, then writes a parametric smlibpy script and builds it with `uv`.
 4. It renders labeled views, checks them, and sends you the views, STL and STEP.
 5. It writes a 3MF with the recommended print settings for your printer, slices it to check, and tells you the time and grams.
 6. You ask for changes by name. Claude edits one or two parameters and repeats.
@@ -172,6 +176,16 @@ mkdir -p ~/.claude/skills
 cp -R printforge/skills/cad-print-design ~/.claude/skills/
 ```
 
+Install the smlibpy plugin. It adds the MCP server that builds, draws and
+checks parts, and needs no account:
+
+```bash
+claude plugin marketplace add awv-informatik/smlibpy
+claude plugin install smlibpy@smlibpy
+```
+
+Inside this repo the `.mcp.json` starts the same server.
+
 Start a new Claude Code session and ask for a part. The skill loads by itself
 when you mention an STL, a 3D print, or a holder for a device.
 
@@ -183,8 +197,8 @@ add it to your skills in Claude.
 ## Requirements
 
 - [Claude Code](https://code.claude.com/docs) or a Claude app with skills enabled
-- [uv](https://docs.astral.sh/uv/) on your path. It installs CadQuery and its
-  OpenCascade kernel from wheels on first use. No conda is needed.
+- [uv](https://docs.astral.sh/uv/) on your path. It installs smlibpy from wheels on
+  first use (Python 3.10 to 3.15, macOS, Linux, Windows). No conda, GPU or CAD system is needed.
 - A slicer for the STL, for example Bambu Studio, OrcaSlicer or PrusaSlicer
 
 ## Rebuild the example yourself
@@ -198,8 +212,8 @@ uv run make_3mf.py mixer_sleeve.stl --settings print_settings.json \
 ```
 
 Or skip the build and open [`mixer_sleeve.3mf`](./projects/mixer-sleeve/mixer_sleeve.3mf) in Bambu Studio:
-it is set up for a P1S with a 0.4 mm nozzle, 0.28 mm layers and 3 wall loops,
-and slices to about 3 hours and 127 g of PLA.
+it is set up for a P1S with a 0.4 mm nozzle, 0.28 mm layers and 4 wall loops,
+and slices to about 3 h 14 min and 153 g of PLA.
 
 Change any number at the top of `mixer_sleeve.py` and run the two commands
 again. See the [project README](./projects/mixer-sleeve/README.md) for the
@@ -224,7 +238,7 @@ Code the same server is the `mixer-sleeve` entry in `.claude/launch.json`.
 <p align="center"><sub>Click a feature on the part and its settings light up. Click a setting and the feature is tagged on the part.</sub></p>
 
 The configurator is its own package, `printforge-configurator`, with no
-dependencies of its own. Any CadQuery project can use it:
+dependencies of its own. Any smlibpy project can use it:
 
 ```bash
 uv add "printforge-configurator @ git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-print-design/configurator"
@@ -240,7 +254,8 @@ uvx --from "git+https://github.com/dz0ny/printforge#subdirectory=skills/cad-prin
 
 | Path | What it is |
 |---|---|
-| `skills/cad-print-design/` | The skill: instructions, CadQuery pitfalls, view renderer, part checker, example |
+| `skills/cad-print-design/` | The skill: instructions, smlibpy pitfalls, view renderer, part checker, example |
+| `.mcp.json` | Starts the smlibpy MCP server for sessions in this repo |
 | `skills/cad-print-design/configurator/` | The `printforge-configurator` package: the live configurator server and page |
 | `.claude/launch.json` | Launchers that open each project's configurator in the Claude browser pane |
 | `projects/` | Parts designed with the skill, each one rebuildable with `uv run` |

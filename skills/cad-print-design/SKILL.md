@@ -1,9 +1,9 @@
 ---
 name: cad-print-design
-description: Design 3D-printable parts (holders, sleeves, mounts, brackets, enclosures, adapters, clips) as parametric CadQuery models run with uv, exporting STEP, STL and a print-ready Bambu Studio/OrcaSlicer 3MF with recommended settings, and rendering labeled side views the user can inspect. Use this whenever the user asks for an STL, a 3D print, a printable holder/case/mount for a device, or wants to change dimensions, walls, lips, holes, vents or fillets on a part — even if they never say "CAD" or "CadQuery".
+description: Design 3D-printable parts (holders, sleeves, mounts, brackets, enclosures, adapters, clips) as parametric smlibpy models (exact NURBS solids on the SMLib kernel) run with uv and worked out through the smlibpy MCP server, exporting STEP, STL and a print-ready Bambu Studio/OrcaSlicer 3MF with recommended settings, and rendering labeled side views the user can inspect. Use this whenever the user asks for an STL, a 3D print, a printable holder/case/mount for a device, or wants to change dimensions, walls, lips, holes, vents or fillets on a part — even if they never say "CAD", "smlibpy" or "CadQuery".
 ---
 
-# Printable part design with CadQuery
+# Printable part design with smlibpy
 
 The user iterates on a physical part by looking at pictures and saying things like "make the left wall thinner" or "remove the lip from the top 6 cm". That loop only works when both of you use the same names for the same places, the pictures are trustworthy, and every number is one clear parameter. Everything below serves that loop.
 
@@ -19,21 +19,39 @@ Ask in one round (AskUserQuestion works well), and say which defaults you will u
 
 When a later message uses a vague word ("height", "thickness", "side", "top"), don't guess. Reply with the named dimensions and their current values ("Length along the slide: 213.5 mm, Width: 198 mm, Depth off the wall: 32.5 mm. Which one?"). In one session "height" meant thickness, and a wrong guess cost two rebuilds.
 
-## 2. Project setup: always uv + CadQuery
+## 2. Project setup: uv + smlibpy, with the smlibpy MCP server
+
+You use the same library in two places:
+
+- **The smlibpy MCP server** is where you try geometry out. `run_script` keeps variables between calls in a session, `snapshot(view="sheet")` draws the part with hidden lines dashed, `highlight=` shows what a selection picks before you fillet or cut with it, `section=` cuts the part to show a wall, and the live view (Buerligons) lets the user orbit and select faces that reach you through `get_selection`.
+- **The model script** in the project folder is the source of truth. The user can run it again without you. When a step works in the session, put it in the script and rebuild from the script.
+
+The server comes from the smlibpy plugin. It runs with `uvx` and needs no account:
+
+```bash
+claude plugin marketplace add awv-informatik/smlibpy
+claude plugin install smlibpy@smlibpy
+```
+
+This repo also has a `.mcp.json` that starts the same server, `uvx --from "smlibpy[mcp]==0.6.2" smlibpy-mcp`. The tools show in a new session after the install. If they are not there, build and check with `uv run` alone: everything below works without the server.
+
+At the start of a session, read the server's guides once with `docs(keys=["SKILL", "recipes/modeling", "recipes/verification"])`. Read `describe_method` for every API you are about to use. Then read `references/smlibpy-pitfalls.md` in this skill.
 
 Work in a real folder the user can reach, not a hidden scratch folder, so they can run the script themselves. If the session sits in a temporary workspace, offer to move it first.
 
 ```bash
 uv init --bare --name <part-name>
-uv add cadquery
+uv add smlibpy
 uv run <part>.py
 ```
 
-Copy `scripts/render_views.py` from this skill into the project. It declares its own dependencies inline, so `uv run render_views.py ...` works.
+Copy `scripts/render_views.py`, `scripts/check_part.py` and `scripts/make_3mf.py` from this skill into the project. Each declares its own dependencies inline, so `uv run render_views.py ...` works.
+
+Every project in this repo uses smlibpy. Each folder has its own copy of the scripts. The ports are references for harder cases: `projects/gutter-outlet` (a ruled funnel between two profiles), `projects/mixer-riser` (an assembly of two pieces), `projects/mixer-sleeve` (spline outlines, a ruled lip fill, a rounding pass that tries each small edge on its own) and `projects/cocoa-dispenser` (a part cache, 1,000 sieve holes cut in 2D, a wave spring of closed lofts, and `drawing_shapes()`).
 
 ## 3. The model script
 
-Use `assets/example_mixer_sleeve.py` as a working reference. It's a complete sleeve with lips, 45° lip fills, hex vents, a low end stop, a slope and mount marks. The shape of a good script:
+Use `assets/example_remote_holder.py` as a working reference. It is a wall pocket for a TV remote with a front wall, a thumb notch, a mount tab with countersunk screws, a drain hole, `device()`, `keep_clear()`, `features()` and design rules. It builds in under a second and passes `check_part.py`. The shape of a good script:
 
 1. **A printer block first:** `NOZZLE`, `LINE` (about 1.1 × nozzle) and `LAYER`. Then express every thickness as a count of those: `WALL = 6 * LINE`, `BASE = 11 * LAYER`. Use lines for thicknesses that lie across the bed in the print orientation, and layers for thicknesses that stack upward. When the user changes nozzle or layer height, the whole part re-tunes. Assert that no wall is thinner than two lines.
 2. **Parameters at the top, in mm, named after the features, in groups.** For example `WALL`, `BASE`, `LIP`, `LIP_FREE`, `END_H`, `HOLE_PATTERN`, with a one-line comment each. A user request should map to changing one or two of these. Derived values (`IN_D`, `OUT_H`, ...) come next.
@@ -58,7 +76,9 @@ Use `assets/example_mixer_sleeve.py` as a working reference. It's a complete sle
 5. **Asserts that catch silly mistakes.** A rotation sign error once put the end stop on top and the opening on the build plate. Check orientation with a slab test, by comparing material volume near z = 0 with material near the top. Also check minimum floor thickness above holes, and that the part fits the bed.
 6. **A section plot** (`sections.png`) through the trickiest profile helps you verify fillets, lips and holes quickly.
 
-Read `references/cadquery-pitfalls.md` before writing fillets, rotations or vent patterns. It records what failed and what worked.
+`build()` returns one smlibpy `Part`. Check `part.is_valid()`, `len(part.solids()) == 1`, `part.bbox().size` and `part.volume` after every change. In smlibpy, `volume` is a property and `bbox()` is a method.
+
+Read `references/smlibpy-pitfalls.md` before writing fillets, holes, rotations or cuts through rounded corners. It records what failed and what worked.
 
 ## 4. Name every side and feature
 
@@ -86,7 +106,9 @@ After every build:
 uv run render_views.py <part>.step --labels labels.json --out views
 ```
 
-This writes shaded orthographic views (front, back, left, right, top, bottom) and two isometric views, all with feature edges and red name tags, plus `views/sheet.png`. A tag appears only where its surface faces the camera and isn't hidden. Use `_views` to title each view by its side name, so "left" becomes "Mount face - Left (from -X)".
+It uses smlibpy's own renderer, with no GPU and no VTK. This writes shaded orthographic views (front, back, left, right, top, bottom) and two isometric views, all with feature edges and red name tags, plus `views/sheet.png`. A tag appears only where its surface faces the camera and isn't hidden.
+
+While you work in the MCP session, check smaller things with `snapshot` instead of a full rebuild: `highlight="part.edges().concave()"` before a fillet, `section="Plane.XZ"` to see a wall, `markers=` at a computed point, and `frame=` with `compare=` for a before and after picture of one change. A picture is scaled to fit, so prove sizes with numbers. Use `_views` to title each view by its side name, so "left" becomes "Mount face - Left (from -X)".
 
 Look at `sheet.png` yourself (Read it) before sending anything. You're checking that the change actually happened, the orientation is right, and no tag sits in the wrong place. Then send the sheet, plus a close-up view if the change was local, along with the STL and STEP.
 
@@ -118,16 +140,16 @@ It builds the model and reports, with an exit code for scripts:
 - `keep_clear()` volumes: a list of shapes that must stay empty, such as a water channel, a screw's access, or the path a plug travels. Define it in the model next to `device()`,
 - overhangs in the print orientation, read from the exported STL.
 
-A part that is several prints, because it spans more than the bed or prints better in pieces, defines `parts()` returning `{name: shape}` in print orientation while `build()` returns the assembly as one compound; the checker then checks each part on its own and the device against the assembly, and the script exports one STL per part.
+A part that is several prints, because it spans more than the bed or prints better in pieces, defines `parts()` returning `{name: shape}` in print orientation while `build()` returns the assembly as a list of the separate pieces (do not fuse them: pieces that touch would merge); the checker then checks each part on its own and the device against the assembly, and the script exports one STL per part.
 
 Model the device honestly: feet, edge radii, beads and hooks. The gutter outlet's bead and the mixer's rubber feet both changed what the checks found. When a check fails, fix the geometry, not the threshold; a per-part threshold is fine when the part really needs it, and the README says so.
 
 ## 6b. Interactive configurator
 
-For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with CadQuery kept as the language. The `printforge-configurator` package in `configurator/` is the server and the page; it needs no CadQuery itself.
+For a part built around a device, give the user a page where they can adjust the device and watch the shell follow, like MakerWorld's Parametric Model Maker but with Python kept as the language. The `printforge-configurator` package in `configurator/` is the server and the page. It needs no CAD library itself. Its worker builds smlibpy models: `build()` returns a part, or a list of separate pieces for an assembly. A model that returns another library's shape stops with a clear message. The worker keeps the mesh of each unchanged piece in memory, so a slider change meshes only what it changed. Each drawing view runs in a forked copy, because the kernel's hidden-line step can crash; a view that fails shows as unavailable. A model with very many small features can define `drawing_shapes()` that returns lighter stand-ins for the Drawing view, as the cocoa dispenser does with a plain floor for its sieve.
 
-1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A comment line above a block of settings is the group: its leading emoji is the group's icon and the first sentence its title, and the group runs until the next heading. The page shows each group as a collapsible section, the first one open. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
-2. Add a `device()` function that returns the device as a CadQuery shape in its resting position. The page draws it as a translucent ghost inside the shell. It is never exported.
+1. Write the model so its settings are exposed without any new format. The server takes every top-level `NAME = number|bool` line above the first `def` as a parameter. The trailing comment is the description, and an optional `[min:max]` at its end makes a slider: `MIX_W = 189.0  # Width on the open side. [100:300]`. A period after the range is allowed, `[100:300].`, so each comment stays one sentence. A comment line above a block of settings is the group: its leading emoji is the group's icon and the first sentence its title, and the group runs until the next heading. The page shows each group as a collapsible section, the first one open. Derived values such as `WALL = 8 * LINE` stay hidden and recompute.
+2. Add a `device()` function that returns the device as an smlibpy part in its resting position. The page draws it as a translucent ghost inside the shell. It is never exported.
 2b. Describe the features in a `features()` function: `{"Left lip": {"at": (x, y, z), "normal": (0, 0, 1), "params": ["LIP", "LIP_T"]}, ...}` in the model's own frame. Build `labels()` for the views from it, so the tags and the page share one table. In the page, clicking a feature highlights its settings on the left and clicking a setting's name shows its feature on the part.
 3. Plug the configurator into the project. Add the package as a dependency, from git (any project) or by path (a project inside this repo):
 
@@ -178,7 +200,7 @@ When a part's projections have arcs, the chains measure the straight edges only;
 - Reply with what changed in feature names and numbers ("Lip: 3 → 8 mm with a 45° fill; Lip-free zone stays 60 mm"), the new outside size, and anything you could not do (for example "two slope edges stay sharp, the fillet fails there").
 - If a request will cause a fit or print problem, say so concretely and offer the choice. For example, a 45° lip fill eats into the corner where a square mixer edge sits.
 - Never claim the part fits until the user test-prints. Say "rebuilt, not printed".
-- **Check corners and cut ends after every change.** When a cut (a slope, a lowered wall, a shortened lip) meets another feature, leftovers appear: stubs of a lip sliced by a slope, or a notch from a stray cutter. Confirm the part is one solid (`len(part.solids().vals()) == 1`). Then render a close-up by intersecting the part with a box around each changed corner and running `render_views.py` on that crop. End features such as lips a few mm *before* a slope instead of letting the slope slice them.
+- **Check corners and cut ends after every change.** When a cut (a slope, a lowered wall, a shortened lip) meets another feature, leftovers appear: stubs of a lip sliced by a slope, or a notch from a stray cutter. Confirm the part is one solid (`len(part.solids()) == 1`). Then look at each changed corner closely: in the MCP session, `snapshot(view=..., zoom=4, look_at=[x, y, z])` or `section=` through the corner; from the script, intersect the part with a box around the corner, export it, and run `render_views.py` on that crop. End features such as lips a few mm *before* a slope instead of letting the slope slice them.
 - **Name your reading of terse requests.** "Revert again" or "go in between" can mean more than one thing. Make the most likely change, then say in one line what you took it to mean and what the other reading would be.
 
 ## Nozzle-aware sizes
