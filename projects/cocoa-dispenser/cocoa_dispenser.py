@@ -30,7 +30,6 @@ WALL = 4 * LINE      # Tube wall, 4 lines. [1.2:4].
 GRIP_RIBS = 12       # Number of vertical grip ribs: round rods half sunk into the tube wall. [0:24].
 GRIP_D = 3.0         # Rib diameter. [2:5].
 GRIP_PROUD = 1.8     # Rib height out of the tube wall. [0.8:2.5].
-GRIP_GAP = 8.0       # Distance between the rib tops and the tube rim. The ribs stand on the bayonet band. [4:20].
 
 # 🕳️ Sieve: the floor of the cocoa cup, with fine holes that are vertical in the print.
 SIEVE_D = 60.0       # Cocoa cup outside diameter, which slides in the body bore. [30:62].
@@ -394,11 +393,8 @@ def stencil_build():
             ear -= rect(2 * (HOP_ID / 2 + BAY_WALL + 1.0), EAR_W + 2, h + 2, 0, 0, 0.0)
             st += ear.rotate(Z, a)
     st += cyl(COLLAR_OD, COLLAR_H + 0.01, -0.01) - cyl(COLLAR_ID, COLLAR_H + 2, -1)
-    for a in BAY_ANGLES:
-        c = a + TWIST
-        st += sector(COLLAR_OD / 2 - 0.2, HOP_ID / 2 + LUG_D - 0.2, c - LUG_A / 2, c + LUG_A / 2, LUG_H, LOCK_Z)
     st -= Polygon(heart_points(HEART_W)).translate(0, 0, -STENCIL_T - 1).extrude(STENCIL_T + 2)
-    return st.translate(0, 0, -CAP_DROP)
+    return st.translate(0, 0, -CAP_DROP) + bayonet_lugs(COLLAR_OD / 2)
 
 
 def sieve_holes(r_max):
@@ -415,38 +411,74 @@ def holed_disc(d, pts):
     return sk.extrude(SIEVE_T)
 
 
-SHELL_DEPS = ["HOP_D", "HOP_ID", "HOP_H", "WALL", "GRIP_RIBS", "GRIP_D", "GRIP_PROUD", "GRIP_GAP",
+SHELL_DEPS = ["HOP_D", "HOP_ID", "HOP_H", "WALL", "GRIP_RIBS", "GRIP_D", "GRIP_PROUD", "CAP_DROP",
               "BAY_WALL", "BAY_H", "GROOVE_FLOOR", "GROOVE_H", "LUG_D", "LUG_A", "TWIST", "DETENT", "BAY_ANGLES", "BODY_Z"]
 SIEVE_DEPS = ["SIEVE_D", "SIEVE_T", "SIEVE_HOLE", "SIEVE_PITCH", "SKIRT_H", "SKIRT_W", "RIB_W", "RIB_D",
               "CARRIER_D", "CARRIER_H", "CARRIER_TOP", "SIEVE_REST", "SOCKET", "ROD_SQ", "ROD_PRESS"]
 
 
-def shell_build():
-    """Return the body in the use frame: the tube, the bayonet band at the bottom and the grip ribs.
+def bayonet_grooves():
+    """Return the three L groove cutters for a bayonet band whose rim is at z = 0 and which goes up from it."""
+    ri = HOP_ID / 2
+    r1 = ri + LUG_D + 0.2
+    half = LUG_A / 2 + 2
+    cut = None
+    for a in BAY_ANGLES:
+        g = sector(ri - 1, r1, a - half, a + half, GROOVE_FLOOR + GROOVE_H + 1, -1)
+        g += sector(ri - 1, r1, a - half, a + TWIST + half, GROOVE_H, GROOVE_FLOOR)
+        cut = g if cut is None else cut + g
+    return cut
 
-    The band is thicker than the tube for the grooves, and a 45 degree top joins it to the tube.
+
+def bayonet_bumps():
+    """Return the click bumps on the groove floors, just past the entry slots, in the frame of bayonet_grooves()."""
+    ri = HOP_ID / 2
+    r1 = ri + LUG_D + 0.2
+    half = LUG_A / 2 + 2
+    bumps = [sector(ri - 0.01, r1 + 0.01, a + half + 1, a + half + 4, DETENT + 0.01, GROOVE_FLOOR - 0.01) for a in BAY_ANGLES]
+    return bumps[0] + bumps[1] + bumps[2]
+
+
+def bayonet_lugs(r_in):
+    """Return the three locked lugs on a collar of radius r_in, in the frame of bayonet_grooves() with a CAP_DROP gap."""
+    lugs = [sector(r_in - 0.2, HOP_ID / 2 + LUG_D - 0.2, a + TWIST - LUG_A / 2, a + TWIST + LUG_A / 2, LUG_H, LOCK_Z)
+            for a in BAY_ANGLES]
+    return (lugs[0] + lugs[1] + lugs[2]).translate(0, 0, -CAP_DROP)
+
+
+def top_frame(shape, zt):
+    """Turn a bayonet shape from the bottom frame upside down, onto a rim at zt."""
+    return shape.rotate(X, 180).translate(0, 0, zt)
+
+
+def shell_build():
+    """Return the body in the use frame: the tube, a bayonet band at each end and the grip ribs.
+
+    The bands are thicker than the tube for the grooves, and 45 degree faces join them to the tube.
+    The top band holds the lid the same way as the bottom band holds the stencil.
+    The tube rim is CAP_DROP under the lid plate, so the lid lugs can lift over the click bumps.
     """
-    zt = BODY_Z + HOP_H
+    zt = BODY_Z + HOP_H - CAP_DROP
     ri, ro, rb = HOP_ID / 2, HOP_D / 2, HOP_ID / 2 + BAY_WALL
     b = cyl(HOP_D, zt)
     b += Polygon((ro - 0.5, 0), (rb, 0), (rb, BAY_H), (ro - 0.5, BAY_H + rb - ro + 0.5)).on(Plane.XZ).revolve(Z)
+    b += Polygon((ro - 0.5, zt), (rb, zt), (rb, zt - BAY_H), (ro - 0.5, zt - BAY_H - rb + ro - 0.5)).on(Plane.XZ).revolve(Z)
     if GRIP_RIBS > 0:
         # Round vertical rods half sunk into the tube wall. They stand on the bayonet band, which is wider,
         # so their bottoms do not print in the air.
         rc = ro - GRIP_D / 2 + GRIP_PROUD
-        z0, z1 = BAY_H - 0.01, zt - GRIP_GAP
+        z0, z1 = BAY_H - 0.01, zt - BAY_H + 0.01
         for k in range(GRIP_RIBS):
             a = 2 * math.pi * (k + 0.5) / GRIP_RIBS
             b += cyl(GRIP_D, z1 - z0, z0).translate(rc * math.cos(a), rc * math.sin(a), 0)
     b -= cyl(HOP_ID, zt + 2, -1)  # The bore, open at both ends: the cocoa cup slides in it.
-    # Each L groove: an entry slot up from the bottom, then a leg along the twist.
-    r1 = ri + LUG_D + 0.2
-    half = LUG_A / 2 + 2
-    for a in BAY_ANGLES:
-        b -= sector(ri - 1, r1, a - half, a + half, GROOVE_FLOOR + GROOVE_H + 1, -1)
-        b -= sector(ri - 1, r1, a - half, a + TWIST + half, GROOVE_H, GROOVE_FLOOR)
-        if DETENT > 0:  # The click bump, just past the entry slot.
-            b += sector(ri - 0.01, r1 + 0.01, a + half + 1, a + half + 4, DETENT + 0.01, GROOVE_FLOOR - 0.01)
+    # Each L groove: an entry slot in from the rim, then a leg along the twist.
+    grooves = bayonet_grooves()
+    b -= grooves
+    b -= top_frame(grooves, zt)
+    if DETENT > 0:
+        bumps = bayonet_bumps()
+        b += bumps + top_frame(bumps, zt)
     return b
 
 
@@ -530,11 +562,13 @@ def tongue_solid():
 
 
 def lid(with_tongue=True):
-    plate = cyl(HOP_D, LID_T, HOP_H)
+    """Return the lid in the use frame. It locks into the body top with a bayonet, the same as the stencil below."""
+    rb = HOP_ID / 2 + BAY_WALL
+    plate = cyl(2 * rb, LID_T, HOP_H)
     plug_od = HOP_ID - 2 * LID_FIT
     plug = cyl(plug_od, LID_PLUG, HUB_BOT) - cyl(plug_od - 2 * 4 * LINE, LID_PLUG + 2, HUB_BOT - 1)
     hub = cyl(HUB_D, HUB_TOP - HUB_LOW, HUB_LOW)
-    l = plate + plug + hub
+    l = plate + plug + hub + top_frame(bayonet_lugs(plug_od / 2), HOP_H - CAP_DROP)
     l -= cyl(SEAT_D, SEAT_DEPTH + 1, LID_TOP - SEAT_DEPTH) - cyl(HUB_D, SEAT_DEPTH + 3, LID_TOP - SEAT_DEPTH - 1)
     sq = ROD_SQ + 2 * ROD_PLAY
     l -= rect(sq, sq, HUB_TOP - HUB_LOW + 2, 0, 0, HUB_LOW - 1)
@@ -550,6 +584,10 @@ def lid(with_tongue=True):
         l += tongue_solid()
     if LID_R > 0:
         l = rounded(l, smallest_circles(l, LID_TOP, LID_TOP), LID_R, "lid")
+    # Grip notches round the plate edge, cut after the round so it does not pick their small arcs.
+    for k in range(18):
+        a = 2 * math.pi * (k + 0.5) / 18
+        l -= cyl(2.0, LID_T + 2, HOP_H - 1).translate(rb * math.cos(a), rb * math.sin(a), 0)
     return l.translate(0, 0, BODY_Z)
 
 

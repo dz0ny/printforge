@@ -31,8 +31,8 @@ from the CAD views. The CAD views are the truth.
   which held the cocoa above it and packed it onto the middle holes.
 - The **body** is one thin tube, 4 lines thick and 69 mm wide. Its bore guides the cup
   with 0.3 mm play per side. It has no foot: you hold it just over the coffee. The
-  twelve grip ribs stand on the bayonet band at the bottom, so none of them starts in
-  the air.
+  twelve grip ribs run between two bayonet bands, one at each end, so none of them
+  starts in the air.
 - The **stencil** goes in from below and locks with a **bayonet**: push it up, turn it
   35°, and it clicks over a 0.3 mm bump. Three lugs on its collar ride in L grooves in
   a thicker ring at the body bottom. The bayonet also sets the way the heart points.
@@ -40,7 +40,11 @@ from the CAD views. The CAD views are the truth.
   chamber.
 - The **rod** is square. One face carries a **rack**: 5 triangular teeth, 3 mm pitch,
   1.3 mm deep, placed so the tongue is on the rack over the whole stroke.
-- The **lid** has a square guide hole, so the rack face always faces the tongue, the
+- The **lid** locks into the top band with the same **bayonet** as the stencil: three
+  lugs on its plug, a 35° turn and a click. The spring pushes the lugs up against the
+  groove ceilings, so the lid sits tight, 0.5 mm over the tube rim. Its plate is as wide
+  as the band, with 18 notches for the fingers.
+- The lid also has a square guide hole, so the rack face always faces the tongue, the
   **striker tongue** in a pocket of the hub, and a 140° **pour opening** between the
   button and the plug. The tongue is 12 mm long with a gusset at its root,
   and its nub has the slope of the teeth. Each tooth bends it 1 mm out and lets it snap
@@ -62,10 +66,10 @@ from the CAD views. The CAD views are the truth.
 
 | Part | Print orientation | Notes |
 |---|---|---|
-| Body | bayonet band down, as used | tube, bayonet band with three L grooves and a 45° top, twelve grip ribs that stand on the band; 69 mm wide, 107 mm tall |
+| Body | bayonet band down, as used | tube, a bayonet band at each end with three L grooves and 45° faces to the tube, twelve grip ribs between the bands; 69 mm wide, 106 mm tall |
 | Stencil | flange down | heart cut-out in a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
 | Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 105 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 41° from vertical: no supports |
-| Lid | upside down | push-fit plug, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
+| Lid | upside down | plug with three bayonet lugs (1 mm overhangs), notched plate, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
 | Spring | flat | PETG wave spring, 7 rings of a 4-layer band (0.64 mm), 18 mm across; 32.0 mm free, 29.5 at rest, 19.5 pressed; about 0.8 N/mm |
 
@@ -84,11 +88,12 @@ spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
    tongue (the side of the hub with the slot). It should click as it goes.
 2. Spring over the rod into the lid seat; press the button onto the rod top (glue drop).
 3. Stencil into the body bottom: lugs into the slots, push up, turn until it clicks.
-4. Lower the cup into the body and push the lid in.
+4. Lower the cup into the body, lugs of the lid into the top slots, push down and turn
+   until it clicks.
 5. Pour cocoa through the opening in the lid, 20 to 25 mm deep.
 6. Hold the body just over the coffee and press.
-7. To change the stencil, twist it back and pull it down. To clean the cup, pull the lid
-   straight up: the cup comes out with it.
+7. To change the stencil, twist it back and pull it down. To clean the cup, twist the lid back and
+   lift it: the cup comes out with it.
 
 ## Test first
 
