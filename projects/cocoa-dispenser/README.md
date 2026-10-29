@@ -1,113 +1,126 @@
 # Cocoa dispenser with stencil and ratchet tapper
 
-Push-button cocoa duster for latte art, all parts printed. Put it on the cup, slide a
-stencil in, press the button. The press clicks a toothed rack past a striker tongue
-in the lid: every click is one tap on the body, and the taps shake a fine, even dust
-of cocoa through the sieve floor. No shutter: the fine holes hold the cocoa at rest,
-it bridges over them, the way the LatteShot works.
+Push-button cocoa duster for latte art, all parts printed. Hold it over the coffee and
+press the button. The button pushes the cocoa cup down and the spring lifts it again.
+The cup's floor is the sieve. On the way a toothed rack clicks past a striker tongue in
+the lid: every click shakes the cup, and the cocoa falls as a fine, even dust through the
+heart in the stencil. No shutter: the fine holes hold the cocoa at rest, it bridges over
+them, the way the LatteShot works.
 
-![in use](renders/v3/v3_cafe.png)
-![the result](renders/v3/v3_result.png)
-![parts](renders/v3/v3_parts_flatlay.png)
-![the wave spring](renders/v3/v3_spring.png)
-![mechanism cutaway](renders/v3/v3_mechanism.png)
+Version 4 has six parts. One slim tube replaces the stand and the hopper, the stencil locks into its bottom with a bayonet, and the rod is part of the
+cocoa cup.
+
+![the cocoa cup](views/cup.png)
 ![section, rest and pressed](views/section_rest_pressed.png)
+![bayonet in the body bottom](views/bayonet_body.png)
+![stencil with its bayonet lugs](views/bayonet_stencil.png)
 ![tongue close-up](views/tongue_closeup.png)
 ![views](views/sheet.png)
 
-The photos in `renders/v3/` are AI images made with Codex from the CAD views
-(`renders/v3/prompt.txt`, `prompt_photos.txt`, `prompt_spring.txt`); `renders/v2/` and `renders/` hold the earlier versions.
-The CAD views are the truth.
+The photos in `renders/` show version 3 and earlier. They are AI images made with Codex
+from the CAD views. The CAD views are the truth.
 
-## How the tapper works
+## How it works
 
-- The body floor is the **sieve**: 0.8 mm holes on a 1.7 mm hex grid over the whole
-  floor, about 1,000 of them, with a 45° cone up to the hopper bore. Cocoa bridges
-  over 0.8 mm holes and stays put until something shakes it.
-- The **rod** is square and straight. One face carries a **rack**: 11 triangular teeth,
-  1.5 mm pitch, 0.8 mm deep, placed so the tongue is on the rack over the whole stroke.
-  A 20 mm **foot** at the rod's bottom stirs the cocoa 2 mm above the sieve at full press.
-- The **lid** has a square guide hole, so the rack face always faces the tongue, and
-  the **striker tongue**: a 0.9 mm thick, 4 mm wide, 8 mm long finger hanging in a
-  pocket of the hub, with a 45° nub at its tip that reaches 0.5 mm into the teeth.
-  Each tooth bends the tongue 0.5 mm out and lets it snap back: one tap into the lid,
-  which is push-fit into the body, which carries the sieve.
-- One press of 10 mm = about 4 taps down and 4 up. Press once for a light dust,
-  two or three times for a full heart.
-- **Dose**: `SIEVE_HOLE` sets the grain (0.8 cocoa, 0.6 to 0.7 cinnamon, which wants
-  a 0.2 mm nozzle or a test print), the number of presses sets the amount, and the
-  cocoa in the hopper sets the pressure on the sieve: more cocoa, bigger dose. Fill
-  it 20 to 30 mm deep for a steady dose.
-- `SIEVE_SEPARATE = True` makes the sieve a drop-in disc with a lifting peg on a ring
-  ledge, so discs with different holes can be swapped. Off by default: 7 parts.
+- The **cocoa cup** moves, sieve and all. Its floor has 0.8 mm holes on a 1.7 mm hex
+  grid, 871 of them, and a 30 mm wall holds the cocoa. Cocoa bridges over 0.8 mm holes
+  and stays put until something shakes it.
+- Three **ribs in a triangle** carry the cup from its rim up to a round block, 45 mm
+  above the floor and clear of the cocoa. The rod grows out of that block. Nothing
+  touches the middle of the sieve. Version 3 had a round agitator foot on the rod there,
+  which held the cocoa above it and packed it onto the middle holes.
+- The **body** is one thin tube, 4 lines thick and 69 mm wide. Its bore guides the cup
+  with 0.3 mm play per side. It has no foot: you hold it just over the coffee. The
+  twelve grip ribs stand on the bayonet band at the bottom, so none of them starts in
+  the air.
+- The **stencil** goes in from below and locks with a **bayonet**: push it up, turn it
+  35°, and it clicks over a 0.3 mm bump. Three lugs on its collar ride in L grooves in
+  a thicker ring at the body bottom. The bayonet also sets the way the heart points.
+  Two ears on the flange end in solid 5 mm tabs, outside the band, for the fingers. Between the stencil and the sieve is a 20 mm drop
+  chamber.
+- The **rod** is square. One face carries a **rack**: 7 triangular teeth, 2.4 mm pitch,
+  0.8 mm deep, placed so the tongue is on the rack over the whole stroke.
+- The **lid** has a square guide hole, so the rack face always faces the tongue, the
+  **striker tongue** in a pocket of the hub, and a 140° **pour opening** between the
+  button and the plug. Each tooth bends the tongue 0.5 mm out and lets it snap back,
+  and the click goes down the rod into the cup.
+- One press of 10 mm is about 4 taps down and 4 up. The button lands on the lid at the
+  bottom; at rest the carrier block stops 0.05 mm under the lid hub. Press once for a
+  light dust, two or three times for a full heart.
+- **Dose**: `SIEVE_HOLE` sets the grain (0.8 cocoa, 0.6 to 0.7 cinnamon, which wants a
+  0.2 mm nozzle or a test print), the number of presses sets the amount, and the depth
+  of cocoa sets the pressure on the sieve. Fill the cup 20 to 25 mm for a steady dose,
+  below its rim, so no cocoa reaches the gap around the cup.
+- The spring lifts the cup and the cocoa: about 2 N at rest and 11 N at the bottom of
+  a press. `SIEVE_LOAD` and `WS_T` set it.
+- The **button** is 25 mm wide and 25 mm tall. Its skirt hides the spring, so the spring
+  sets its size: 7 rings on an 18 mm diameter, round a 14 mm lid hub.
 
 ## Parts
 
 | Part | Print orientation | Notes |
 |---|---|---|
-| Stand | flat, as used | sits on the cup rim; stencil slot open to the front; 15 mm drop chamber above it, its roof a 45° cone |
-| Stencil | flat | heart cut-out, 1.2 mm, with a 3 mm lip: a tray for the spill, pour spout at the back |
-| Body | flange down | the sieve floor prints as the first 6 layers; twelve rounded grip ribs around the hopper, rounded flange edge |
-| Rod | lying on its -Y face | the foot is flat on that side; the rack teeth print as vertical walls, 13 mm high instead of 102 |
-| Lid | upside down | push-fit plug, square guide hole, spring seat, the tongue stands vertical in its pocket |
+| Body | bayonet band down, as used | tube, bayonet band with three L grooves and a 45° top, twelve grip ribs that stand on the band; 69 mm wide, 102 mm tall |
+| Stencil | flange down | heart cut-out in a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
+| Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 100 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 34° from vertical: no supports |
+| Lid | upside down | push-fit plug, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
-| Spring | flat | PETG wave spring, 8 rings of a 3-layer band; 36.5 mm free, 32.5 at rest, 22.5 pressed; about 0.4 N/mm |
+| Spring | flat | PETG wave spring, 7 rings of a 4-layer band (0.64 mm), 18 mm across; 32.0 mm free, 29.5 at rest, 19.5 pressed; about 0.8 N/mm |
 
-No bought parts. Print the spring, the rod and the lid in PETG: the tongue and the
+No bought parts. Print the spring, the cup and the lid in PETG: the tongue and the
 spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
 `PRINT_SPRING = False` for a bought metal spring (OD 9 to 10 mm, free length about
-25 mm).
+25 mm). The model uses 0.16 mm layers.
 
 ## Assembly
 
-1. Rod through the lid's square hole from below, foot down, with the rack face
-   toward the tongue (the side of the hub with the slot). It should click as it goes.
+1. The cup's rod through the lid's square hole from below, with the rack face toward the
+   tongue (the side of the hub with the slot). It should click as it goes.
 2. Spring over the rod into the lid seat; press the button onto the rod top (glue drop).
-3. Fill the body with cocoa, 20 to 30 mm. Push the lid in.
-4. Stand on the cup, stencil into the slot, body onto the stand. Press.
+3. Stencil into the body bottom: lugs into the slots, push up, turn until it clicks.
+4. Lower the cup into the body and push the lid in.
+5. Pour cocoa through the opening in the lid, 20 to 25 mm deep.
+6. Hold the body just over the coffee and press.
+7. To change the stencil, twist it back and pull it down. To clean the cup, pull the lid
+   straight up: the cup comes out with it.
 
 ## Test first
 
-Rebuilt, not printed. Print the lid and the rod alone and click the rack past the
-tongue by hand. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
+Rebuilt, not printed. Print the lid and the cup first and click the rack past the
+tongue by hand. Print the stencil and the bottom 15 mm of the body to try the bayonet. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
 three lines thick, and watch the return rule: the spring has to push the tongue back up
 the last tooth on its own, so a stronger tongue wants more `PRELOAD` or a longer
 `RACK_PITCH` (the build prints both forces). If the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
-body over paper: nothing should fall at rest with 0.8 mm holes.
+cup over paper: nothing should fall at rest with 0.8 mm holes.
 
 ## Rebuilding fast
 
 The model is smlibpy. Parts are cached on disk in `.cache/` as native `.smb` files,
 keyed by the settings each part uses and the builder's own source, and so are their
-STLs. A change to a grip or flange setting rebuilds the body's shell and unions the
-cached sieve floor into it; the thousand holes are cut once, in 2D before the
-extrusion. The interference and orientation checks use the body with a plain floor,
-because meshing the holes for every check took minutes. A warm run takes about 35 s.
+STLs. The cup's holes are cut once, in 2D before the extrusion. The interference
+checks, the configurator drawing and the configurator section use a cup with no holes,
+because meshing the holes for every check took minutes. A warm run takes about 30 s.
 `--no-cache` builds everything from scratch; delete `.cache/` to start over.
 
 ## Files
 
 - `cocoa_dispenser.py` the model; `uv run cocoa_dispenser.py` writes everything below.
-  `cocoa_dispenser_v1.py.bak` is version 1 (agitator, no shutter),
-  `cocoa_dispenser_v2.py.bak` version 2 (rotating shutter), `cocoa_dispenser_v2chamber.py.bak`
-  version 2 with the drop chamber and aperture disc.
+  The `.py.bak` files are versions 1 and 2.
 - `cocoa_dispenser.step` assembly at rest, `cocoa_dispenser_pressed.step` at full press.
-- `stand.stl` ... `spring.stl`: seven parts in print orientation.
-- `cocoa_dispenser_plate.stl` and `cocoa_dispenser.3mf`: all seven on one 256 mm plate.
+- `body.stl`, `stencil.stl`, `cup.stl`, `lid.stl`, `button.stl`, `spring.stl`: six parts
+  in print orientation, and `cocoa_dispenser_plate.stl` with all six on one plate.
 - `sections.py` draws `views/section_rest_pressed.png` and `views/tongue_closeup.png`.
 - `uv run check_part.py cocoa_dispenser.py --max-overhang-area 400 --skip spring` checks
-  each part and the assembly; the heart's cusp counts as a knife edge, which is the shape.
-  The spring is skipped by design: its band is three layers, the rings meet tangentially,
-  and each wave underside is a bridge of about 10 mm, which prints fine but reads as overhang.
-  The lid's thin-wall finding is the tongue, two lines by design. The stand reports
-  about 8 mm² where the 45° slot roof meets the channel: the geometry is the same as
-  the CadQuery version, and that mesh's samples happened to miss the edge.
-- Rounds: `STAND_R`, `FLANGE_R` and `LID_R` round the window and rim edges of the stand,
-  the joint between hopper and flange, and the top of the guide hub. The CadQuery
-  version picked those edges, and the port keeps them.
+  each part and the assembly. Two findings stay by design: the heart's cusp counts as a
+  knife edge, and the lid's thin wall is the tongue, two lines thick. The spring is
+  skipped: the rings meet tangentially and each wave underside is a bridge of about
+  10 mm, which prints fine but reads as overhang.
+- `LID_R` rounds the top of the guide hub.
 - The wave rings are smooth closed lofts, and the flat end rings are 0.1 mm wider per
   side than the band (`WS_END_LAP`): with faces on the same cylinders, smlibpy could
-  not fuse them. The spring is 0.8 cm³, 0.03 more than before.
-- `cocoa_dispenser.3mf` is the project saved from Bambu Studio, split into its parts.
-  Rebuild it from `cocoa_dispenser_plate.stl` with `make_3mf.py` when the parts change.
-- `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768.
+  not fuse them.
+- `cocoa_dispenser.3mf` is the project saved from Bambu Studio. It still holds version 3.
+  Make a new project from `cocoa_dispenser_plate.stl` before printing version 4.
+- `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768. Its Section
+  view cuts the assembly from the front, the side or the top, with a slider for the
+  place of the cut and each part named on its cut face.

@@ -1,6 +1,6 @@
 {
-  "_why": "0.2 mm layers to match the layer counts in the script (sieve plate and rotor 6 layers, follower 6 layers). 3 wall loops so the 2.25 mm hopper wall is pure perimeters. Every part prints flat or standing with 45 degree undersides only: no supports. The rod lies on its flat side, so it needs no brim. 15% infill. PETG for the spring, rotor and rod; food-safe PETG or PLA for the rest.",
-  "layer_height": "0.2",
+  "_why": "0.16 mm layers to match the layer counts in the script (sieve floor and stencil 6 layers, spring band 4). 3 wall loops so the 1.8 mm tube is pure perimeters. Every part prints as used or upside down with 45 degree undersides only: no supports. The cup is 100 mm tall on a 60 mm floor, so it needs no brim. 15% infill. PETG for the spring, cup and lid; food-safe PETG or PLA for the rest.",
+  "layer_height": "0.16",
   "initial_layer_print_height": "0.2",
   "wall_loops": "3",
   "top_shell_layers": "4",

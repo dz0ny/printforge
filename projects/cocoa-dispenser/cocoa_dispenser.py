@@ -1,9 +1,11 @@
 """Cocoa duster for latte art, made with smlibpy.
 
-Each press moves a rack past a striker tongue in the lid: one tap on the body per tooth.
-The taps shake cocoa through the fine sieve floor onto a slide-in stencil on the cup.
-Parts: stand, stencil, body with sieve, rod with rack, lid with tongue, button and a printed wave spring.
-Z is up from the cup rim, the stencil tab points to -Y and the rack faces +X.
+Each press moves the cocoa cup down and the spring lifts it again.
+On the way the rack clicks past a striker tongue in the lid: one tap per tooth, which shakes the cup.
+The cocoa falls through the fine sieve onto a stencil that locks into the body bottom with a bayonet.
+Three ribs in a triangle hold the cup on the rod, so nothing covers the middle of the sieve.
+Parts: body, stencil, cocoa cup with the sieve and the rack rod, lid with tongue, button and a printed wave spring.
+Z is up from the body underside and the rack faces +X.
 Run `uv run cocoa_dispenser.py` for the STEPs, STLs and labels, or add `--serve` for the configurator.
 """
 import math
@@ -11,92 +13,85 @@ import math
 from smlibpy import (Align, Box, Circle, Cylinder, Line, Plane, Polygon, Polyline, Sphere, ThreePointArc, Wire, X, Z,
                      loft, make_face)
 
-# ☕ Cup, only for the ghost view: the stand rests on any rim wider than its window.
+# ☕ Coffee cup, only for the ghost view: the dispenser is held just above it.
 CUP_D = 90.0         # Cup rim outside diameter. [60:130].
 CUP_H = 70.0         # Cup height below the rim. [30:120].
 
 # 🖨️ Printer. Every part prints flat, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
 LINE = 0.45          # Line width, about 1.1 x the nozzle.
-LAYER = 0.2
+LAYER = 0.16
 
-# 🫙 Body: the cocoa hopper with its locating flange.
-HOP_D = 72.0         # Hopper outside diameter. [50:100].
-HOP_H = 75.0         # Body height from the sieve face to the hopper rim. [40:130].
-WALL = 5 * LINE      # Hopper wall, 5 lines. [1.2:4].
-FLANGE_D = 104.0     # Flange diameter, which covers the stencil slot. [90:130].
-FLANGE_T = 15 * LAYER  # Flange thickness. [1.6:6].
+# 🫙 Body: one tube with the stencil at the bottom, then the drop chamber and the cocoa cup.
+HOP_H = 75.0         # Tube height above the cup's lowest point. [40:130].
+WALL = 4 * LINE      # Tube wall, 4 lines. [1.2:4].
 
-# ✋ Grip and joint.
-FLANGE_R = 1.5       # Fillet where the hopper meets the flange. [0:3].
-GRIP_RIBS = 12       # Number of vertical grip ribs: round rods half sunk into the hopper wall. [0:24].
+# ✋ Grip.
+GRIP_RIBS = 12       # Number of vertical grip ribs: round rods half sunk into the tube wall. [0:24].
 GRIP_D = 3.0         # Rib diameter. [2:5].
-GRIP_PROUD = 1.8     # Rib height out of the hopper wall. [0.8:2.5].
-GRIP_GAP = 8.0       # Distance between the rib ends and the flange and the hopper rim. [4:20].
+GRIP_PROUD = 1.8     # Rib height out of the tube wall. [0.8:2.5].
+GRIP_GAP = 8.0       # Distance between the rib tops and the tube rim. The ribs stand on the bayonet band. [4:20].
 
-# 🕳️ Sieve: the body floor, with fine holes that are vertical in the print.
-SIEVE_D = 60.0       # Sieve diameter, with a 45 degree cone up to the hopper bore. [30:62].
-SIEVE_T = 6 * LAYER  # Floor thickness. [0.8:2].
+# 🕳️ Sieve: the floor of the cocoa cup, with fine holes that are vertical in the print.
+SIEVE_D = 60.0       # Cocoa cup outside diameter, which slides in the body bore. [30:62].
+SIEVE_T = 6 * LAYER  # Sieve floor thickness. [0.8:2].
 SIEVE_HOLE = 0.8     # Hole diameter, 0.8 for cocoa and 0.6 to 0.7 for cinnamon. [0.6:1.2].
 SIEVE_PITCH = 1.7    # Hole spacing on a hex grid, so the web is two lines at 0.45. [1.2:3].
 
-# 🧩 Drop-in sieve.
-SIEVE_SEPARATE = False  # A drop-in sieve disc with a peg, so you can change the hole size. [0:1].
-SIEVE_LEDGE = 3.0    # Width of the ring ledge under the drop-in disc. [2:5].
+# 🧺 Cocoa cup wall and its play in the body bore.
+SKIRT_H = 30.0       # Cup wall above the sieve floor, for a fill of 20 to 25 mm. [10:32].
+SKIRT_W = 4 * LINE   # Cup wall, 4 lines. [1.2:3].
+SIEVE_PLAY = 0.3     # Clearance per side of the cup in the body bore. [0.15:0.6].
+
+# 🔺 Carrier: three ribs in a triangle from the cup rim up to the block that carries the rod.
+RIB_W = 3.0          # Rib width across. [2:5].
+RIB_D = 3.0          # Rib depth along the radius. [2:5].
 
 # 🦷 Rod and rack: the tapper.
 ROD_SQ = 6.0         # Rod square side. [5:9].
 RACK_PITCH = 2.4     # Tooth pitch along the rod, one tap per tooth, longer for a gentler flank. [1:3].
 RACK_DEPTH = 0.8     # Tooth depth into the rod face. [0.5:1.5].
 
-# 🥄 Agitator foot.
-AGI_FOOT = True      # A flat disc at the rod bottom that stirs the cocoa above the sieve. [0:1].
-FOOT_D = 20.0        # Agitator foot diameter. [10:30].
-FOOT_T = 2.0         # Agitator foot thickness. [1:4].
+# 🖼️ Stencil: a disc with a grip flange and a collar that goes up into the body bore from below.
+STENCIL_T = 6 * LAYER  # Stencil disc thickness, which is also the grip flange. [0.8:2].
+STENCIL_PLAY = 0.3   # Clearance per side of the collar in the bore. [0.15:0.6].
+COLLAR_W = 3 * LINE  # Collar wall, 3 lines. [1.2:3].
+HEART_W = 46.0       # Heart width; its lobes reach 26 mm from the centre. [15:50].
+EAR_L = 10.0         # Reach of the two grip ears past the flange, to turn the stencil. [0:20].
+EAR_W = 14.0         # Ear width. [8:24].
+EAR_H = 5.0          # Height of each ear outside the bayonet band, a solid tab for the fingers. [1:10].
 
-# 🖼️ Stencil, which slides into the stand from the front.
-STENCIL_D = 90.0     # Stencil disc diameter. [70:100].
-STENCIL_T = 6 * LAYER  # Stencil thickness. [0.8:2].
-STENCIL_LIP = 3.0    # Lip around the disc that keeps the spill on the stencil. [0:4].
-SPOUT_W = 12.0       # Width of the pour spout, a gap in the lip at the back. [0:20].
-HEART_W = 52.0       # Heart width. [15:70].
-
-# 🏷️ Stencil tab and slot.
-TAB_W = 30.0         # Pull tab width. [15:50].
-TAB_L = 18.0         # Tab length out of the stand. [8:40].
-SLOT_PLAY = 0.4      # Slot height above the stencil thickness. [0.2:1].
-SLOT_SIDE = 0.3      # Slot clearance per side around the disc. [0.1:0.6].
-
-# 🍽️ Stand, which rests on the cup rim.
-STAND_D = 112.0      # Stand outside diameter. [95:140].
-STAND_BASE = 17 * LAYER  # Floor under the stencil. [2:6].
-WINDOW_D = 70.0      # Opening under the stencil, over the cup. [40:85].
-RIM_H = 3.0          # Locating rim around the body flange. [1:8].
-RIM_PLAY = 0.5       # Clearance per side between the rim and the flange. [0.2:1.5].
+# 🔒 Bayonet: three lugs on the collar, in L grooves in the body bottom.
+LUG_H = 2.4          # Lug height. [1.6:4].
+LUG_D = 1.0          # Lug reach into the body wall. [0.6:1.6].
+LUG_A = 20.0         # Lug width in degrees. [10:30].
+LOCK_Z = 3.0         # Lug underside above the flange, which leaves body wall under the groove. [2:6].
+TWIST = 35.0         # Twist from the entry slot to the locked place, in degrees. [20:60].
+BAY_WALL = 4.0       # Body wall at the bayonet ring, from the bore out. [3:6].
+DETENT = 0.3         # Bump on the groove floor that the lug clicks over, so taps do not twist it loose. [0:0.5].
 
 # 🌫️ Drop chamber, so the hole pattern mixes into an even cloud of cocoa.
-STAND_R = 1.5        # Round on the window edge at the bottom and the rim edge at the top. [0:3].
-DROP_H = 15.0        # Height of the chamber between the stencil and the sieve. [8:40].
-CHAMBER_D = 80.0     # Chamber bore, with a 45 degree cone over the stencil slot around it. [60:95].
+DROP_H = 20.0        # Height between the stencil lip and the sieve at full press. [8:40].
 
 # 🔘 Lid and button travel.
 STROKE = 10.0        # Button travel. [4:20].
 ROD_PLAY = 0.3       # Clearance per side of the rod in the square guide of the lid. [0.15:0.6].
 LID_T = 16 * LAYER   # Lid plate thickness. [1.6:5].
-LID_PLUG = 6.0       # Depth of the lid plug in the hopper. [3:12].
-LID_FIT = 0.2        # Clearance per side of the lid plug in the hopper. [0.05:0.5].
+LID_PLUG = 6.0       # Depth of the lid plug in the tube. [3:12].
+LID_FIT = 0.2        # Clearance per side of the lid plug in the tube. [0.05:0.5].
+POUR_ANGLE = 140.0   # Pour opening in the lid: an arc between the button and the plug, on the -X side. [0:220].
 
 # 🧲 Lid hub and spring seat.
 LID_R = 1.0          # Round on the top edge of the guide hub. [0:2].
-HUB_D = 16.0         # Guide hub diameter, with two lines of wall outside the tongue pocket. [10:20].
+HUB_D = 14.0         # Guide hub diameter, with two lines of wall outside the tongue pocket. [10:20].
 HUB_DOWN = 4.0       # Hub reach below the plug, for a longer guide and room for the tongue. [0:12].
 SEAT_DEPTH = 8 * LAYER  # Spring seat depth in the lid top. [0.8:3].
 SPRING_PLAY = 1.0    # Clearance per side around the spring in the seat and the button skirt. [0.3:2].
 
 # 🔲 Button.
-BTN_WALL = 9 * LINE  # Button skirt wall. [1.2:6].
-BTN_TOP = 8.0        # Solid cap above the skirt, which holds the rod socket. [5:14].
-SOCKET = 6.0         # Rod depth in the button. [3:10].
+BTN_WALL = 4 * LINE  # Button skirt wall, 4 lines. [1.2:6].
+BTN_TOP = 6.5        # Solid cap above the skirt, which holds the rod socket under the finger dimple. [5:14].
+SOCKET = 4.0         # Rod depth in the button socket. [3:10].
 ROD_PRESS = 0.05     # Tight socket clearance per side, for a drop of glue. [0:0.2].
 
 # 👅 Striker tongue: a finger in the lid hub that the rack clicks past.
@@ -111,17 +106,18 @@ TONGUE_ROOT = 2.0    # Solid lid above the tongue root. [1.2:4].
 TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG. [0.2:0.5].
 PETG_E = 2000.0      # Printed PETG modulus in MPa, for the tongue and spring force estimates. [1500:2500].
 PRINT_SPRING = True  # Print the wave spring, or use a bought metal spring.
-PRELOAD = 4.0        # Spring compression at rest, against rattle and for the return over the last tooth. [0.5:6].
+PRELOAD = 2.5        # Spring compression at rest, against rattle and for the return over the last tooth. [0.5:6].
+SIEVE_LOAD = 1.0     # Weight in N that the spring lifts: the basket and the cocoa on it. [0:3].
 
 # 🌀 Printed wave spring.
-WS_D = 20.0          # Wave spring mean diameter, softer when larger. [12:30].
+WS_D = 18.0          # Wave spring mean diameter, softer when larger. [12:30].
 WS_B = 4 * LINE      # Radial band width, 4 lines. [1.2:4].
-WS_T = 3 * LAYER     # Vertical band thickness, 3 layers, with half the rate of 4. [0.6:2].
+WS_T = 4 * LAYER     # Vertical band thickness: 4 layers of 0.16, 0.64 mm. [0.6:2].
 WS_H = 4.0           # Wave height, crest to trough. [2:8].
 WS_WAVES = 3         # Waves per ring, softer when fewer but with a flatter underside. [2:6].
 
 # 🔁 Wave spring rings.
-WS_RINGS = 8         # Number of wave rings, softer and longer when more. [4:16].
+WS_RINGS = 7         # Number of wave rings, softer and longer when more. [4:16].
 WS_END = 6 * LAYER   # Flat end ring thickness. [0.8:3].
 WS_JOIN = 0.3        # Overlap where the rings touch, so they print as one part. [0.1:0.6].
 
@@ -140,22 +136,32 @@ else:
     SPRING_OD, SPRING_L, SPRING_SOLID = METAL_OD, METAL_L, METAL_SOLID
 WS_END_LAP = 0.1                           # The end rings are this much wider per side than the band, so the fuse works.
 ROD_D = ROD_SQ * math.sqrt(2)              # The rod diagonal, which round bores must clear.
-ROD_FOOT = STROKE + 2.0                    # Rod bottom above the sieve at rest, 2 mm above it at full press.
 SEAT_D = SPRING_OD + 2 * SPRING_PLAY
 BTN_CAV_D = SPRING_OD + 2 * SPRING_PLAY
 BTN_D = BTN_CAV_D + 2 * BTN_WALL
 BTN_CAV = SPRING_L - PRELOAD - STROKE - SEAT_DEPTH   # Skirt depth, so the spring at rest fits exactly.
-HOP_ID = HOP_D - 2 * WALL
-SLOT_H = STENCIL_T + STENCIL_LIP + SLOT_PLAY
-SLOT_TOP = STAND_BASE + SLOT_H
-STAND_TOP = SLOT_TOP + DROP_H
-SLOT_R = STENCIL_D / 2 + SLOT_SIDE
-BODY_Z = STAND_TOP                      # Body underside in the use frame.
+HOP_ID = SIEVE_D + 2 * SIEVE_PLAY      # Tube bore, which guides the cup.
+HOP_D = HOP_ID + 2 * WALL
+COLLAR_OD = HOP_ID - 2 * STENCIL_PLAY
+COLLAR_ID = COLLAR_OD - 2 * COLLAR_W    # The window under the cocoa, over the coffee cup.
+CAP_DROP = 0.5                          # Gap under the body bottom: the locked lugs hang on the groove floor.
+GROOVE_FLOOR = LOCK_Z - CAP_DROP        # Groove floor above the body underside.
+GROOVE_H = LUG_H + CAP_DROP + DETENT + 0.2  # Groove height, so the lug can lift over the bump.
+COLLAR_H = LOCK_Z + LUG_H + 2.0         # Collar height above the flange.
+BAY_H = GROOVE_FLOOR + GROOVE_H + 2.0   # Height of the thick bayonet ring in the body.
+STENCIL_TOP = COLLAR_H - CAP_DROP       # Collar top in the use frame.
+BODY_Z = STENCIL_TOP + DROP_H           # Body frame origin: the sieve underside at full press.
+BAY_ANGLES = [90.0 + 120.0 * k for k in range(3)]  # Entry slot centres.
 HUB_BOT = HOP_H - LID_PLUG              # Lid hub underside, body frame.
 LID_TOP = HOP_H + LID_T
 HUB_TOP = LID_TOP                       # The hub is flush with the lid top, inside the spring.
 HUB_LOW = HUB_BOT - HUB_DOWN            # Hub underside, body frame.
-ROD_BOT = SIEVE_T + ROD_FOOT            # Rod bottom at rest, body frame.
+TRAVEL = STROKE                         # Cup travel: the button lands on the lid at full press.
+SIEVE_REST = TRAVEL                     # Cup underside at rest, body frame.
+CARRIER_D = ROD_D + 2 * ROD_PRESS + 2 * 4 * LINE  # Round carrier block, with 4 lines outside the socket corners.
+CARRIER_H = 8.0                         # Carrier block height, which the rod grows out of.
+CARRIER_TOP = HUB_LOW - 0.05            # Carrier top at rest, 0.05 mm under the hub, which is the up stop.
+ROD_BOT = CARRIER_TOP - SOCKET          # Rod bottom at rest, body frame, in the carrier socket.
 BTN_Z = LID_TOP + STROKE                # Button skirt bottom at rest, which lands on the lid at full press.
 CEIL_Z = BTN_Z + BTN_CAV
 ROD_TOP = CEIL_Z + SOCKET
@@ -184,23 +190,24 @@ def return_budget():
     tip_force = 3 * PETG_E * (TONGUE_W * TONGUE_T ** 3 / 12) * TONGUE_BITE / TONGUE_L ** 3
     flank = math.atan(RACK_DEPTH / (RACK_PITCH / 2))
     climb = tip_force * math.tan(flank + math.atan(TOOTH_MU))
-    have = spring_rate() * (PRELOAD + RACK_PITCH) if PRINT_SPRING else float("nan")
+    # The spring also lifts the basket and the cocoa on it.
+    have = spring_rate() * (PRELOAD + RACK_PITCH) - SIEVE_LOAD if PRINT_SPRING else float("nan")
     return have, climb, math.degrees(flank)
 
 
 def check_design():
     assert SIEVE_HOLE >= 2 * NOZZLE, "sieve holes this small close up"
     assert SIEVE_PITCH - SIEVE_HOLE >= 2 * LINE - 0.01, "sieve webs thinner than two lines"
-    assert SIEVE_D < HOP_ID, "the sieve is wider than the hopper"
     assert HEART_W < SIEVE_D - 4, "the heart is wider than the sieve area"
-    assert WINDOW_D < 2 * SLOT_R - 8, "the window leaves no ledge for the stencil"
-    assert CHAMBER_D / 2 < SLOT_R, "the chamber bore is wider than the stencil slot"
-    assert DROP_H > SLOT_R - CHAMBER_D / 2 + 2, "the chamber is too low for the 45 degree roof over the slot"
-    assert DROP_H < SLOT_R, "the tapered roof would close before the top: lower DROP_H or widen the stencil"
-    assert CHAMBER_D + 4 <= STAND_D, "the chamber bore is wider than the stand"
-    assert SPOUT_W < STENCIL_D / 3
-    assert FLANGE_D > 2 * SLOT_R + 8, "the flange must cover the stencil slot"
-    assert STAND_D / 2 - FLANGE_D / 2 - RIM_PLAY >= 2 * LINE + 1, "no room for the locating rim"
+    heart_r = max(math.hypot(x, y) for x, y in heart_points(HEART_W))
+    assert heart_r < COLLAR_ID / 2 - 0.5, f"the heart reaches {heart_r:.1f} mm, past the collar"
+    assert GROOVE_FLOOR >= 1.5, "too little body wall under the bayonet grooves"
+    assert BAY_WALL - LUG_D - 0.2 >= 2 * LINE, "the body wall behind the grooves is thinner than two lines"
+    assert HOP_D / 2 + GRIP_PROUD <= HOP_ID / 2 + BAY_WALL, "the grip ribs stick out past the bayonet band they stand on"
+    if EAR_L > 0:
+        assert HOP_D / 2 + EAR_L > HOP_ID / 2 + BAY_WALL + 4, "the ears end under the bayonet band: lengthen EAR_L"
+    assert TWIST > LUG_A + 4, "the twist is too short to move the lug past the entry slot"
+    assert DROP_H >= 8, "the drop chamber is too low for an even cloud"
     assert WS_D - WS_B > ROD_D + 1 if PRINT_SPRING else SPRING_OD - 1.6 > ROD_D + 1, "the spring does not clear the rod's diagonal"
     assert SPRING_OD + 1 <= BTN_CAV_D and SPRING_OD + 2 * WS_END_LAP <= SEAT_D, "the spring does not fit"
     assert SPRING_REST < SPRING_L, "no spring preload: shorten BTN_CAV or use a longer spring"
@@ -216,6 +223,7 @@ def check_design():
         assert per_ring <= 0.5 * (WS_H - WS_JOIN), "each ring bends more than half its wave: add rings"
         assert WS_B >= 2 * LINE - 0.01 and WS_T >= 3 * LAYER - 0.01, "the wave band is too thin to print"
         have, climb, flank = return_budget()
+        assert spring_rate() * PRELOAD > 1.5 * SIEVE_LOAD, "the spring cannot hold the full basket up at rest: raise PRELOAD"
         assert have >= 1.3 * climb, (f"the spring has {have:.1f} N at the last tooth but the tongue needs {climb:.1f} N to climb "
                                      f"a {flank:.0f} degree flank: raise PRELOAD or RACK_PITCH, or lower TONGUE_BITE")
     # The rack and the tongue.
@@ -229,14 +237,13 @@ def check_design():
     hub_x_at_pocket_corner = math.sqrt(max((HUB_D / 2) ** 2 - pocket_y ** 2, 0.0))
     assert hub_x_at_pocket_corner - pocket_x >= 2 * LINE, "the hub wall outside the tongue's pocket is thinner than two lines: raise HUB_D"
     assert TONGUE_L + TONGUE_ROOT + 1 <= LID_TOP - HUB_LOW, "the tongue is longer than the hub: raise HUB_DOWN"
-    assert HUB_LOW > ROD_BOT + (FOOT_T if AGI_FOOT else 0) + 2, "the hub reaches the rod's foot at rest"
-    assert RACK_Z0 > (FOOT_T if AGI_FOOT else 0) + 1, "the rack runs into the rod's foot"
+    assert TIP_Z > CARRIER_TOP + RACK_PITCH, "the tongue tip at rest is too close to the carrier block"
     assert RACK_Z0 + RACK_L < ROD_TOP - ROD_BOT - SOCKET - 1, "the rack runs into the button socket"
-    assert ROD_FOOT - STROKE >= 1.5, "the rod's foot would hit the sieve at full press"
-    if AGI_FOOT:
-        assert FOOT_D < SIEVE_D - 4, "the foot is wider than the sieve"
-    if SIEVE_SEPARATE:
-        assert SIEVE_LEDGE >= 2.0, "the ledge is too narrow to hold the disc"
+    # The cup and its stops.
+    assert TRAVEL > 2 * RACK_PITCH, "the cup travels less than two teeth"
+    assert SKIRT_W >= 2 * LINE - 0.01, "the basket wall is thinner than two lines"
+    assert CARRIER_TOP - CARRIER_H - CARRIER_D > SIEVE_REST + SIEVE_T + SKIRT_H, "the carrier is too low for its ribs"
+    assert SIEVE_REST + SIEVE_T + SKIRT_H < HUB_BOT - 2, "the cup rim reaches the lid plug at rest"
 
 
 def cyl(d, h, z=0.0):
@@ -346,47 +353,18 @@ def heart_points(w, n=120):
 
 # Parts, each in the use frame.
 
-def stadium(z):
-    """Return the way out of the stencil at height z: the round slot and the channel to the front."""
-    rs = SLOT_R
-    return make_face(Wire([ThreePointArc((rs, 0, z), (0, rs, z), (-rs, 0, z)), Line((-rs, 0, z), (-rs, -STAND_D, z)),
-                           Line((-rs, -STAND_D, z), (rs, -STAND_D, z)), Line((rs, -STAND_D, z), (rs, 0, z))]))
+def sector(r0, r1, a0, a1, h, z):
+    """Return a ring sector from radius r0 to r1 and angle a0 to a1 in degrees, h high from z."""
+    k = 24
+    pts = [(0.0, 0.0)] + [(2 * r1 * math.cos(math.radians(a0 + (a1 - a0) * i / k)),
+                           2 * r1 * math.sin(math.radians(a0 + (a1 - a0) * i / k))) for i in range(k + 1)]
+    wedge = Polygon(pts).translate(0, 0, z - 1).extrude(h + 2)
+    ring = cyl(2 * r1, h, z) - cyl(2 * r0, h + 2, z - 1) if r0 > 0 else cyl(2 * r1, h, z)
+    return ring & wedge
 
 
-STAND_DEPS = ["STAND_D", "STAND_BASE", "WINDOW_D", "RIM_H", "RIM_PLAY", "STAND_R", "DROP_H", "CHAMBER_D",
-              "STENCIL_D", "STENCIL_T", "STENCIL_LIP", "SLOT_PLAY", "SLOT_SIDE", "FLANGE_D"]
-
-
-def stand():
-    return cached("stand", STAND_DEPS, stand_build)
-
-
-def stand_build():
-    """Return the base ring with the stencil slot, the drop chamber above it and the locating rim.
-
-    The roof of the slot is the stadium outline, tapered inward at 45 degrees as it rises.
-    The ceiling over the slot, over the channel and at the front mouth is thus one slope that prints.
-    The chamber bore goes through it.
-    """
-    rs, ro = SLOT_R, STAND_D / 2
-    s = cyl(STAND_D, STAND_TOP) - cyl(WINDOW_D, STAND_TOP + 2, -1)
-    s -= stadium(STAND_BASE).extrude(SLOT_H)
-    s -= stadium(SLOT_TOP - 0.01).extrude(DROP_H + 2, taper=45)
-    s -= cyl(CHAMBER_D, DROP_H + 2, SLOT_TOP - 0.01)
-    rim = cyl(STAND_D, RIM_H, STAND_TOP) - cyl(FLANGE_D + 2 * RIM_PLAY, RIM_H + 2, STAND_TOP - 1)
-    s += rim - rect(2 * SLOT_R, STAND_D, RIM_H + 2, 0, -STAND_D / 2, STAND_TOP - 1)
-    # Where the straight sides of the channel leave the round stand, the outer skin thins to a feather.
-    # Cut both horns flat, 2 mm behind the tangent point, over the full height.
-    y_t = math.sqrt(ro ** 2 - rs ** 2)
-    for sx in (1, -1):
-        s -= rect(20, 60, STAND_TOP + RIM_H + 2, sx * (rs + 10), -(y_t - 2) - 30, -1)
-    if STAND_R > 0:  # The window edge at the bottom, then the rim edge at the top.
-        s = rounded(s, smallest_circles(s, 0.0, 0.0), STAND_R, "stand bottom")
-        s = rounded(s, smallest_circles(s, STAND_TOP + RIM_H, STAND_TOP + RIM_H), STAND_R, "stand top")
-    return s
-
-
-STENCIL_DEPS = ["STENCIL_D", "STENCIL_T", "STENCIL_LIP", "SPOUT_W", "HEART_W", "TAB_W", "TAB_L", "STAND_D", "STAND_BASE"]
+STENCIL_DEPS = ["STENCIL_T", "COLLAR_OD", "COLLAR_ID", "COLLAR_H", "HOP_D", "HOP_ID", "HEART_W", "LUG_H", "LUG_D", "LUG_A",
+                "LOCK_Z", "TWIST", "CAP_DROP", "BAY_ANGLES", "EAR_L", "EAR_W", "EAR_H", "BAY_WALL"]
 
 
 def stencil():
@@ -394,17 +372,32 @@ def stencil():
 
 
 def stencil_build():
-    reach = STAND_D / 2 + TAB_L
-    st = cyl(STENCIL_D, STENCIL_T) + rect(TAB_W, reach, STENCIL_T, 0, -reach / 2)
-    st = st.fillet([e for e in st.edges().parallel_to(Z) if abs(e.center().y + reach) < 1 and abs(e.center().x) <= TAB_W], 4)
-    if STENCIL_LIP > 0:
-        lip = cyl(STENCIL_D, STENCIL_LIP, STENCIL_T) - cyl(STENCIL_D - 2 * 3 * LINE, STENCIL_LIP + 2, STENCIL_T - 1)
-        if SPOUT_W > 0:  # The pour spout is a gap in the lip at the back (+Y).
-            lip -= rect(SPOUT_W, 10, STENCIL_LIP + 2, 0, STENCIL_D / 2, STENCIL_T - 1)
-        st += lip
-    st -= cyl(12, STENCIL_T + 2, -1).translate(0, -reach + 9, 0)
-    st -= Polygon(heart_points(HEART_W)).translate(0, 0, -1).extrude(STENCIL_T + 2)
-    return st.translate(0, 0, STAND_BASE)
+    """Return the stencil, locked: a grip flange with the heart, a collar and three bayonet lugs.
+
+    The flange is as wide as the tube, with notches round its edge and two ears with lips for the fingers.
+    The lugs stand 1 mm out of the collar, so their undersides print as short overhangs.
+    """
+    st = cyl(HOP_D, STENCIL_T, -STENCIL_T)
+    for k in range(18):
+        a = 2 * math.pi * (k + 0.5) / 18
+        st -= cyl(2.0, STENCIL_T + 2, -STENCIL_T - 1).translate(HOP_D / 2 * math.cos(a), HOP_D / 2 * math.sin(a), 0)
+    if EAR_L > 0:
+        # Two ears at +X and -X. Outside the bayonet band each ear is a solid tab EAR_H high for the fingers.
+        r_tip = HOP_D / 2 + EAR_L - EAR_W / 2
+        for a in (0, 180):
+            h = STENCIL_T + CAP_DROP + EAR_H
+            ear = rect(r_tip - HOP_D / 2 + 2, EAR_W, h, (HOP_D / 2 - 2 + r_tip) / 2, 0, -STENCIL_T)
+            ear += cyl(EAR_W, h, -STENCIL_T).translate(r_tip, 0, 0)
+            # Under the band the ear stays as thin as the flange, with 1 mm of room to the band.
+            # A flat inner face keeps the tab corners square.
+            ear -= rect(2 * (HOP_ID / 2 + BAY_WALL + 1.0), EAR_W + 2, h + 2, 0, 0, 0.0)
+            st += ear.rotate(Z, a)
+    st += cyl(COLLAR_OD, COLLAR_H + 0.01, -0.01) - cyl(COLLAR_ID, COLLAR_H + 2, -1)
+    for a in BAY_ANGLES:
+        c = a + TWIST
+        st += sector(COLLAR_OD / 2 - 0.2, HOP_ID / 2 + LUG_D - 0.2, c - LUG_A / 2, c + LUG_A / 2, LUG_H, LOCK_Z)
+    st -= Polygon(heart_points(HEART_W)).translate(0, 0, -STENCIL_T - 1).extrude(STENCIL_T + 2)
+    return st.translate(0, 0, -CAP_DROP)
 
 
 def sieve_holes(r_max):
@@ -421,65 +414,100 @@ def holed_disc(d, pts):
     return sk.extrude(SIEVE_T)
 
 
-FLOOR_DEPS = ["SIEVE_D", "SIEVE_T", "SIEVE_HOLE", "SIEVE_PITCH"]
-SHELL_DEPS = ["HOP_D", "HOP_H", "WALL", "FLANGE_D", "FLANGE_T", "FLANGE_R", "GRIP_RIBS", "GRIP_D", "GRIP_PROUD", "GRIP_GAP",
-              "SIEVE_D", "SIEVE_T", "SIEVE_SEPARATE", "SIEVE_LEDGE"]
-
-
-def floor_build():
-    """Return the sieve floor alone: a disc with the hex grid of holes, 1 mm of radius into the shell."""
-    return holed_disc(SIEVE_D + 2.0, sieve_holes(SIEVE_D / 2))
+SHELL_DEPS = ["HOP_D", "HOP_ID", "HOP_H", "WALL", "GRIP_RIBS", "GRIP_D", "GRIP_PROUD", "GRIP_GAP",
+              "BAY_WALL", "BAY_H", "GROOVE_FLOOR", "GROOVE_H", "LUG_D", "LUG_A", "TWIST", "DETENT", "BAY_ANGLES", "BODY_Z"]
+SIEVE_DEPS = ["SIEVE_D", "SIEVE_T", "SIEVE_HOLE", "SIEVE_PITCH", "SKIRT_H", "SKIRT_W", "RIB_W", "RIB_D",
+              "CARRIER_D", "CARRIER_H", "CARRIER_TOP", "SIEVE_REST", "SOCKET", "ROD_SQ", "ROD_PRESS"]
 
 
 def shell_build():
-    """Return the hopper, the flange, the grip ribs and the cone, with the floor open for the sieve disc."""
-    b = cyl(FLANGE_D, FLANGE_T) + cyl(HOP_D, HOP_H)
-    if FLANGE_R > 0:
-        b = rounded(b, smallest_circles(b, 0.0, FLANGE_T), FLANGE_R, "flange")
+    """Return the body in the use frame: the tube, the bayonet band at the bottom and the grip ribs.
+
+    The band is thicker than the tube for the grooves, and a 45 degree top joins it to the tube.
+    """
+    zt = BODY_Z + HOP_H
+    ri, ro, rb = HOP_ID / 2, HOP_D / 2, HOP_ID / 2 + BAY_WALL
+    b = cyl(HOP_D, zt)
+    b += Polygon((ro - 0.5, 0), (rb, 0), (rb, BAY_H), (ro - 0.5, BAY_H + rb - ro + 0.5)).on(Plane.XZ).revolve(Z)
     if GRIP_RIBS > 0:
-        # Round vertical rods half sunk into the hopper wall: easy to hold, nothing to support.
-        rc = HOP_D / 2 - GRIP_D / 2 + GRIP_PROUD
-        z0, z1 = FLANGE_T + GRIP_GAP, HOP_H - GRIP_GAP
+        # Round vertical rods half sunk into the tube wall. They stand on the bayonet band, which is wider,
+        # so their bottoms do not print in the air.
+        rc = ro - GRIP_D / 2 + GRIP_PROUD
+        z0, z1 = BAY_H - 0.01, zt - GRIP_GAP
         for k in range(GRIP_RIBS):
-            a = 2 * math.pi * k / GRIP_RIBS
+            a = 2 * math.pi * (k + 0.5) / GRIP_RIBS
             b += cyl(GRIP_D, z1 - z0, z0).translate(rc * math.cos(a), rc * math.sin(a), 0)
-    r0, r1 = SIEVE_D / 2, HOP_ID / 2
-    cavity = Polygon((0, SIEVE_T), (r0, SIEVE_T), (r1, SIEVE_T + (r1 - r0)), (r1, HOP_H + 1), (0, HOP_H + 1))
-    b -= cavity.on(Plane.XZ).revolve(Z)
-    if SIEVE_SEPARATE:
-        # A ring ledge: the drop-in sieve disc rests on it, flush with the top of the floor.
-        b -= cyl(SIEVE_D - 2 * SIEVE_LEDGE, SIEVE_T + 2, -1)
-        b -= cyl(SIEVE_D + 0.6, SIEVE_T, 0.001) - cyl(SIEVE_D - 2 * SIEVE_LEDGE - 1, SIEVE_T + 2, -1)
-    else:
-        b -= cyl(SIEVE_D, SIEVE_T + 2, -1)  # The floor opening that the sieve disc fills.
+    b -= cyl(HOP_ID, zt + 2, -1)  # The bore, open at both ends: the cocoa cup slides in it.
+    # Each L groove: an entry slot up from the bottom, then a leg along the twist.
+    r1 = ri + LUG_D + 0.2
+    half = LUG_A / 2 + 2
+    for a in BAY_ANGLES:
+        b -= sector(ri - 1, r1, a - half, a + half, GROOVE_FLOOR + GROOVE_H + 1, -1)
+        b -= sector(ri - 1, r1, a - half, a + TWIST + half, GROOVE_H, GROOVE_FLOOR)
+        if DETENT > 0:  # The click bump, just past the entry slot.
+            b += sector(ri - 0.01, r1 + 0.01, a + half + 1, a + half + 4, DETENT + 0.01, GROOVE_FLOOR - 0.01)
     return b
 
 
 def body():
-    """Return the hopper, the flange and the sieve floor with the 45 degree cone up to the bore."""
-    b = cached("shell", SHELL_DEPS, shell_build)
-    if not SIEVE_SEPARATE:
-        b += cached("floor", FLOOR_DEPS, floor_build)
-    return b.translate(0, 0, BODY_Z)
+    """Return the body: one tube from the coffee cup to the lid."""
+    return cached("shell", SHELL_DEPS, shell_build)
 
 
 def body_plain():
-    """Return the body with a plain floor disc instead of the sieve holes, for the checks.
+    """Return the body for the checks. The body has no holes now, so it is the same part."""
+    return body()
 
-    An intersection meshes both parts, and the 1,000 holes made each check of the body take seconds.
+
+def sieve_build(holes=True):
+    """Return the sieve basket on z = 0, at rest height in its own frame.
+
+    The basket is a holed floor with a tall wall, so it holds the cocoa.
+    Three ribs go from the wall up and in to a block with a square socket for the rod.
+    The ribs stand 30 degrees from vertical, and a steep cone holds the block, so it prints with no supports.
     """
-    b = cached("shell", SHELL_DEPS, shell_build)
-    if not SIEVE_SEPARATE:
-        b += cyl(SIEVE_D + 2.0, SIEVE_T)
-    return b.translate(0, 0, BODY_Z)
+    r_out = SIEVE_D / 2
+    r_in = r_out - SKIRT_W
+    top = CARRIER_TOP - SIEVE_REST
+    blk_bot = top - CARRIER_H
+    pts = sieve_holes(r_in) if holes else []
+    s = holed_disc(SIEVE_D, pts)
+    s += cyl(SIEVE_D, SKIRT_H + 0.1, SIEVE_T - 0.1) - cyl(2 * r_in, SKIRT_H + 2, SIEVE_T - 1)
+    # The round block, and a steep cone of the same diameter under it.
+    cr = CARRIER_D / 2
+    s += cyl(CARRIER_D, top - blk_bot, blk_bot)
+    s += Polygon((0, blk_bot - 1.5 * cr), (cr, blk_bot), (cr, blk_bot + 0.5), (0, blk_bot + 0.5)).on(Plane.XZ).revolve(Z)
+    w = RIB_D + 0.5
+    rib = Polygon((r_in - RIB_D, SIEVE_T - 0.1), (r_in + 0.5, SIEVE_T - 0.1), (w - RIB_D, blk_bot + 1.0),
+                  (-RIB_D, blk_bot + 1.0))
+    rib = rib.on(Plane.XZ.offset(-RIB_W / 2)).extrude(RIB_W)
+    for k in range(3):
+        s += rib.rotate(Z, 90 + 120 * k)
+    sq = ROD_SQ + 2 * ROD_PRESS
+    s -= rect(sq, sq, SOCKET + 1, 0, 0, top - SOCKET)
+    return s
 
 
-def sieve():
-    """Return the drop-in sieve disc that rests on the ledge, with a peg at the edge to lift it."""
-    d = SIEVE_D - 0.6
-    s = holed_disc(d, sieve_holes(d / 2 - SIEVE_LEDGE))
-    s += cyl(4.0, 8.0, SIEVE_T).translate(d / 2 - 3.0, 0, 0)  # The lifting peg.
-    return s.translate(0, 0, BODY_Z)
+CUP_DEPS = SIEVE_DEPS + ["RACK_PITCH", "RACK_DEPTH", "RACK_Z0", "RACK_TEETH", "ROD_TOP", "ROD_BOT", "BODY_Z"]
+
+
+def cup_build():
+    """Return the cocoa cup on z = 0: the sieve basket and the rod as one part.
+
+    The rack teeth print upright, with their down flank 34 degrees from vertical.
+    """
+    return sieve_build() + rod().translate(0, 0, -(BODY_Z + SIEVE_REST))
+
+
+def cup(press=0.0):
+    """Return the cocoa cup in the use frame. The press moves it down."""
+    return cached("cup", CUP_DEPS, cup_build).translate(0, 0, BODY_Z + SIEVE_REST - press)
+
+
+def cup_plain(press=0.0):
+    """Return the cup with no holes, for the checks and the drawing."""
+    return (cached("sieve-plain", SIEVE_DEPS, sieve_build, False).translate(0, 0, BODY_Z + SIEVE_REST - press)
+            + rod(press))
 
 
 def tongue_solid():
@@ -508,6 +536,10 @@ def lid(with_tongue=True):
     # It is a little wider than the tongue, and it goes from below the tip up to the root.
     x_in, x_out = ROD_SQ / 2 + ROD_PLAY - 0.01, ROD_SQ / 2 + ROD_PLAY + TONGUE_T + TONGUE_FLEX
     l -= rect(x_out - x_in, TONGUE_W + 1.2, TONGUE_L + 1.0, (x_in + x_out) / 2, 0, TIP_Z - 1.0)
+    if POUR_ANGLE > 0:
+        # The pour opening: an arc on the -X side, between the button and the plug.
+        r0, r1 = BTN_D / 2 + 1.0, HOP_ID / 2 - LID_FIT - 4 * LINE - 1.0
+        l -= sector(r0, r1, 180 - POUR_ANGLE / 2, 180 + POUR_ANGLE / 2, LID_T + 2, HOP_H - 1)
     if with_tongue:
         l += tongue_solid()
     if LID_R > 0:
@@ -516,12 +548,9 @@ def lid(with_tongue=True):
 
 
 def rod(press=0.0):
-    """Return the square rod, straight, with the rack on its +X face and the foot at the bottom."""
+    """Return the square rod, straight, with the rack on its +X face. Its bottom goes into the basket carrier."""
     r = rect(ROD_SQ, ROD_SQ, ROD_TOP - ROD_BOT)
     r -= Polygon(rack_profile()).on(Plane.XZ.offset(-(ROD_SQ / 2 + 1))).extrude(ROD_SQ + 2)
-    if AGI_FOOT:
-        # The foot is flat on the -Y side, flush with the rod, so the rod prints on that face.
-        r += cyl(FOOT_D, FOOT_T) - rect(FOOT_D + 2, FOOT_D, FOOT_T + 2, 0, -ROD_SQ / 2 - FOOT_D / 2, -1)
     return r.translate(0, 0, BODY_Z + ROD_BOT - press)
 
 
@@ -588,13 +617,11 @@ FIXED = {}
 
 def parts(press=0.0):
     """Return all parts in the use frame. The parts that the press does not move build once per run."""
-    for name, fn in (("stand", stand), ("stencil", stencil), ("body", body), ("lid", lid)):
+    for name, fn in (("stencil", stencil), ("body", body), ("lid", lid)):
         if name not in FIXED:
             FIXED[name] = fn()
-    ps = {"stand": FIXED["stand"], "stencil": FIXED["stencil"], "body": FIXED["body"], "lid": FIXED["lid"],
-          "rod": rod(press), "button": button(press)}
-    if SIEVE_SEPARATE:
-        ps["sieve"] = sieve()
+    ps = {"stencil": FIXED["stencil"], "body": FIXED["body"], "lid": FIXED["lid"],
+          "cup": cup(press), "button": button(press)}
     if PRINT_SPRING:
         ps["spring"] = spring(press)
     return ps
@@ -607,18 +634,25 @@ def build():
 
 
 def drawing_shapes():
-    """Return the assembly for the Drawing view of the configurator, with the body on a plain floor.
+    """Return the assembly for the Drawing view of the configurator, with a sieve with no holes.
 
     The hidden-line step over the 1,000 sieve holes took minutes a view.
     """
     ps = parts()
-    ps["body"] = body_plain()
+    ps["cup"] = cup_plain()
     return list(ps.values())
+
+
+def section_shapes():
+    """Return the parts by name for the Section view of the configurator, with a cup with no holes."""
+    ps = parts()
+    ps["cup"] = cup_plain()
+    return ps
 
 
 def device():
     """Return the cup, and the bought spring when there is one, for the ghost view."""
-    cup = cyl(CUP_D, CUP_H, -CUP_H) - cyl(CUP_D - 6, CUP_H, -CUP_H + 4)
+    cup = (cyl(CUP_D, CUP_H, -CUP_H) - cyl(CUP_D - 6, CUP_H, -CUP_H + 4)).translate(0, 0, -STENCIL_T - CAP_DROP - 3.0)
     if PRINT_SPRING:
         return cup
     z = BODY_Z + LID_TOP - SEAT_DEPTH
@@ -626,66 +660,50 @@ def device():
 
 
 def features():
-    reach = STAND_D / 2 + TAB_L
     zb = BODY_Z
     f = {
-        "Stand": {"at": (STAND_D / 2 + 0.5, 0, SLOT_TOP / 2), "normal": (1, 0, 0),
-                  "params": ["STAND_D", "STAND_BASE", "WINDOW_D"]},
-        "Stencil slot": {"at": (0, -STAND_D / 2 - 0.5, STAND_BASE + SLOT_H / 2), "normal": (0, -1, 0),
-                         "params": ["SLOT_PLAY", "SLOT_SIDE", "STENCIL_D"]},
-        "Locating rim": {"at": (STAND_D / 2 - 1, 0, STAND_TOP + RIM_H + 0.5), "normal": (0, 0, 1),
-                         "params": ["RIM_H", "RIM_PLAY"]},
-        "Stencil tab": {"at": (0, -reach + 4, STAND_BASE + STENCIL_T + 0.5), "normal": (0, 0, 1),
-                        "params": ["TAB_W", "TAB_L"]},
-        "Heart": {"at": (0, 0, STAND_BASE - 0.5), "normal": (0, 0, -1), "params": ["HEART_W"]},
-        "Flange": {"at": (FLANGE_D / 2 - 1, 0, zb + FLANGE_T + 0.5), "normal": (0, 0, 1),
-                   "params": ["FLANGE_D", "FLANGE_T"]},
-        "Hopper": {"at": (HOP_D / 2 + 0.5, 0, zb + HOP_H / 2), "normal": (1, 0, 0),
-                   "params": ["HOP_D", "HOP_H", "WALL"]},
+        "Heart": {"at": (0, 0, -STENCIL_T - CAP_DROP - 0.5), "normal": (0, 0, -1), "params": ["HEART_W"]},
+        "Stencil flange": {"at": (HOP_D / 2 - 1.5, 0, -STENCIL_T - CAP_DROP - 0.5), "normal": (0, 0, -1),
+                           "params": ["STENCIL_T", "STENCIL_PLAY", "COLLAR_W"]},
+        "Bayonet": {"at": (HOP_ID / 2 + BAY_WALL + 0.5, 0, BAY_H / 2), "normal": (1, 0, 0),
+                    "params": ["LUG_H", "LUG_D", "LUG_A", "LOCK_Z", "TWIST", "BAY_WALL", "DETENT"]},
+        "Drop chamber": {"at": (HOP_D / 2 + 0.5, 0, zb - DROP_H / 2), "normal": (1, 0, 0), "params": ["DROP_H"]},
+        "Body tube": {"at": (HOP_D / 2 + 0.5, 0, zb + HOP_H / 2), "normal": (1, 0, 0),
+                      "params": ["HOP_H", "WALL", "SIEVE_PLAY", "GRIP_RIBS"]},
+        "Pour opening": {"at": (-(BTN_D / 2 + HOP_ID / 2) / 2, 0, zb + LID_TOP + 0.5), "normal": (0, 0, 1),
+                         "params": ["POUR_ANGLE"]},
         "Lid": {"at": (HOP_D / 2 - 4, 0, zb + LID_TOP + 0.5), "normal": (0, 0, 1),
                 "params": ["LID_T", "LID_PLUG", "LID_FIT", "HUB_D", "HUB_DOWN"]},
         "Button": {"at": (0, 0, zb + BTN_Z + BTN_CAV + BTN_TOP + 0.5), "normal": (0, 0, 1),
                    "params": ["STROKE", "BTN_D", "BTN_CAV", "BTN_TOP"]},
-        "Sieve": {"at": (SIEVE_D / 2 - 6, 0, zb - 0.5), "normal": (0, 0, -1),
-                  "params": ["SIEVE_D", "SIEVE_HOLE", "SIEVE_PITCH", "SIEVE_SEPARATE"]},
+        "Sieve": {"at": (SIEVE_D / 2 - 8, 0, zb + SIEVE_REST - 0.5), "normal": (0, 0, -1),
+                  "params": ["SIEVE_D", "SIEVE_HOLE", "SIEVE_PITCH", "SKIRT_H"]},
+        "Carrier rib": {"at": (0, 14, zb + (SIEVE_REST + CARRIER_TOP) / 2), "normal": (0, 1, 0),
+                        "params": ["RIB_W", "RIB_D"]},
         "Rack": {"at": (ROD_SQ / 2 + 0.5, 0, zb + ROD_BOT + RACK_Z0 + RACK_L / 2), "normal": (1, 0, 0),
-                 "params": ["RACK_PITCH", "RACK_DEPTH", "STROKE"]},
-        "Rod": {"at": (-ROD_SQ / 2 - 0.5, 0, zb + HUB_BOT - 8), "normal": (-1, 0, 0),
-                "params": ["ROD_SQ", "STROKE", "ROD_PLAY"]},
+                 "params": ["RACK_PITCH", "RACK_DEPTH", "STROKE", "ROD_SQ", "ROD_PLAY"]},
         "Striker tongue": {"at": (ROD_SQ / 2 + ROD_PLAY + TONGUE_T + 0.3, 0, zb + TIP_Z + TONGUE_L / 2), "normal": (1, 0, 0),
                            "params": ["TONGUE_T", "TONGUE_L", "TONGUE_W", "TONGUE_BITE", "TONGUE_FLEX", "TONGUE_ROOT"]},
-        "Stencil lip": {"at": (STENCIL_D / 2 - 1, 0, STAND_BASE + STENCIL_T + STENCIL_LIP + 0.5), "normal": (0, 0, 1),
-                        "params": ["STENCIL_LIP", "SPOUT_W"]},
-        "Drop chamber": {"at": (CHAMBER_D / 2 - 0.5, 0, STAND_TOP - 3), "normal": (-1, 0, 0),
-                         "params": ["DROP_H", "CHAMBER_D"]},
         "Spring": {"at": (SPRING_OD / 2 + 0.5, 0, zb + LID_TOP + STROKE / 2), "normal": (1, 0, 0),
                    "params": ["PRINT_SPRING", "WS_D", "WS_T", "WS_H", "WS_WAVES", "WS_RINGS"]},
     }
-    if AGI_FOOT:
-        f["Agitator foot"] = {"at": (FOOT_D / 2 + 0.5, 0, zb + ROD_BOT + FOOT_T / 2), "normal": (1, 0, 0),
-                              "params": ["AGI_FOOT", "FOOT_D", "FOOT_T"]}
     return f
 
 
 def labels():
-    out = {"_views": {"front": "Front (tab side)", "top": "Button side", "bottom": "Cup side"}}
+    out = {"_views": {"front": "Front (key side)", "top": "Button side", "bottom": "Cup side"}}
     for name, f in features().items():
         out[name] = {"at": list(f["at"]), "normal": list(f["normal"])}
     return out
 
 
-# Print orientation per part: "flip" turns it upside down, and "side" lays it on its -Y face.
-# The rod prints on its side, because standing it is 102 mm tall on a 6 mm square.
-# On its side, the rack teeth are vertical walls.
-PRINT_FLIP = {"stand": "", "stencil": "", "body": "", "sieve": "", "lid": "flip",
-              "rod": "side", "button": "flip", "spring": ""}
+# Print orientation per part: "flip" turns it upside down. The cup prints as used, sieve down.
+PRINT_FLIP = {"stencil": "", "body": "", "cup": "", "lid": "flip", "button": "flip", "spring": ""}
 
 
 def for_print(p, turn):
     if turn == "flip":
         p = p.rotate(X, 180)
-    elif turn == "side":
-        p = p.rotate(X, 90)  # This turns -Y to -Z, so the -Y face goes on the bed.
     low = p.bbox().min
     return p.translate(-low.x, -low.y, -low.z)
 
@@ -703,7 +721,8 @@ def slab_test(p, name):
     # Each slab reaches 0.5 mm past the part, because a slab face on a part face makes the intersection fail.
     slab = Box(BED + 2, BED + 2, 1.5, align=Align.MIN).translate(-1, -1, 0)
     lo, hi = shared(p, slab.translate(0, 0, -0.5)), shared(p, slab.translate(0, 0, size.z - 1.0))
-    assert lo >= hi, f"{name}: more material at the top than on the bed, check the flip"
+    # A part that is almost the same at both ends, like the spring, may differ a little; a wrong flip differs a lot.
+    assert lo >= 0.9 * hi, f"{name}: more material at the top than on the bed, check the flip"
     assert size.x <= BED and size.y <= BED, f"{name}: does not fit the bed"
 
 
@@ -747,7 +766,7 @@ if __name__ == "__main__":
     check_design()
     ps = parts()
     export_step(list(ps.values()), "cocoa_dispenser.step")
-    pressed = parts(press=STROKE)
+    pressed = parts(press=TRAVEL)  # Full press: the basket is on the ledge.
     export_step(list(pressed.values()), "cocoa_dispenser_pressed.step")
     taps = STROKE / RACK_PITCH
     print(f"one press: about {taps:.0f} taps down and {taps:.0f} up; rack {RACK_L:.1f} mm, {RACK_TEETH} teeth")
@@ -756,7 +775,7 @@ if __name__ == "__main__":
 
     # The tongue must be on the rack at rest and at full press, and bite by TONGUE_BITE and no more.
     tongue = tongue_solid().translate(0, 0, BODY_Z)
-    for state, press in (("rest", 0.0), ("pressed", STROKE)):
+    for state, press in (("rest", 0.0), ("pressed", TRAVEL)):
         tip_rod_z = TIP_Z - (ROD_BOT - press)  # Tip height in the rod frame.
         assert RACK_Z0 + 1 < tip_rod_z < RACK_Z0 + RACK_L - 1, f"{state}: the tongue tip is off the rack"
         # Against the plain square of the rod the nub must reach in by the bite, and no more.
@@ -772,7 +791,7 @@ if __name__ == "__main__":
     for state, pp in (("rest", ps), ("pressed", pressed)):
         pp = dict(pp)
         pp["lid"] = lid(with_tongue=False)
-        pp["body"] = body_plain()
+        pp["cup"] = cup_plain(0.0 if state == "rest" else TRAVEL)
         names = list(pp)
         bbs = {k: v.bbox() for k, v in pp.items()}
         for i, a in enumerate(names):
@@ -784,8 +803,8 @@ if __name__ == "__main__":
                 assert v < 0.5, f"{state}: {a} and {b} overlap by {v:.2f} mm3"
 
     # Each part on its own, then one plate STL from those meshes, so the sieve holes get one mesh.
-    layout = {"stand": (2, 2), "body": (118, 2), "spring": (226, 2), "stencil": (2, 120),
-              "lid": (96, 120), "button": (172, 120), "rod": (210, 120), "sieve": (172, 160)}
+    layout = {"body": (2, 2), "stencil": (76, 2), "lid": (166, 2), "cup": (2, 76), "button": (68, 76),
+              "spring": (106, 76)}
     boxes = []
     if PRINT_SPRING:
         ps["spring"] = wave_spring()  # The spring prints at its free length.
@@ -794,33 +813,16 @@ if __name__ == "__main__":
         assert len(p.solids()) == 1, f"{name}: not one solid"
         pr = for_print(p, PRINT_FLIP[name])
         # The STL goes in the cache with the part: the 1,000 holes of the body take a long time to mesh.
-        stl_key = KEYS.get(name)
-        if name == "body":
-            stl_key = (KEYS.get("shell", "") + KEYS.get("floor", "")) or None
+        stl_key = KEYS.get("shell" if name == "body" else name)
         if name == "spring":
             stl_key = part_key("spring-free", SPRING_DEPS, wave_spring)
         cached_stl = CACHE_DIR / f"{name}-{stl_key}-{PRINT_FLIP[name] or 'up'}.stl" if (USE_CACHE and stl_key) else None
         if cached_stl and cached_stl.exists():
             shutil.copyfile(cached_stl, f"{name}.stl")
-        elif name == "body" and not SIEVE_SEPARATE and USE_CACHE:
-            # The body mesh is its shell and its sieve floor, meshed apart and joined as two shells that overlap.
-            # Slicers join them, and a grip change thus costs only the shell.
-            slab_test(for_print(body_plain(), PRINT_FLIP[name]), name)
-            low = p.bbox().min
-            pieces = []
-            for piece in ("shell", "floor"):
-                f = CACHE_DIR / f"{piece}-{KEYS[piece]}.stl"
-                if not f.exists():
-                    shape = load(str(CACHE_DIR / f"{piece}-{KEYS[piece]}.smb"))
-                    export_stl(shape.translate(-low.x, -low.y, BODY_Z - low.z), str(f), tolerance=0.05,
-                               angle=30.0 if piece == "floor" else 12.0)
-                pieces.append((str(f), (0, 0)))
-            merge_stls(pieces, f"{name}.stl")
-            if cached_stl:
-                shutil.copyfile(f"{name}.stl", cached_stl)
         else:
             slab_test(pr, name)
-            export_stl(pr, f"{name}.stl", tolerance=0.05, angle=12.0)
+            # The 871 tiny sieve holes mesh fast with a coarse angle.
+            export_stl(pr, f"{name}.stl", tolerance=0.05, angle=30.0 if name == "cup" else 12.0)
             if cached_stl:
                 shutil.copyfile(f"{name}.stl", cached_stl)
         ps_ = pr.bbox().size
@@ -843,7 +845,7 @@ if __name__ == "__main__":
         k = spring_rate()
         have, climb, flank = return_budget()
         print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.1f} N at rest, {k * (PRELOAD + STROKE):.1f} N pressed")
-        print(f"return: {have:.1f} N at the last tooth against {climb:.1f} N to climb its {flank:.0f} degree flank "
+        print(f"return: {have:.1f} N net of the basket load at the last tooth against {climb:.1f} N to climb its {flank:.0f} degree flank "
               f"({have / climb:.1f}x); press peak about {k * (PRELOAD + STROKE) + climb:.0f} N")
     print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json "
           f"in {time.monotonic() - t_run:.0f} s" + ("" if USE_CACHE else " without the cache"))
