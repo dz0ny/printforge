@@ -23,7 +23,7 @@ LINE = 0.45          # Line width, about 1.1 x the nozzle.
 LAYER = 0.16
 
 # 🫙 Body: one tube with the stencil at the bottom, then the drop chamber and the cocoa cup.
-HOP_H = 75.0         # Tube height above the cup's lowest point. [40:130].
+HOP_H = 80.0         # Tube height above the cup's lowest point. [40:130].
 WALL = 4 * LINE      # Tube wall, 4 lines. [1.2:4].
 
 # ✋ Grip.
@@ -49,8 +49,8 @@ RIB_D = 3.0          # Rib depth along the radius. [2:5].
 
 # 🦷 Rod and rack: the tapper.
 ROD_SQ = 6.0         # Rod square side. [5:9].
-RACK_PITCH = 2.4     # Tooth pitch along the rod, one tap per tooth, longer for a gentler flank. [1:3].
-RACK_DEPTH = 0.8     # Tooth depth into the rod face. [0.5:1.5].
+RACK_PITCH = 3.0     # Tooth pitch along the rod, one tap per tooth, longer for a gentler flank. [1:4].
+RACK_DEPTH = 1.3     # Tooth depth into the rod face. [0.5:1.5].
 
 # 🖼️ Stencil: a disc with a grip flange and a collar that goes up into the body bore from below.
 STENCIL_T = 6 * LAYER  # Stencil disc thickness, which is also the grip flange. [0.8:2].
@@ -84,7 +84,7 @@ POUR_ANGLE = 140.0   # Pour opening in the lid: an arc between the button and th
 # 🧲 Lid hub and spring seat.
 LID_R = 1.0          # Round on the top edge of the guide hub. [0:2].
 HUB_D = 14.0         # Guide hub diameter, with two lines of wall outside the tongue pocket. [10:20].
-HUB_DOWN = 4.0       # Hub reach below the plug, for a longer guide and room for the tongue. [0:12].
+HUB_DOWN = 9.0       # Hub reach below the plug, for a longer guide and room for the tongue. [0:12].
 SEAT_DEPTH = 8 * LAYER  # Spring seat depth in the lid top. [0.8:3].
 SPRING_PLAY = 1.0    # Clearance per side around the spring in the seat and the button skirt. [0.3:2].
 
@@ -95,14 +95,15 @@ SOCKET = 4.0         # Rod depth in the button socket. [3:10].
 ROD_PRESS = 0.05     # Tight socket clearance per side, for a drop of glue. [0:0.2].
 
 # 👅 Striker tongue: a finger in the lid hub that the rack clicks past.
-TONGUE_T = 2 * LINE  # Tongue thickness of 2 lines, thin enough to flex 0.5 mm. [0.6:1.8].
-TONGUE_L = 8.0       # Tongue length from its root to the tip. [6:14].
-TONGUE_W = 4.0       # Tongue width. [2:6].
-TONGUE_BITE = 0.5    # Reach of the tip into the teeth, which is the bend per tooth. [0.3:1].
+TONGUE_T = 2 * LINE  # Tongue thickness of 2 lines, thin enough to flex 1 mm. [0.6:1.8].
+TONGUE_L = 12.0      # Tongue length from its root to the tip, long so the root bends little. [6:16].
+TONGUE_W = 4.5       # Tongue width. [2:6].
+TONGUE_BITE = 1.0    # Reach of the tip into the teeth, which is the bend per tooth. [0.3:1.2].
 TONGUE_FLEX = 1.2    # Free room behind the tongue, so it can swing out. [0.8:2].
 
 # 🧮 Tongue root and force estimates.
 TONGUE_ROOT = 2.0    # Solid lid above the tongue root. [1.2:4].
+ROOT_R = 1.0         # Gusset at the tongue root on the flex side. [0:2].
 TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG. [0.2:0.5].
 PETG_E = 2000.0      # Printed PETG modulus in MPa, for the tongue and spring force estimates. [1500:2500].
 PRINT_SPRING = True  # Print the wave spring, or use a bought metal spring.
@@ -518,9 +519,14 @@ def tongue_solid():
     """
     x_body = ROD_SQ / 2 + ROD_PLAY
     reach = ROD_PLAY + TONGUE_BITE
+    half = reach * (RACK_PITCH / 2) / RACK_DEPTH  # The nub flanks have the slope of the tooth flanks, so the nub sits in a valley.
     finger = rect(TONGUE_T, TONGUE_W, TONGUE_L + 0.5, x_body + TONGUE_T / 2, 0, TIP_Z)
-    nub = Polygon((x_body + 0.01, TIP_Z), (x_body - reach, TIP_Z + reach), (x_body + 0.01, TIP_Z + 2 * reach))
-    return finger + nub.on(Plane.XZ.offset(-TONGUE_W / 2)).extrude(TONGUE_W)
+    nub = Polygon((x_body + 0.01, TIP_Z), (x_body - reach, TIP_Z + half), (x_body + 0.01, TIP_Z + 2 * half))
+    # A gusset on the flex side rounds the root, so the bend does not start at a sharp corner.
+    x_out, root = x_body + TONGUE_T, TIP_Z + TONGUE_L
+    gusset = Polygon((x_out - 0.01, root - ROOT_R), (x_out - 0.01, root + 0.01), (x_out + ROOT_R, root + 0.01))
+    side = Plane.XZ.offset(-TONGUE_W / 2)
+    return finger + nub.on(side).extrude(TONGUE_W) + gusset.on(side).extrude(TONGUE_W)
 
 
 def lid(with_tongue=True):
@@ -775,13 +781,14 @@ if __name__ == "__main__":
 
     # The tongue must be on the rack at rest and at full press, and bite by TONGUE_BITE and no more.
     tongue = tongue_solid().translate(0, 0, BODY_Z)
-    for state, press in (("rest", 0.0), ("pressed", TRAVEL)):
+    # The "loose" state moves the rod away from the tongue by the full play, as a printed guide can let it.
+    for state, press, shift in (("rest", 0.0, 0.0), ("pressed", TRAVEL, 0.0), ("loose", 0.0, -ROD_PLAY)):
         tip_rod_z = TIP_Z - (ROD_BOT - press)  # Tip height in the rod frame.
         assert RACK_Z0 + 1 < tip_rod_z < RACK_Z0 + RACK_L - 1, f"{state}: the tongue tip is off the rack"
         # Against the plain square of the rod the nub must reach in by the bite, and no more.
         # Against the toothed rod it overlaps less, because it sits in a tooth valley.
-        env = rect(ROD_SQ, ROD_SQ, ROD_TOP - ROD_BOT, 0, 0, BODY_Z + ROD_BOT - press)
-        v_env, v_rod = shared(tongue, env), shared(tongue, rod(press))
+        env = rect(ROD_SQ, ROD_SQ, ROD_TOP - ROD_BOT, shift, 0, BODY_Z + ROD_BOT - press)
+        v_env, v_rod = shared(tongue, env), shared(tongue, rod(press).translate(shift, 0, 0))
         assert v_env > 0.05, f"{state}: the tongue does not reach the rod"
         assert v_env < TONGUE_BITE ** 2 * TONGUE_W * 2, f"{state}: the tongue is buried in the rod"
         assert v_rod < v_env + 0.01, f"{state}: the tongue is not over the teeth"

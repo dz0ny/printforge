@@ -38,13 +38,15 @@ from the CAD views. The CAD views are the truth.
   a thicker ring at the body bottom. The bayonet also sets the way the heart points.
   Two ears on the flange end in solid 5 mm tabs, outside the band, for the fingers. Between the stencil and the sieve is a 20 mm drop
   chamber.
-- The **rod** is square. One face carries a **rack**: 7 triangular teeth, 2.4 mm pitch,
-  0.8 mm deep, placed so the tongue is on the rack over the whole stroke.
+- The **rod** is square. One face carries a **rack**: 5 triangular teeth, 3 mm pitch,
+  1.3 mm deep, placed so the tongue is on the rack over the whole stroke.
 - The **lid** has a square guide hole, so the rack face always faces the tongue, the
   **striker tongue** in a pocket of the hub, and a 140° **pour opening** between the
-  button and the plug. Each tooth bends the tongue 0.5 mm out and lets it snap back,
-  and the click goes down the rod into the cup.
-- One press of 10 mm is about 4 taps down and 4 up. The button lands on the lid at the
+  button and the plug. The tongue is 12 mm long with a gusset at its root,
+  and its nub has the slope of the teeth. Each tooth bends it 1 mm out and lets it snap
+  back, and the click goes down the rod into the cup. The nub still reaches 0.7 mm into
+  the teeth when the rod leans away by its full play.
+- One press of 10 mm is about 3 taps down and 3 up. The button lands on the lid at the
   bottom; at rest the carrier block stops 0.05 mm under the lid hub. Press once for a
   light dust, two or three times for a full heart.
 - **Dose**: `SIEVE_HOLE` sets the grain (0.8 cocoa, 0.6 to 0.7 cinnamon, which wants a
@@ -60,12 +62,16 @@ from the CAD views. The CAD views are the truth.
 
 | Part | Print orientation | Notes |
 |---|---|---|
-| Body | bayonet band down, as used | tube, bayonet band with three L grooves and a 45° top, twelve grip ribs that stand on the band; 69 mm wide, 102 mm tall |
+| Body | bayonet band down, as used | tube, bayonet band with three L grooves and a 45° top, twelve grip ribs that stand on the band; 69 mm wide, 107 mm tall |
 | Stencil | flange down | heart cut-out in a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
-| Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 100 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 34° from vertical: no supports |
+| Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 105 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 41° from vertical: no supports |
 | Lid | upside down | push-fit plug, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
 | Spring | flat | PETG wave spring, 7 rings of a 4-layer band (0.64 mm), 18 mm across; 32.0 mm free, 29.5 at rest, 19.5 pressed; about 0.8 N/mm |
+
+A coil spring from a generator also works in place of the wave spring. It must go over
+the 14 mm hub and fit the 21.8 mm seat: inside diameter 15.4, width 2.7, thickness 4.5,
+pitch 10, length 32 (about 0.9 N/mm, solid at 14.4 mm).
 
 No bought parts. Print the spring, the cup and the lid in PETG: the tongue and the
 spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
@@ -87,7 +93,7 @@ spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
 ## Test first
 
 Rebuilt, not printed. Print the lid and the cup first and click the rack past the
-tongue by hand. Print the stencil and the bottom 15 mm of the body to try the bayonet. If the taps are weak, raise `TONGUE_BITE` to 0.7 or make the tongue
+tongue by hand. Print the stencil and the bottom 15 mm of the body to try the bayonet. If the taps are weak, raise `TONGUE_BITE` to 1.2 or make the tongue
 three lines thick, and watch the return rule: the spring has to push the tongue back up
 the last tooth on its own, so a stronger tongue wants more `PRELOAD` or a longer
 `RACK_PITCH` (the build prints both forces). If the tongue breaks, lengthen `TONGUE_L`. Then shake the filled
