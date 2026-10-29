@@ -77,11 +77,13 @@ body over paper: nothing should fall at rest with 0.8 mm holes.
 
 ## Rebuilding fast
 
-Parts are cached on disk in `.cache/` as BREP, keyed by the settings each part uses
-and the builder's own source, and so are their STLs and slab tests. A change to a
-grip or flange setting rebuilds the body's shell and unions the cached sieve floor
-into it; the thousand holes are cut once. `--no-cache` builds everything from
-scratch; delete `.cache/` to start over.
+The model is smlibpy. Parts are cached on disk in `.cache/` as native `.smb` files,
+keyed by the settings each part uses and the builder's own source, and so are their
+STLs. A change to a grip or flange setting rebuilds the body's shell and unions the
+cached sieve floor into it; the thousand holes are cut once, in 2D before the
+extrusion. The interference and orientation checks use the body with a plain floor,
+because meshing the holes for every check took minutes. A warm run takes about 35 s.
+`--no-cache` builds everything from scratch; delete `.cache/` to start over.
 
 ## Files
 
@@ -97,5 +99,15 @@ scratch; delete `.cache/` to start over.
   each part and the assembly; the heart's cusp counts as a knife edge, which is the shape.
   The spring is skipped by design: its band is three layers, the rings meet tangentially,
   and each wave underside is a bridge of about 10 mm, which prints fine but reads as overhang.
-  The lid's thin-wall finding is the tongue, two lines by design.
+  The lid's thin-wall finding is the tongue, two lines by design. The stand reports
+  about 8 mm² where the 45° slot roof meets the channel: the geometry is the same as
+  the CadQuery version, and that mesh's samples happened to miss the edge.
+- Rounds: `STAND_R`, `FLANGE_R` and `LID_R` round the window and rim edges of the stand,
+  the joint between hopper and flange, and the top of the guide hub. The CadQuery
+  version picked those edges, and the port keeps them.
+- The wave rings are smooth closed lofts, and the flat end rings are 0.1 mm wider per
+  side than the band (`WS_END_LAP`): with faces on the same cylinders, smlibpy could
+  not fuse them. The spring is 0.8 cm³, 0.03 more than before.
+- `cocoa_dispenser.3mf` is the project saved from Bambu Studio, split into its parts.
+  Rebuild it from `cocoa_dispenser_plate.stl` with `make_3mf.py` when the parts change.
 - `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768.

@@ -1,10 +1,10 @@
 [project]
 name = "cocoa-dispenser"
-description = "Push-button cocoa duster with a slide-in latte-art stencil, made with CadQuery"
+description = "Push-button cocoa duster with a slide-in latte-art stencil, made with smlibpy"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "cadquery>=2.8.0",
+    "smlibpy==0.6.2",
     "printforge-configurator",
 ]
 
