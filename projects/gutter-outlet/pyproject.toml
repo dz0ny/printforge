@@ -1,10 +1,10 @@
 [project]
 name = "gutter-outlet"
-description = "Outlet funnel for a half-round NW 280 gutter to a 58 mm downpipe, made with CadQuery"
+description = "Outlet funnel for a half-round NW 280 gutter to a 58 mm downpipe, made with smlibpy"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "cadquery>=2.8.0",
+    "smlibpy==0.6.2",
     "printforge-configurator",
 ]
 

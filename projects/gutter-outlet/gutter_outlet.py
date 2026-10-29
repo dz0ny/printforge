@@ -1,192 +1,189 @@
-"""Outlet funnel for a half-round gutter, NW/RS 280, to a round downpipe. Made with CadQuery.
+"""Outlet funnel from a half-round NW 280 gutter to a round downpipe, made with smlibpy.
 
-No inner lip: every joint steps DOWN in the flow direction.
-- The gutter goes INTO the skirt (the skirt sits on the outside of the gutter).
-- The funnel narrows the gutter profile to the spigot; the floor goes down all the way.
-- The pipe goes OVER the spigot (the pipe sits on the outside).
-
-Design frame: X is the gutter axis (+X into the gutter, -X is the flow out),
-Y across the gutter, Z up. The gutter axis lies on the X axis, open top at Z = 0.
-Run `uv run gutter_outlet.py` to write the STEP and the STL, or
-`uv run gutter_outlet.py --serve` to adjust it in the browser.
+No joint has an inner lip, so water never climbs a step.
+The gutter goes into the skirt, the floor only goes down, and the pipe goes over the spigot.
+X is the gutter axis, +X into the gutter, Y across, Z up, open top at Z = 0.
+Run `uv run gutter_outlet.py` to write the STEP and the STL.
+Add `--serve` to adjust the part in the browser.
 """
 import math
 
-import cadquery as cq
+from smlibpy import (Align, Box, Circle, Cone, Cylinder, Line, Part, ThreePointArc, Wire, Y,
+                     make_face, ruled, stitch)
 
-# 🌧️ Gutter. Measure yours and correct these.
-GUTTER_ID = 127.0      # Gutter inside diameter, NW 280 half-round. [80:200]
-SHEET = 0.6            # Gutter sheet thickness. [0.4:2]
-FIT = 0.4              # Clearance per side, skirt over the gutter. [0:1.5]
-BEAD_D = 16.0          # Rolled front bead diameter, drawn on the ghost; 0 for none. [0:25]
-HOOK_D = 8.0           # Rear hook diameter, drawn on the ghost; 0 for none. [0:15]
+# 🌧️ Gutter size in mm.
+GUTTER_ID = 127.0      # Gutter inside diameter, NW 280 half-round. [80:200].
+SHEET = 0.6            # Gutter sheet thickness. [0.4:2].
+FIT = 0.4              # Clearance per side between the skirt and the gutter. [0:1.5].
+BEAD_D = 16.0          # Diameter of the rolled front bead on the ghost, zero for none. [0:25].
+HOOK_D = 8.0           # Diameter of the rear hook on the ghost, zero for none. [0:15].
 
-# 🖨️ Printer. The part stands on the spigot tip, so walls lie across the bed.
+# 🖨️ Printer. The part stands on the spigot tip, so the walls lie across the bed.
 NOZZLE = 0.4
 LINE = 0.48            # Line width, 1.2 x the nozzle.
 LAYER = 0.2
 
-# 🧱 Skirt and funnel. The skirt sits over the gutter end; the funnel narrows to the spigot.
-WALL = 5 * LINE        # Wall of the spigot, 5 lines, so the bore stays wide.
-FUNNEL_WALL = 8 * LINE  # Wall of the skirt and the funnel, 8 lines. They carry the water and take the knocks.
-SKIRT_L = 25.0         # Skirt length over the gutter. [10:60]
-SKIRT_TOP = -8.0       # The skirt stops this far below the gutter top, clearing bead and hook. [-30:0]
-FUNNEL_L = 50.0        # Funnel length; about 38 degree sides print without support. [30:120]
-DROP = 3.0             # The floor goes down this much along the funnel. [0:15]
-LID_START = 12.0       # The funnel stays open like the gutter this far, then the lid closes. [0:40]
-ROUND = 1.0            # Radius on the skirt's free edges. [0:1.2]
+# 🧱 Skirt over the gutter end.
+WALL = 5 * LINE        # Spigot wall of 5 lines, so the bore stays wide.
+FUNNEL_WALL = 8 * LINE  # Skirt and funnel wall of 8 lines, because they carry the water.
+SKIRT_L = 25.0         # Skirt length over the gutter. [10:60].
+SKIRT_TOP = -8.0       # Distance of the skirt top below the gutter top, clear of bead and hook. [-30:0].
+ROUND = 1.0            # Radius on the free edges of the skirt. [0:1.2].
 
-# 🪠 Pipe. The downpipe slides over the spigot.
-PIPE_OD = 58.0         # Outlet pipe outside diameter. [40:120]
-PIPE_WALL = 1.0        # Outlet pipe wall; pipe ID = OD - 2 x wall. Measure it. [0.5:4]
-PIPE_FIT = 0.3         # Clearance per side, pipe over the spigot. [0:1]
-SPIGOT_L = 40.0        # Spigot length into the pipe. [15:80]
-COLLAR = 2.5           # Pipe stop collar, radial size beyond the pipe OD. [1:6]
+# 🌀 Funnel from the gutter profile to the spigot.
+FUNNEL_L = 50.0        # Funnel length, with sides of about 38 degrees. [30:120].
+DROP = 3.0             # Drop of the floor along the funnel. [0:15].
+LID_START = 12.0       # Open length of the funnel before the lid starts. [0:40].
+
+# 🪠 Downpipe, which slides over the spigot.
+PIPE_OD = 58.0         # Outlet pipe outside diameter. [40:120].
+PIPE_WALL = 1.0        # Outlet pipe wall, which sets the pipe inside diameter. [0.5:4].
+PIPE_FIT = 0.3         # Clearance per side between the pipe and the spigot. [0:1].
+SPIGOT_L = 40.0        # Spigot length into the pipe. [15:80].
+COLLAR = 2.5           # Radial size of the pipe stop collar beyond the pipe OD. [1:6].
 
 R_SK_IN = GUTTER_ID / 2 + SHEET + FIT
-R_SK_OUT = R_SK_IN + FUNNEL_WALL         # Skirt and funnel share one outer surface: no step.
+R_SK_OUT = R_SK_IN + FUNNEL_WALL         # Skirt and funnel share one outer surface, with no step.
 R_FN_OUT = R_SK_OUT
 R_SP_OUT = (PIPE_OD - 2 * PIPE_WALL) / 2 - PIPE_FIT
 R_SP_IN = R_SP_OUT - WALL
 Z_FLOOR_B = -R_SK_IN - DROP
-ZC = Z_FLOOR_B + R_SP_IN                 # Spigot axis: bore bottom = funnel floor end.
+ZC = Z_FLOOR_B + R_SP_IN                 # Spigot axis, where the bore bottom meets the funnel floor.
 R_COLLAR = PIPE_OD / 2 + COLLAR
 X_B = -FUNNEL_L
 X_TIP = X_B - SPIGOT_L
-CONE_H = R_COLLAR - R_SP_OUT             # 45 degree cone under the collar.
+CONE_H = R_COLLAR - R_SP_OUT             # Cone of 45 degrees under the collar.
 
 
 def check_design():
-    """Design rules, run inside build() so the configurator reports them in its build log."""
+    """Check the design rules. The configurator shows a failed rule in its build log."""
     assert min(WALL, FUNNEL_WALL) >= 2 * LINE, "a wall is thinner than two lines"
     assert R_SP_IN > 5, "the spigot bore is too small for the wall"
     assert ZC - R_SP_IN <= -R_SK_IN + 1e-6, "the floor goes up along the flow: a lip would hold water"
     assert ROUND < FUNNEL_WALL / 2, "the round is too big for the skirt wall"
 
 
+def xcyl(r, x0, length, zc=0.0, y=0.0):
+    """Make a cylinder along +X from x0, with its axis at (y, zc)."""
+    return Cylinder(r, length, align=(Align.CENTER, Align.CENTER, Align.MIN)).rotate(Y, 90).translate(x0, y, zc)
 
-def d_wire(r, ztop, x):
-    """D profile at x: a half circle of radius r below z = 0 and a flat top at ztop.
 
-    Exact arcs and lines, so the loft has a few faces and the booleans stay fast.
-    With ztop at 0 the D is a half disc with two edges, otherwise four.
+def xring(r_out, r_in, x0, length, zc=0.0, y=0.0):
+    """Make a tube along +X from x0, with its axis at (y, zc)."""
+    return (Circle(r_out) - Circle(r_in)).extrude(length).rotate(Y, 90).translate(x0, y, zc)
+
+
+def d_edges(r, ztop, x):
+    """Return the edges of the D profile at x: a half circle below z = 0 and a flat top at ztop.
+
+    With ztop at 0, the D is a half disc with two edges.
+    With a higher ztop, the D has four edges.
     """
-    V = cq.Vector
-    edges = [cq.Edge.makeThreePointArc(V(x, r, 0), V(x, 0, -r), V(x, -r, 0))]
+    edges = [ThreePointArc((x, r, 0), (x, 0, -r), (x, -r, 0))]
     if ztop > 1e-6:
-        edges += [cq.Edge.makeLine(V(x, -r, 0), V(x, -r, ztop)),
-                  cq.Edge.makeLine(V(x, -r, ztop), V(x, r, ztop)),
-                  cq.Edge.makeLine(V(x, r, ztop), V(x, r, 0))]
+        edges += [Line((x, -r, 0), (x, -r, ztop)), Line((x, -r, ztop), (x, r, ztop)),
+                  Line((x, r, ztop), (x, r, 0))]
     else:
-        edges.append(cq.Edge.makeLine(V(x, -r, 0), V(x, r, 0)))
-    return cq.Wire.assembleEdges(edges)
+        edges.append(Line((x, -r, 0), (x, r, 0)))
+    return edges
 
 
-def c_wire(r, zc, x, top_fractions):
-    """Circle of radius r about (x, 0, zc): one bottom half arc, then top arcs.
+def c_edges(r, zc, x, top_fractions):
+    """Return a circle of radius r about (x, 0, zc) as one bottom half arc and some top arcs.
 
-    The top half is split in the given fractions, so each edge of d_wire pairs
-    with a circle edge of matching share and the ruled loft does not twist or
-    bulge. For a D with a flat top of height ztop the fractions are the three
-    edge lengths over the top path: ztop, 2r, ztop.
+    The top half splits in the given fractions.
+    Each edge of the D then gets a circle edge of the same share, so the funnel does not twist.
+    For a D with a flat top of height ztop, the fractions are ztop, 2r and ztop.
     """
-    V = cq.Vector
-
     def at(a):
-        return V(x, r * math.cos(a), zc + r * math.sin(a))
+        return (x, r * math.cos(a), zc + r * math.sin(a))
 
-    edges = [cq.Edge.makeThreePointArc(at(0), at(-math.pi / 2), at(math.pi))]
+    edges = [ThreePointArc(at(0), at(-math.pi / 2), at(math.pi))]
     total = sum(top_fractions)
     a0 = math.pi
     for f in top_fractions:
         a1 = a0 - math.pi * f / total
-        edges.append(cq.Edge.makeThreePointArc(at(a0), at((a0 + a1) / 2), at(a1)))
+        edges.append(ThreePointArc(at(a0), at((a0 + a1) / 2), at(a1)))
         a0 = a1
-    return cq.Wire.assembleEdges(edges)
+    return edges
 
 
-def loft(w1, w2):
-    return cq.Workplane().add(cq.Solid.makeLoft([w1, w2], ruled=True))
+def ruled_loft(d, c):
+    """Make a solid from one ruled face per edge pair and two end caps.
+
+    The loft function pairs the two profiles by itself, and it twisted this funnel.
+    Ruled faces keep the pairs that the two edge lists give.
+    """
+    body = stitch([ruled(a, b) for a, b in zip(d, c)], make_face(Wire(d)), make_face(Wire(c)))
+    assert isinstance(body, Part), "the funnel did not close into a solid"
+    return body
 
 
 def build():
     check_design()
-    # Skirt: half ring over the gutter, x = 0 .. SKIRT_L, open above SKIRT_TOP.
-    skirt = cq.Workplane("YZ").circle(R_SK_OUT).circle(R_SK_IN).extrude(SKIRT_L)
-    skirt = skirt.cut(cq.Workplane("XY").box(SKIRT_L + 2, 2 * R_SK_OUT + 4, 100,
-                                             centered=(False, True, False)).translate((-1, 0, SKIRT_TOP)))
-    # Funnel: D (gutter profile) at x = 0 -> circle (spigot) at x = X_B.
-    # It is FUNNEL_WALL thick: its outer D sits FUNNEL_WALL outside the inner
-    # one, and its small end is FUNNEL_WALL outside the spigot bore.
-    r_end = R_SP_IN + FUNNEL_WALL
-    outer = loft(d_wire(R_FN_OUT, FUNNEL_WALL, 0.0), c_wire(r_end, ZC, X_B, [FUNNEL_WALL, 2 * R_FN_OUT, FUNNEL_WALL]))
-    # The cavity starts 1 mm inside the skirt, 0.3 mm wider than its bore, so no
-    # surface of the cut coincides with the skirt's. The gutter end then rests on
-    # the shoulder where the cavity narrows to the gutter's outside diameter.
-    inner = loft(d_wire(R_SK_IN + 0.3, 0.0, 1.0), c_wire(R_SP_IN, ZC, X_B - 0.01, [1.0]))
-    # Spigot and stop collar, with a 45 degree cone under the collar for printing.
-    # The collar starts half a millimetre inside the cone, so no face of it
-    # coincides with the inner loft's end: a coincident face makes the cut a no-op.
-    spigot = cq.Workplane("YZ", origin=(X_TIP, 0, ZC)).circle(R_SP_OUT).extrude(SPIGOT_L + 0.5)
-    collar = cq.Workplane("YZ", origin=(X_B - 0.5, 0, ZC)).circle(R_COLLAR).extrude(3.5)
-    cone = cq.Solid.makeCone(R_SP_OUT, R_COLLAR, CONE_H, pnt=cq.Vector(X_B - 0.5 - CONE_H, 0, ZC),
-                             dir=cq.Vector(1, 0, 0))
-    assert R_COLLAR >= r_end, "the collar is smaller than the funnel's end"
-    # The first LID_START mm of the funnel stay open like the gutter, level with
-    # the skirt cut, so the lid starts clear of the gutter's bead and hook.
-    if LID_START > 0:
-        outer = outer.cut(cq.Workplane("XY").box(LID_START + 1, 2 * R_FN_OUT + 4, 100, centered=(False, True, False))
-                          .translate((-LID_START, 0, SKIRT_TOP)))
+    # Skirt: a half ring over the gutter, from x = 0 to SKIRT_L, open above SKIRT_TOP.
+    skirt = xring(R_SK_OUT, R_SK_IN, 0, SKIRT_L)
+    skirt -= Box(SKIRT_L + 2, 2 * R_SK_OUT + 4, 100, align=(Align.MIN, Align.CENTER, Align.MIN)).translate(
+        -1, 0, SKIRT_TOP)
     if ROUND > 0:
-        # Round the skirt's free edges before the union, where the fillets work:
-        # its top cut and the arcs of the open end. On the assembled part these
-        # fillets fail, and on the funnel's open start a fillet ends in a notch.
-        def fillet_edges(wp, pick, what):
-            edges = [e for e in wp.edges().vals() if pick(e)]
-            try:
-                return wp.newObject(edges).fillet(ROUND) if edges else wp
-            except Exception as e:  # A failed fillet leaves the edges sharp rather than the part broken.
-                print(f"round skipped on {what}: {e}")
-                return wp
+        # Round the top cut and the arcs of the open end before the union.
+        # Use one fillet call for all edges, because two calls fail at the corners.
+        top = [e for e in skirt.edges() if abs(e.center().z - SKIRT_TOP) < 0.1
+               and abs(e.point_at(0).x - e.point_at(1).x) > 5]
+        end = [e for e in skirt.edges() if abs(e.center().x - SKIRT_L) < 0.1 and e.geom_type == "circle"]
+        try:
+            skirt = skirt.fillet(top + end, ROUND)
+        except Exception as e:  # A failed round leaves the edges sharp, and the part stays whole.
+            print(f"round skipped on the skirt: {e}")
 
-        def top(e):
-            return abs(e.Center().z - SKIRT_TOP) < 0.1 and abs(e.startPoint().x - e.endPoint().x) > 5
+    # Funnel: from the D of the gutter at x = 0 to the circle of the spigot at x = X_B.
+    # The outer D is FUNNEL_WALL outside the inner D, and the small end is FUNNEL_WALL outside the bore.
+    r_end = R_SP_IN + FUNNEL_WALL
+    outer = ruled_loft(d_edges(R_FN_OUT, FUNNEL_WALL, 0.0),
+                       c_edges(r_end, ZC, X_B, [FUNNEL_WALL, 2 * R_FN_OUT, FUNNEL_WALL]))
+    # The cavity starts 1 mm inside the skirt and 0.3 mm wider than its bore, so no faces touch.
+    # The gutter end rests on the shoulder where the cavity becomes narrower.
+    inner = ruled_loft(d_edges(R_SK_IN + 0.3, 0.0, 1.0), c_edges(R_SP_IN, ZC, X_B - 0.01, [1.0]))
+    # The first LID_START mm of the funnel stay open like the gutter, level with the skirt cut.
+    if LID_START > 0:
+        outer -= Box(LID_START + 1, 2 * R_FN_OUT + 4, 100, align=(Align.MIN, Align.CENTER, Align.MIN)).translate(
+            -LID_START, 0, SKIRT_TOP)
 
-        skirt = fillet_edges(skirt, top, "skirt top cut")
-        skirt = fillet_edges(skirt, lambda e: abs(e.Center().x - SKIRT_L) < 0.1 and e.geomType() == "CIRCLE", "open end")
-    part = outer.union(skirt).union(spigot).union(collar).union(cq.Workplane().add(cone))
-    # Hollow everything the water passes through: the funnel cavity (through the
-    # collar too) and the bore, which ends exactly on the cavity's end face.
-    part = part.cut(inner)
-    bore = cq.Workplane("YZ", origin=(X_TIP - 1, 0, ZC)).circle(R_SP_IN).extrude(SPIGOT_L + 0.99)
-    part = part.cut(bore)
+    # Spigot and stop collar, with a cone of 45 degrees under the collar for printing.
+    # The collar starts 0.5 mm inside the cone, away from the end face of the cavity.
+    assert R_COLLAR >= r_end, "the collar is smaller than the end of the funnel"
+    spigot = xcyl(R_SP_OUT, X_TIP, SPIGOT_L + 0.5, ZC)
+    collar = xcyl(R_COLLAR, X_B - 0.5, 3.5, ZC)
+    cone = Cone(R_SP_OUT, R_COLLAR, CONE_H, align=(Align.CENTER, Align.CENTER, Align.MIN)).rotate(Y, 90)
+    cone = cone.translate(X_B - 0.5 - CONE_H, 0, ZC)
+
+    part = outer + skirt + spigot + collar + cone
+    # Cut the funnel cavity and the bore, which ends on the end face of the cavity.
+    part -= inner
+    part -= xcyl(R_SP_IN, X_TIP - 1, SPIGOT_L + 0.99, ZC)
     return part
 
 
 def keep_clear():
-    """Volumes that must stay empty, checked by check_part.py: the water channel."""
-    channel = cq.Workplane("YZ", origin=(X_TIP - 1, 0, ZC)).circle(R_SP_IN - 0.5).extrude(SPIGOT_L + 1 + 8)
-    return [channel]
+    """Return the volumes that must stay empty for check_part.py: the water channel."""
+    return [xcyl(R_SP_IN - 0.5, X_TIP - 1, SPIGOT_L + 1 + 8, ZC)]
 
 
 def device():
-    """The gutter end with its bead and hook, and the downpipe, in place, for the ghost view."""
+    """Return the gutter end with its bead and hook, and the downpipe, for the ghost view."""
     r = GUTTER_ID / 2 + SHEET
-    gutter = cq.Workplane("YZ").circle(r).circle(GUTTER_ID / 2).extrude(SKIRT_L + 30)
-    gutter = gutter.cut(cq.Workplane("XY").box(SKIRT_L + 40, 2 * r + 4, 100, centered=(False, True, False))
-                        .translate((-5, 0, 0)))
+    gutter = xring(r, GUTTER_ID / 2, 0, SKIRT_L + 30)
+    gutter -= Box(SKIRT_L + 40, 2 * r + 4, 100, align=(Align.MIN, Align.CENTER, Align.MIN)).translate(-5, 0, 0)
     for d, side in ((BEAD_D, -1), (HOOK_D, 1)):
         if d > 0:
-            # The bead rolls outward from the sheet's top edge.
-            gutter = gutter.union(cq.Workplane("YZ", origin=(0, side * (r + d / 2 - SHEET), 0))
-                                  .circle(d / 2).circle(max(d / 2 - SHEET, 0.1)).extrude(SKIRT_L + 30))
-    pipe = cq.Workplane("YZ", origin=(X_TIP - 30, 0, ZC)).circle(PIPE_OD / 2) \
-        .circle(PIPE_OD / 2 - PIPE_WALL).extrude(SPIGOT_L + 30 - CONE_H - 0.5)
-    return gutter.union(pipe)
+            # The bead rolls outward from the top edge of the sheet.
+            gutter += xring(d / 2, max(d / 2 - SHEET, 0.1), 0, SKIRT_L + 30, y=side * (r + d / 2 - SHEET))
+    pipe = xring(PIPE_OD / 2, PIPE_OD / 2 - PIPE_WALL, X_TIP - 30, SPIGOT_L + 30 - CONE_H - 0.5, ZC)
+    return gutter + pipe
 
 
 def features():
-    """Named features: an anchor on the surface, its outward normal, and the settings behind it."""
+    """Return the named features with an anchor, an outward normal and the settings behind each."""
     return {
         "Skirt": {"at": (SKIRT_L / 2, 0, -R_SK_OUT - 0.5), "normal": (0, 0, -1),
                   "params": ["SKIRT_L", "SKIRT_TOP", "FIT", "WALL", "ROUND"]},
@@ -204,11 +201,11 @@ def features():
 
 
 def labels():
-    """Named anchors in the use frame, the frame of the STEP, for render_views.py."""
+    """Return the named anchors in the frame of the STEP, for render_views.py."""
     out = {"_views": {"left": "Outlet end", "right": "Gutter side", "top": "Top", "bottom": "Bottom"}}
     for name, f in features().items():
         if name in ("Gutter", "Pipe"):
-            continue  # Not part of the printed part.
+            continue  # The gutter and the pipe are not part of the print.
         out[name] = {"at": list(f["at"]), "normal": list(f["normal"])}
     return out
 
@@ -219,36 +216,36 @@ if __name__ == "__main__":
     if "--serve" in sys.argv:
         from printforge_configurator import serve
         port = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8765
-        host = "0.0.0.0" if "--lan" in sys.argv else "127.0.0.1"  # --lan: reachable from a phone.
+        host = "0.0.0.0" if "--lan" in sys.argv else "127.0.0.1"  # Use --lan to open the page from a phone.
         serve(__file__, port=port, open_browser="--open" in sys.argv, host=host)
         sys.exit()
 
+    from smlibpy import export_step, export_stl
+
     part = build()
-    solid = part.val()
-    assert solid.isValid(), "invalid solid"
-    assert len(part.solids().vals()) == 1, "the part is not one solid"
-    bb = solid.BoundingBox()
-    cq.exporters.export(part, "gutter_outlet.step")
+    assert part.is_valid(), "invalid solid"
+    assert len(part.solids()) == 1, "the part is not one solid"
+    size = part.bbox().size
+    export_step(part, "gutter_outlet.step")
     with open("labels.json", "w") as f:
         json.dump(labels(), f, indent=1)
 
-    # Print orientation: spigot tip on the bed (-X -> down).
-    pr = part.rotate((0, 0, 0), (0, 1, 0), -90)   # (x, y, z) -> (-z, y, x)
-    pb = pr.val().BoundingBox()
-    pr = pr.translate((-pb.xmin, -pb.ymin, -pb.zmin))
-    pb = pr.val().BoundingBox()
+    # Print orientation: the spigot tip is on the bed, so -X points down.
+    pr = part.rotate(Y, -90)   # This turns (x, y, z) into (-z, y, x).
+    low = pr.bbox().min
+    pr = pr.translate(-low.x, -low.y, -low.z)
+    psize = pr.bbox().size
 
-    def slab_w(z0):
-        b = pr.intersect(cq.Workplane("XY").box(400, 400, 1, centered=(True, True, False))
-                         .translate((0, 0, z0))).val().BoundingBox()
-        return max(b.xlen, b.ylen)
+    def slab_width(z0):
+        s = (pr & Box(400, 400, 1, align=(Align.CENTER, Align.CENTER, Align.MIN)).translate(0, 0, z0)).bbox().size
+        return max(s.x, s.y)
 
-    lo, hi = slab_w(0), slab_w(pb.zmax - 1)
-    assert lo < hi, (lo, hi)   # Spigot on the bed, skirt on top.
-    assert max(pb.xlen, pb.ylen) < 256, "the part does not fit the bed"
-    cq.exporters.export(pr, "gutter_outlet.stl", tolerance=0.05, angularTolerance=0.1)
+    lo, hi = slab_width(0), slab_width(psize.z - 1)
+    assert lo < hi, (lo, hi)   # The spigot is on the bed and the skirt is on top.
+    assert max(psize.x, psize.y) < 256, "the part does not fit the bed"
+    export_stl(pr, "gutter_outlet.stl", tolerance=0.05)
 
-    print(f"use size {bb.xlen:.1f} x {bb.ylen:.1f} x {bb.zlen:.1f} mm, volume {solid.Volume() / 1000:.1f} cm3")
-    print(f"print size {pb.xlen:.1f} x {pb.ylen:.1f} x {pb.zlen:.1f} mm")
+    print(f"use size {size.x:.1f} x {size.y:.1f} x {size.z:.1f} mm, volume {part.volume / 1000:.1f} cm3")
+    print(f"print size {psize.x:.1f} x {psize.y:.1f} x {psize.z:.1f} mm")
     print(f"skirt ID {2 * R_SK_IN:.1f}, spigot OD {2 * R_SP_OUT:.1f} / ID {2 * R_SP_IN:.1f}, collar {2 * R_COLLAR:.1f}")
     print("wrote gutter_outlet.step, gutter_outlet.stl, labels.json")
