@@ -520,7 +520,8 @@ def rod(press=0.0):
     r = rect(ROD_SQ, ROD_SQ, ROD_TOP - ROD_BOT)
     r -= Polygon(rack_profile()).on(Plane.XZ.offset(-(ROD_SQ / 2 + 1))).extrude(ROD_SQ + 2)
     if AGI_FOOT:
-        r += cyl(FOOT_D, FOOT_T)
+        # The foot is flat on the -Y side, flush with the rod, so the rod prints on that face.
+        r += cyl(FOOT_D, FOOT_T) - rect(FOOT_D + 2, FOOT_D, FOOT_T + 2, 0, -ROD_SQ / 2 - FOOT_D / 2, -1)
     return r.translate(0, 0, BODY_Z + ROD_BOT - press)
 
 
@@ -673,14 +674,18 @@ def labels():
     return out
 
 
-# Print orientation per part: True turns it upside down.
-PRINT_FLIP = {"stand": False, "stencil": False, "body": False, "sieve": False, "lid": True,
-              "rod": False, "button": True, "spring": False}
+# Print orientation per part: "flip" turns it upside down, and "side" lays it on its -Y face.
+# The rod prints on its side, because standing it is 102 mm tall on a 6 mm square.
+# On its side, the rack teeth are vertical walls.
+PRINT_FLIP = {"stand": "", "stencil": "", "body": "", "sieve": "", "lid": "flip",
+              "rod": "side", "button": "flip", "spring": ""}
 
 
-def for_print(p, flip):
-    if flip:
+def for_print(p, turn):
+    if turn == "flip":
         p = p.rotate(X, 180)
+    elif turn == "side":
+        p = p.rotate(X, 90)  # This turns -Y to -Z, so the -Y face goes on the bed.
     low = p.bbox().min
     return p.translate(-low.x, -low.y, -low.z)
 
@@ -794,7 +799,7 @@ if __name__ == "__main__":
             stl_key = (KEYS.get("shell", "") + KEYS.get("floor", "")) or None
         if name == "spring":
             stl_key = part_key("spring-free", SPRING_DEPS, wave_spring)
-        cached_stl = CACHE_DIR / f"{name}-{stl_key}-{int(PRINT_FLIP[name])}.stl" if (USE_CACHE and stl_key) else None
+        cached_stl = CACHE_DIR / f"{name}-{stl_key}-{PRINT_FLIP[name] or 'up'}.stl" if (USE_CACHE and stl_key) else None
         if cached_stl and cached_stl.exists():
             shutil.copyfile(cached_stl, f"{name}.stl")
         elif name == "body" and not SIEVE_SEPARATE and USE_CACHE:

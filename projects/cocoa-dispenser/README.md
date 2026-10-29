@@ -48,7 +48,7 @@ The CAD views are the truth.
 | Stand | flat, as used | sits on the cup rim; stencil slot open to the front; 15 mm drop chamber above it, its roof a 45° cone |
 | Stencil | flat | heart cut-out, 1.2 mm, with a 3 mm lip: a tray for the spill, pour spout at the back |
 | Body | flange down | the sieve floor prints as the first 6 layers; twelve rounded grip ribs around the hopper, rounded flange edge |
-| Rod | standing on its foot | the rack faces +X; the foot is its base, no brim needed |
+| Rod | lying on its -Y face | the foot is flat on that side; the rack teeth print as vertical walls, 13 mm high instead of 102 |
 | Lid | upside down | push-fit plug, square guide hole, spring seat, the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
 | Spring | flat | PETG wave spring, 8 rings of a 3-layer band; 36.5 mm free, 32.5 at rest, 22.5 pressed; about 0.4 N/mm |
