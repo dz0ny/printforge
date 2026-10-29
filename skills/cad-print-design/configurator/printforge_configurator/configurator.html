@@ -225,16 +225,20 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
 #sheetMsg.err { color: var(--err); }
 #sheetMsg .spin { display: inline-block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
-#viewer.drawing #ftip, #viewer.drawing .dimlabel,
-#viewer.section > canvas, #viewer.section #tools, #viewer.section #readout, #viewer.section #flabel,
-#viewer.section #ftip, #viewer.section .dimlabel { display: none !important; }
-/* Section view: a rendered cut through the assembly, with each part named on its cut face */
-#secView { position: absolute; inset: 0; background: #fff; }
-#secBar { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 10px; }
+#viewer.drawing #ftip, #viewer.drawing .dimlabel { display: none !important; }
+#viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip,
+#viewer.section .dimlabel { display: none !important; }
+/* Section view: the 3D view cut by a plane, with each part in its own colour and filled cut faces */
+#secView { position: absolute; inset: 0; pointer-events: none; }
+#viewer.section #tools { top: 56px; }
+#secView > * { pointer-events: auto; }
+#secLegend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+#secLegend span { display: flex; align-items: center; gap: 8px; }
+#secLegend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+#secBar { position: absolute; top: 8px; left: 12px; z-index: 2; display: flex; align-items: center; gap: 10px; }
 #secPos { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
 #secPos input { width: 180px; }
 #secAt { min-width: 74px; font-variant-numeric: tabular-nums; }
-#secImg { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; width: 100%; height: calc(100% - 52px); object-fit: contain; }
 #secMsg {
   position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
@@ -345,7 +349,7 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
         </div>
         <label id="secPos">Cut at <input type="range" id="secSlider" min="1" max="99" step="1" value="50"> <span id="secAt">50 %</span></label>
       </div>
-      <img id="secImg" alt="Section through the assembly">
+      <div id="secLegend" hidden></div>
       <div id="secMsg" hidden></div>
     </section>
   </section>
@@ -658,7 +662,7 @@ async function loadViewer() {
 
 function makeViewer(T, STLLoader, OrbitControls) {
   const host = $('viewer');
-  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true, stencil: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   host.prepend(renderer.domElement);
   const scene = new T.Scene();
@@ -859,10 +863,124 @@ function makeViewer(T, STLLoader, OrbitControls) {
   };
   const drop = (m) => { if (m) { root.remove(m); m.geometry.dispose(); } };
 
+  // Section: one mesh per part, cut by a clipping plane. Each part fills its own cut face:
+  // its back faces count up the stencil and its front faces count down, so the stencil is
+  // not zero where the plane is inside the part, and a cap plane paints only there.
+  renderer.localClippingEnabled = true;
+  const clip = new T.Plane(new T.Vector3(0, 1, 0), 0);
+  const secGroup = new T.Group();
+  secGroup.visible = false;
+  scene.add(secGroup);
+  const PALETTE = [0x4e79a7, 0xf28e2b, 0x59a14f, 0xe15759, 0x76b7b2, 0xedc948, 0xb07aa1, 0xff9da7, 0x9c755f, 0xbab0ac];
+  const capGeo = new T.PlaneGeometry(1, 1);
+  const caps = [];
+  // The look of the smlibpy renders: dark edge lines on the parts and hatched cut faces.
+  const EDGE = 0x1f2937;
+  const hatch = (color) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d');
+    const base = new T.Color(color);
+    g.fillStyle = `#${base.clone().lerp(new T.Color(0xffffff), 0.35).getHexString()}`;
+    g.fillRect(0, 0, 32, 32);
+    g.strokeStyle = `#${base.clone().multiplyScalar(0.55).getHexString()}`;
+    g.lineWidth = 2.5;
+    for (const o of [-32, 0, 32]) { g.beginPath(); g.moveTo(o, 32); g.lineTo(o + 32, 0); g.stroke(); }
+    const t = new T.CanvasTexture(c);
+    t.wrapS = t.wrapT = T.RepeatWrapping;
+    t.colorSpace = T.SRGBColorSpace;
+    return t;
+  };
+  let secKey = null, secBox = null, legend = [], sectionOn = false;
+  const CUTS = {  // The kept side of each cut, and the camera on the removed side.
+    front: { axis: 'y', n: [0, 1, 0], cam: [0, -1, 0.001] },
+    side: { axis: 'x', n: [1, 0, 0], cam: [-1, 0, 0.001] },
+    top: { axis: 'z', n: [0, 0, -1], cam: [0.001, -0.001, 1] },
+  };
+  const clearParts = () => {
+    for (const o of secGroup.children) {
+      if (o.material.map) o.material.map.dispose();
+      o.material.dispose();
+      if (o.geometry !== capGeo) o.geometry.dispose();
+    }
+    secGroup.clear();
+    caps.length = 0;
+  };
+  const addPart = (geo, color, i) => {
+    geo.computeVertexNormals();
+    const order = 1 + 3 * i;
+    const count = (side, op) => new T.MeshBasicMaterial({
+      side, clippingPlanes: [clip], colorWrite: false, depthWrite: false, depthTest: false,
+      stencilWrite: true, stencilFunc: T.AlwaysStencilFunc, stencilFail: op, stencilZFail: op, stencilZPass: op,
+    });
+    const back = new T.Mesh(geo, count(T.BackSide, T.IncrementWrapStencilOp));
+    const front = new T.Mesh(geo, count(T.FrontSide, T.DecrementWrapStencilOp));
+    back.renderOrder = front.renderOrder = order;
+    const cap = new T.Mesh(capGeo, new T.MeshBasicMaterial({
+      map: hatch(color), side: T.DoubleSide, stencilWrite: true, stencilRef: 0,
+      stencilFunc: T.NotEqualStencilFunc, stencilFail: T.ReplaceStencilOp, stencilZFail: T.ReplaceStencilOp, stencilZPass: T.ReplaceStencilOp,
+    }));
+    cap.renderOrder = order + 1;
+    cap.onAfterRender = (r) => r.clearStencil();
+    const body = new T.Mesh(geo, new T.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, clippingPlanes: [clip], side: T.DoubleSide }));
+    body.renderOrder = order + 2;
+    const edges = new T.LineSegments(new T.EdgesGeometry(geo, 30), new T.LineBasicMaterial({ color: EDGE, clippingPlanes: [clip] }));
+    edges.renderOrder = order + 2;
+    secGroup.add(back, front, cap, body, edges);
+    caps.push(cap);
+  };
+  const showSection = () => {
+    secGroup.visible = sectionOn && !!secKey;
+    if (shell) shell.visible = !sectionOn;
+    if (device) device.visible = devOn && !sectionOn;
+    dimGroup.visible = !sectionOn;
+    marker.visible = !sectionOn && !!anchored;
+  };
+
   return {
     view,
     probe: (x, y) => featureAt(x, y),  // for debugging from the console
-    setDevice(on) { devOn = on; if (device) device.visible = on; },
+    setDevice(on) { devOn = on; showSection(); },
+    hasParts: (key) => !!key && key === secKey,
+    legend: () => legend,
+    async loadParts(list, key) {
+      const geos = await Promise.all(list.map((p) => load(p.url)));
+      clearParts();
+      secBox = new T.Box3();
+      legend = list.map((p, i) => {
+        const color = PALETTE[i % PALETTE.length];
+        geos[i].computeBoundingBox();
+        secBox.union(geos[i].boundingBox);
+        addPart(geos[i], color, i);
+        return { name: p.name, color: `#${color.toString(16).padStart(6, '0')}` };
+      });
+      secKey = key;
+      showSection();
+    },
+    setSection(on) { sectionOn = on; showSection(); },
+    // Put the plane at pct percent across the parts along the cut axis; return its place in mm.
+    setCut(cut, pct, look) {
+      const c = CUTS[cut];
+      const lo = secBox.min[c.axis], hi = secBox.max[c.axis];
+      const at = lo + Math.max(0.5, Math.min(99.5, pct)) / 100 * (hi - lo);
+      const n = new T.Vector3(...c.n);
+      clip.set(n, -n.dot(new T.Vector3(c.axis === 'x' ? at : 0, c.axis === 'y' ? at : 0, c.axis === 'z' ? at : 0)));
+      const size = secBox.getSize(new T.Vector3()).length() * 2;
+      const mid = secBox.getCenter(new T.Vector3());
+      const on = clip.projectPoint(mid, new T.Vector3());
+      for (const cap of caps) {
+        cap.scale.setScalar(size);
+        cap.material.map.repeat.set(size / 3, size / 3);  // A hatch line every 3 mm.
+        cap.position.copy(on);
+        cap.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), n);
+      }
+      if (look) {
+        center = mid;
+        radius = secBox.getSize(new T.Vector3()).length() / 2;
+        frame(new T.Vector3(...c.cam));
+      }
+      return at;
+    },
     setDims(on) { dimsOn = on; rebuildDims(); },
     setMarker(f, at) {
       anchored = f || null;
@@ -1541,50 +1659,57 @@ document.addEventListener('keydown', (e) => {
 });
 document.querySelectorAll('#pager button').forEach((b) => b.addEventListener('click', () => showPage(b.dataset.page)));
 
-// ---- Section view: a PNG per build key and cut, rendered by the server
+// ---- Section view: the 3D view cut by a plane, from one mesh per part that the server sends once per build
 let sectionMode = false, secCut = 'front', secSeq = 0;
 const secPct = { front: 50, side: 50, top: 50 };  // The slider place per cut, in percent of the assembly.
-const secCache = new Map();
 function showSecMsg(text, bad) {
   const m = $('secMsg');
   m.hidden = !text;
   m.className = bad ? 'err' : '';
   m.textContent = text || '';
 }
+function applyCut(look) {
+  if (!viewer || !viewer.hasParts(state.buildKey)) return;
+  const at = viewer.setCut(secCut, secPct[secCut], look);
+  $('secAt').textContent = `${{ front: 'y', side: 'x', top: 'z' }[secCut]} ${at.toFixed(1)} mm`;
+}
 async function ensureSection() {
-  const pct = secPct[secCut];
-  const key = `${state.buildKey}|${secCut}|${pct}`;
-  if (secCache.has(key)) { const c = secCache.get(key); $('secImg').src = c.url; $('secAt').textContent = c.at; showSecMsg(''); return; }
+  const v = await viewerReady;
+  if (!v || !sectionMode) return;
   const seq = ++secSeq;
-  showSecMsg('Cutting the section…', false);
-  try {
-    const r = await fetch(`/api/section?cut=${secCut}&pct=${pct}`);
-    if (seq !== secSeq) return;
-    if ((r.headers.get('Content-Type') || '').startsWith('image/')) {
-      const url = URL.createObjectURL(await r.blob());
-      const axis = { front: 'y', side: 'x', top: 'z' }[secCut];
-      const at = `${axis} ${r.headers.get('X-Cut-At')} mm`;
-      secCache.set(`${r.headers.get('X-Build-Key')}|${secCut}|${pct}`, { url, at });
-      $('secImg').src = url;
-      $('secAt').textContent = at;
-      showSecMsg('');
-    } else {
-      const data = await r.json().catch(() => ({ log: `HTTP ${r.status}` }));
-      showSecMsg(data.log || data.error || 'Section failed', true);
+  if (!v.hasParts(state.buildKey)) {
+    showSecMsg('Loading the parts…', false);
+    try {
+      const r = await fetch('/api/parts');
+      const data = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}` }));
+      if (seq !== secSeq) return;
+      if (!data.ok) { showSecMsg(data.log || data.error || 'Part export failed', true); return; }
+      await v.loadParts(data.parts, data.key);
+      if (seq !== secSeq) return;
+    } catch (e) {
+      if (seq === secSeq) showSecMsg(String(e), true);
+      return;
     }
-  } catch (e) {
-    if (seq === secSeq) showSecMsg(String(e), true);
+    const lg = $('secLegend');
+    lg.replaceChildren(...v.legend().map((p) => {
+      const row = el('span'); const sw = el('i'); sw.style.background = p.color;
+      row.append(sw, document.createTextNode(p.name));
+      return row;
+    }));
+    lg.hidden = false;
   }
+  showSecMsg('');
+  v.setSection(sectionMode);
+  applyCut(true);
 }
 document.querySelectorAll('#secCut button').forEach((b) => b.addEventListener('click', () => {
   secCut = b.dataset.cut;
   for (const x of document.querySelectorAll('#secCut button')) x.setAttribute('aria-pressed', String(x === b));
   $('secSlider').value = secPct[secCut];
-  ensureSection();
+  applyCut(true);
 }));
-// The label follows the slider while it moves, and the cut renders when it is let go.
-$('secSlider').addEventListener('input', (e) => { $('secAt').textContent = `${e.target.value} %`; });
-$('secSlider').addEventListener('change', (e) => { secPct[secCut] = Number(e.target.value); ensureSection(); });
+// The plane follows the slider live: the page cuts the meshes itself.
+$('secSlider').addEventListener('input', (e) => { secPct[secCut] = Number(e.target.value); applyCut(false); });
 
 function setMode(mode) {
   drawingMode = mode === 'drawing';
@@ -1594,6 +1719,7 @@ function setMode(mode) {
   $('sheet').hidden = !drawingMode;
   $('secView').hidden = !sectionMode;
   if (sectionMode) ensureSection();
+  else if (viewer) viewer.setSection(false);
   for (const b of document.querySelectorAll('#modeSeg button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
   if (drawingMode) {
     if (!zoom.fitted) fitSheet();

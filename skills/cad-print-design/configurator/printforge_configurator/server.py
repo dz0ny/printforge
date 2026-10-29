@@ -29,7 +29,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import urlsplit
 
 RANGE = re.compile(r"\[\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*\]\s*\.?\s*$")
 DEF_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
@@ -218,20 +218,26 @@ class SmlibpyBackend:
         import struct
         tris, count = [], 0
         for piece in self.pieces(shape):
-            key = hashlib.sha1(self.sm.to_smb(piece, ascii=False)).hexdigest()
-            data = self.meshes.get(key)
-            if data is None:
-                tmp = Path(path).with_suffix(".piece.stl")
-                self.sm.export_stl(piece, str(tmp), tolerance=0.02, angle=30.0)
-                data = tmp.read_bytes()
-                tmp.unlink()
-                self.meshes[key] = data
-                while len(self.meshes) > 64:
-                    del self.meshes[next(iter(self.meshes))]
+            data = self.piece_stl(piece, path)
             n = struct.unpack("<I", data[80:84])[0]
             tris.append(data[84:84 + 50 * n])
             count += n
         Path(path).write_bytes(b"printforge configurator".ljust(80, b" ") + struct.pack("<I", count) + b"".join(tris))
+
+    def piece_stl(self, piece, path):
+        """Return the binary STL of one piece, from the mesh cache when the exact body is the same."""
+        import hashlib
+        key = hashlib.sha1(self.sm.to_smb(piece, ascii=False)).hexdigest()
+        data = self.meshes.get(key)
+        if data is None:
+            tmp = Path(path).with_suffix(".piece.stl")
+            self.sm.export_stl(piece, str(tmp), tolerance=0.02, angle=30.0)
+            data = tmp.read_bytes()
+            tmp.unlink()
+            self.meshes[key] = data
+            while len(self.meshes) > 64:
+                del self.meshes[next(iter(self.meshes))]
+        return data
 
     def step(self, shape, path):
         self.sm.export_step(self.pieces(shape), str(path))
@@ -383,71 +389,6 @@ def smlibpy_drawing_views(sm, part):
     return views
 
 
-# Section cuts: the axis the plane moves along, the plane normal, and the view from the side that stays.
-SECTION_CUTS = {
-    "front": {"axis": 1, "normal": (0, -1, 0), "view": {"direction": (0, 1, 0), "up": (0, 0, 1)}},
-    "side": {"axis": 0, "normal": (-1, 0, 0), "view": {"direction": (1, 0, 0), "up": (0, 0, 1)}},
-    "top": {"axis": 2, "normal": (0, 0, 1), "view": {"direction": (0, 0, -1), "up": (0, 1, 0)}},
-}
-
-
-def name_point(piece, axis, at):
-    """Return a point on the cut face of a piece for its name tag, or None when no ray hits it.
-
-    The rays lie in the cut plane. They start outside the piece and run along the first other axis.
-    The second other axis gives the rows that the rays try in turn.
-    """
-    bb = piece.bbox()
-    lo, hi = tuple(bb.min), tuple(bb.max)
-    if not lo[axis] <= at <= hi[axis]:
-        return None
-    run, row = [k for k in (0, 1, 2) if k != axis]
-    if axis != 2:
-        run, row = (1 - axis), 2  # Vertical cuts: rays run across, rows go up.
-    d = [0.0, 0.0, 0.0]
-    d[run] = 1.0
-    for f in (0.5, 0.3, 0.7, 0.15, 0.85, 0.05, 0.95):
-        o = [0.0, 0.0, 0.0]
-        o[axis] = at
-        o[row] = lo[row] + f * (hi[row] - lo[row])
-        o[run] = lo[run] - 5.0
-        try:
-            hits = piece.raycast(tuple(o), tuple(d))
-        except Exception:
-            continue
-        if hits:
-            p = hits[0].point
-            return (float(p.x), float(p.y), float(p.z))
-    return None
-
-
-def smlibpy_section(sm, items, cut, pct=50.0):
-    """Return (PNG, plane position in mm) of the assembly cut at pct percent along the cut axis.
-
-    Each part gets its own colour and its name on its cut face.
-    """
-    c = SECTION_CUTS[cut]
-    k = c["axis"]
-    pieces = [p for _, p in items]
-    boxes = [p.bbox() for p in pieces]
-    lo, hi = min(b.min[k] for b in boxes), max(b.max[k] for b in boxes)
-    at = lo + max(0.5, min(99.5, pct)) / 100.0 * (hi - lo)
-    origin = [0.0, 0.0, 0.0]
-    origin[k] = at
-    sec = {"origin": tuple(origin), "normal": c["normal"]}
-    markers = []
-    for name, p in items:
-        pt = name_point(p, k, at)
-        if pt is not None:
-            markers.append({"position": pt, "label": name})
-    pic = guarded(lambda: bytes(sm.render(pieces, view=c["view"], size=(1100, 1100), colors="distinct",
-                                          section=sec, markers=markers)), timeout=120.0)
-    if pic is None:
-        pic = guarded(lambda: bytes(sm.render(pieces, view=c["view"], size=(1100, 1100), colors="distinct",
-                                              section=sec)), timeout=120.0)
-    return pic, at
-
-
 def section_items(last, ns):
     """Return the parts to cut as (name, shape) pairs.
 
@@ -501,15 +442,18 @@ def worker(model_path):
                     hook = last_ns.get("drawing_shapes")
                     shapes = hook() if callable(hook) else last
                     reply = {"ok": True, "views": backend_for(shapes).drawing(shapes, Path(req["out"]))}
-                elif req["cmd"] == "section":
+                elif req["cmd"] == "parts":
+                    # One STL per part, for the section view: the page cuts them itself.
                     if last is None:
                         raise RuntimeError("no build yet")
-                    import base64
-                    backend = backend_for(last)
-                    png, at = smlibpy_section(backend.sm, section_items(last, last_ns), req["cut"], req.get("pct", 50.0))
-                    if png is None:
-                        raise RuntimeError("the section render failed in the kernel")
-                    reply = {"ok": True, "png": base64.b64encode(png).decode(), "at": at}
+                    items = section_items(last, last_ns)
+                    backend = backend_for([p for _, p in items])
+                    names = []
+                    for i, (name, piece) in enumerate(items):
+                        f = Path(req["out"]) / f"part_{i}.stl"
+                        f.write_bytes(backend.piece_stl(piece, f))
+                        names.append(name)
+                    reply = {"ok": True, "names": names}
         except AssertionError as e:
             # A design rule from the model's own asserts: say it plainly, no traceback.
             buf.write(f"Design rule: {e}\n")
@@ -660,29 +604,26 @@ def export_drawing(srv):
         return {"ok": True, "key": entry["key"], "bbox": entry["info"]["bbox"], "views": entry["drawing"]}, None
 
 
-def export_section(srv, cut, pct):
-    """The section PNG and plane position of the current build for one cut, made on demand and kept with the entry."""
-    import base64
-    if cut not in SECTION_CUTS:
-        return None, f"unknown cut: {cut}"
+def export_parts(srv):
+    """The part meshes of the current build for the section view, made on demand and kept with the entry."""
     with srv.lock:
         entry = srv.last
         if not entry:
             return None, "no build yet"
-        sections = entry.setdefault("sections", {})
-        key = (cut, round(pct))
-        if key not in sections:
+        if entry.get("parts") is None:
             if srv.worker_key != entry["key"]:
                 fresh = build_entry(srv, entry["key"], entry["values"])
                 if not fresh["ok"]:
                     return None, fresh["log"]
-            reply = srv.worker.request({"cmd": "section", "cut": cut, "pct": float(round(pct))})
-            if not reply.get("ok"):
-                return None, reply.get("log", "section failed")
-            sections[key] = (base64.b64decode(reply["png"]), reply["at"])
-            while len(sections) > 48:
-                del sections[next(iter(sections))]
-        return sections[key], None
+            root = Path(tempfile.mkdtemp(prefix="cad-configurator-"))
+            try:
+                reply = srv.worker.request({"cmd": "parts", "out": str(root)})
+                if not reply.get("ok"):
+                    return None, reply.get("log", "part export failed")
+                entry["parts"] = [(name, (root / f"part_{i}.stl").read_bytes()) for i, name in enumerate(reply["names"])]
+            finally:
+                shutil.rmtree(root, ignore_errors=True)
+        return entry, None
 
 
 def export_step(srv):
@@ -805,19 +746,20 @@ class Handler(BaseHTTPRequestHandler):
                 if err:
                     return self._json(200, {"ok": False, "log": err})
                 return self._json(200, data)
-            if path == "/api/section":
-                q = parse_qs(urlsplit(self.path).query)
-                cut = q.get("cut", ["front"])[0]
-                try:
-                    pct = float(q.get("pct", ["50"])[0])
-                except ValueError:
-                    pct = 50.0
-                data, err = export_section(srv, cut, pct)
+            if path == "/api/parts":
+                entry, err = export_parts(srv)
                 if err:
                     return self._json(200, {"ok": False, "log": err})
-                png, at = data
-                return self._send(200, png, "image/png", {"Cache-Control": "no-store", "X-Cut-At": f"{at:.1f}",
-                                                          "X-Build-Key": str(srv.last["key"])})
+                k = entry["key"]
+                return self._json(200, {"ok": True, "key": k, "parts": [
+                    {"name": name, "url": f"/api/parts/{i}.stl?key={k[:12]}"} for i, (name, _) in enumerate(entry["parts"])]})
+            m = re.fullmatch(r"/api/parts/(\d+)\.stl", path)
+            if m:
+                parts = (srv.last or {}).get("parts") or []
+                i = int(m.group(1))
+                if i >= len(parts):
+                    return self._json(404, {"ok": False, "error": "no such part mesh"})
+                return self._send(200, parts[i][1], "model/stl", {"Cache-Control": "no-store"})
             if path == "/api/step":
                 data, err = export_step(srv)
                 if err:
