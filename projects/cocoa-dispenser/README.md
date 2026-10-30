@@ -57,10 +57,16 @@ from the CAD views. The CAD views are the truth.
   0.2 mm nozzle or a test print), the number of presses sets the amount, and the depth
   of cocoa sets the pressure on the sieve. Fill the cup 20 to 25 mm for a steady dose,
   below its rim, so no cocoa reaches the gap around the cup.
-- The spring lifts the cup and the cocoa: about 2 N at rest and 11 N at the bottom of
-  a press. `SIEVE_LOAD` and `WS_T` set it.
-- The **button** is 25 mm wide and 25 mm tall. Its skirt hides the spring, so the spring
-  sets its size: 7 rings on an 18 mm diameter, round a 14 mm lid hub.
+- The spring lifts the cup and the cocoa: about 2 N at rest and 10 N at the bottom of
+  a press. `TS_COIL` and `TS_SLOT` set it.
+- The **spring** is a slotted tube: 26 mm across with a 17 mm hole, round the 14 mm lid
+  hub. Three helical slots, 1.7 mm high, wind three turns each through its 4.5 mm wall
+  and leave 2 mm coils between them, with round ends and a solid 2 mm ring at each end.
+  The coils twist like the wire of a coil spring. Every vertical line through the wall
+  crosses nine slots, so the spring has 15 mm of travel and stays 2.8 mm short of
+  solid at full press.
+- The **button** is 32 mm wide and 32 mm tall. Its skirt hides the spring, so the spring
+  sets its size.
 
 ## Parts
 
@@ -68,17 +74,19 @@ from the CAD views. The CAD views are the truth.
 |---|---|---|
 | Body | bayonet band down, as used | tube, a bayonet band at each end with three L grooves and 45° faces to the tube, twelve grip ribs between the bands; 69 mm wide, 106 mm tall |
 | Stencil | flange down | heart cut-out in a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
-| Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 105 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 41° from vertical: no supports |
+| Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 112 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 41° from vertical: no supports |
 | Lid | upside down | plug with three bayonet lugs (1 mm overhangs), notched plate, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
-| Spring | flat | PETG wave spring, 7 rings of a 4-layer band (0.64 mm), 18 mm across; 32.0 mm free, 29.5 at rest, 19.5 pressed; about 0.8 N/mm |
+| Spring | standing, as used | PETG slotted tube, 26 mm across, 17 mm hole; 39.0 mm free, 36.5 at rest, 26.5 pressed, solid at 23.7; about 0.8 N/mm |
 
-A coil spring from a generator also works in place of the wave spring. It must go over
-the 14 mm hub and fit the 21.8 mm seat: inside diameter 15.4, width 2.7, thickness 4.5,
-pitch 10, length 32 (about 0.9 N/mm, solid at 14.4 mm).
+Version 4 first had a wave spring of thin rings that met at their crests. It could not be
+printed. The slotted tube prints as a plain tube: each layer, the ceiling of a slot moves
+1.2 mm on round the tube, and three slots side by side keep that short. A slotted spring
+from a generator works the same way, but a short one with 0.5 mm slots closes after about
+3 mm: this one needs 12.5 mm, from free length to full press.
 
 No bought parts. Print the spring, the cup and the lid in PETG: the tongue and the
-spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
+spring flex, PLA creeps. Print the spring standing, with no supports in the slots. Food-safe PETG or PLA for the rest. Set
 `PRINT_SPRING = False` for a bought metal spring that goes over the 14 mm hub (OD 19 mm,
 wire 0.8 to 1 mm, free length about 32 mm). The model uses 0.16 mm layers.
 
@@ -121,19 +129,20 @@ because meshing the holes for every check took minutes. A warm run takes about 3
 - `body.stl`, `stencil.stl`, `cup.stl`, `lid.stl`, `button.stl`, `spring.stl`: six parts
   in print orientation, and `cocoa_dispenser_plate.stl` with all six on one plate.
 - `sections.py` draws `views/section_rest_pressed.png` and `views/tongue_closeup.png`.
-- `uv run check_part.py cocoa_dispenser.py --max-overhang-area 400 --skip spring` checks
-  each part and the assembly. Two findings stay by design: the heart's cusp counts as a
+- `uv run check_part.py cocoa_dispenser.py --max-overhang-area 600 --skip spring` checks
+  each part and the assembly. Most of the lid's 506 mm2 of overhang is the floor of the
+  spring seat, which the upside-down lid prints as a 7 mm bridge from the hub to the rim. Two findings stay by design: the heart's cusp counts as a
   knife edge, and the lid's thin wall is the tongue, two lines thick. The spring is
-  skipped: the rings meet tangentially and each wave underside is a bridge of about
-  10 mm, which prints fine but reads as overhang.
+  skipped: the ceilings of its slots are overhangs by design, 2,800 mm2 of them, each
+  layer printing 1.2 mm past the one under it.
 - `LID_R` rounds the top of the guide hub.
-- The wave rings are smooth closed lofts, and the flat end rings are 0.1 mm wider per
-  side than the band (`WS_END_LAP`): with faces on the same cylinders, smlibpy could
-  not fuse them.
+- The spring's slots are rectangles swept along helices. A compressed spring in the
+  pressed views has lower slots, and the build prints its rate, the twist in its coils
+  and how far a slot ceiling moves per layer.
 - `cocoa_dispenser.3mf` is the project saved from Bambu Studio. It still holds version 3.
   Make a new project from `cocoa_dispenser_plate.stl` before printing version 4.
 - `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768. It shows
-  the 23 settings a user should change: sizes, fits, the taps, the tongue and the spring.
+  the 24 settings a user should change: sizes, fits, the taps, the tongue and the spring.
   The other values are fixed in the script. Its Section
   view cuts the assembly from the front, the side or the top, with a slider for the
   place of the cut and each part named on its cut face.

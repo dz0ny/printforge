@@ -4,14 +4,14 @@ Each press moves the cocoa cup down and the spring lifts it again.
 On the way the rack clicks past a striker tongue in the lid: one tap per tooth, which shakes the cup.
 The cocoa falls through the fine sieve onto a stencil that locks into the body bottom with a bayonet.
 Three ribs in a triangle hold the cup on the rod, so nothing covers the middle of the sieve.
-Parts: body, stencil, cocoa cup with the sieve and the rack rod, lid with tongue, button and a printed wave spring.
+Parts: body, stencil, cocoa cup with the sieve and the rack rod, lid with tongue, button and a printed tube spring.
 Z is up from the body underside and the rack faces +X.
 Run `uv run cocoa_dispenser.py` for the STEPs, STLs and labels, or add `--serve` for the configurator.
 """
 import math
 
-from smlibpy import (Align, Box, Circle, Cylinder, Line, Plane, Polygon, Polyline, Sphere, ThreePointArc, Wire, X, Z,
-                     loft, make_face)
+from smlibpy import (Align, Box, Circle, Cylinder, Helix, Line, Plane, Polygon, Rectangle, Sphere, ThreePointArc,
+                     Wire, X, Y, Z, make_face, sweep)
 
 # ☕ Coffee cup, only for the ghost view: the dispenser is held just above it.
 CUP_D = 90.0         # Cup rim outside diameter.
@@ -73,7 +73,7 @@ DETENT = 0.3         # Bump on the groove floor that the lug clicks over, so tap
 DROP_H = 20.0        # Height between the stencil lip and the sieve at full press. [8:40].
 
 # 🔘 Lid and button travel.
-STROKE = 10.0        # Button travel. [4:20].
+STROKE = 10.0        # Button travel. [7:12].
 ROD_PLAY = 0.3       # Clearance per side of the rod in the square guide of the lid. [0.15:0.6].
 LID_T = 16 * LAYER   # Lid plate thickness. [1.6:5].
 LID_PLUG = 6.0       # Depth of the lid plug in the tube.
@@ -105,21 +105,21 @@ TONGUE_ROOT = 2.0    # Solid lid above the tongue root.
 ROOT_R = 1.0         # Gusset at the tongue root on the flex side.
 TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG.
 PETG_E = 2000.0      # Printed PETG modulus in MPa, for the tongue and spring force estimates.
+PETG_G = PETG_E / 2.7  # Shear modulus, for the twist in the spring coils.
 SIEVE_LOAD = 1.0     # Weight in N that the spring lifts: the basket and the cocoa on it.
 
-# 🌀 Spring: a printed wave spring or a bought metal spring.
-PRINT_SPRING = True  # Print the wave spring, or use a bought metal spring. [0:1].
-PRELOAD = 2.5        # Spring compression at rest, against rattle and for the return over the last tooth. [0.5:6].
-WS_RINGS = 7         # Number of wave rings, softer and longer when more. [4:16].
+# 🌀 Spring: a printed tube spring or a bought metal spring.
+PRINT_SPRING = True  # Print the tube spring, or use a bought metal spring. [0:1].
+PRELOAD = 2.5        # Spring compression at rest, against rattle and for the return over the last tooth. [2:4].
+TS_TURNS = 3         # Turns of each slot, softer and longer when more.
+TS_COIL = 2.0        # Coil height between two slots, stiffer when taller. [1.8:3].
+TS_SLOT = 1.7        # Slot height, which each coil gives as travel. [1.5:2.5].
 
-# 〰️ Printed wave spring shape.
-WS_D = 18.0          # Wave spring mean diameter, softer when larger.
-WS_B = 4 * LINE      # Radial band width, 4 lines.
-WS_T = 4 * LAYER     # Vertical band thickness: 4 layers of 0.16, 0.64 mm.
-WS_H = 4.0           # Wave height, crest to trough.
-WS_WAVES = 3         # Waves per ring, softer when fewer but with a flatter underside.
-WS_END = 6 * LAYER   # Flat end ring thickness.
-WS_JOIN = 0.3        # Overlap where the rings touch, so they print as one part.
+# 🧵 Printed tube spring: a thick tube with helical slots through its wall, which prints standing.
+TS_OD = 26.0         # Outside diameter.
+TS_ID = 17.0         # Inside diameter, over the lid hub.
+TS_STARTS = 3        # Slots side by side, like a three-start thread, so each slot ceiling overhangs less per layer.
+TS_END = 2.0         # Solid ring at each end.
 
 # 🔩 Bought metal spring, when PRINT_SPRING is off.
 METAL_OD = 19.0      # Outside diameter, for wire of 0.8 to 1 mm, so it goes over the lid hub. [18:22].
@@ -127,14 +127,15 @@ METAL_L = 32.0       # Free length. [24:40].
 METAL_SOLID = 10.0   # Fully compressed length. [4:16].
 
 # Derived values.
+TS_PITCH = TS_STARTS * (TS_COIL + TS_SLOT)  # Rise of one slot per turn.
+TS_GAPS = TS_STARTS * TS_TURNS             # Slots that a vertical line through the wall crosses, the same at every angle.
 if PRINT_SPRING:
-    SPRING_OD = WS_D + WS_B
-    WS_PITCH = WS_H + WS_T - WS_JOIN
-    SPRING_L = 2 * WS_END - WS_JOIN + WS_RINGS * WS_PITCH
-    SPRING_SOLID = 2 * WS_END + WS_RINGS * WS_T
+    SPRING_OD = TS_OD
+    SPRING_L = 2 * TS_END + TS_TURNS * TS_PITCH + TS_SLOT
+    SPRING_SOLID = SPRING_L - TS_GAPS * TS_SLOT
 else:
     SPRING_OD, SPRING_L, SPRING_SOLID = METAL_OD, METAL_L, METAL_SOLID
-WS_END_LAP = 0.1                           # The end rings are this much wider per side than the band, so the fuse works.
+SPRING_ID = TS_ID if PRINT_SPRING else METAL_OD - 2  # Wire of up to 1 mm.
 ROD_D = ROD_SQ * math.sqrt(2)              # The rod diagonal, which round bores must clear.
 SEAT_D = SPRING_OD + 2 * SPRING_PLAY
 BTN_CAV_D = SPRING_OD + 2 * SPRING_PLAY
@@ -176,9 +177,26 @@ BED = 256.0
 assert min(WALL, 4 * LINE) >= 2 * LINE, "a wall is thinner than two lines"
 
 
+def coil_section():
+    """Return the long and the short side of the coil section, and its torsion constant J = beta * a * b^3 (Roark)."""
+    a, b = max((TS_OD - TS_ID) / 2, TS_COIL), min((TS_OD - TS_ID) / 2, TS_COIL)
+    return a, b, (1 / 3 - 0.21 * b / a * (1 - (b / a) ** 4 / 12)) * a * b ** 3
+
+
 def spring_rate():
-    """Return the rate of the printed wave spring in N/mm, a crest-to-crest estimate. Printed parts vary, so test it."""
-    return PETG_E * WS_B * WS_T ** 3 * WS_WAVES ** 4 / (2.4 * WS_D ** 3) / WS_RINGS
+    """Return the rate of the printed tube spring in N/mm. Printed parts vary, so test it.
+
+    Each slot leaves a coil like the wire of a coil spring, twisted by the load: k = 4 G J / (pi D^3 n) per start.
+    """
+    d = (TS_OD + TS_ID) / 2
+    return TS_STARTS * 4 * PETG_G * coil_section()[2] / (math.pi * d ** 3 * TS_TURNS)
+
+
+def coil_strain():
+    """Return the largest shear strain in the coils at full press, from Roark's stress in a twisted rectangle."""
+    a, b, _ = coil_section()
+    torque = spring_rate() * (PRELOAD + STROKE) / TS_STARTS * (TS_OD + TS_ID) / 4
+    return torque * (3 * a + 1.8 * b) / (a ** 2 * b ** 2) / PETG_G
 
 
 def return_budget():
@@ -208,21 +226,21 @@ def check_design():
         assert HOP_D / 2 + EAR_L > HOP_ID / 2 + BAY_WALL + 4, "the ears end under the bayonet band: lengthen EAR_L"
     assert TWIST > LUG_A + 4, "the twist is too short to move the lug past the entry slot"
     assert DROP_H >= 8, "the drop chamber is too low for an even cloud"
-    assert WS_D - WS_B > ROD_D + 1 if PRINT_SPRING else SPRING_OD - 1.6 > ROD_D + 1, "the spring does not clear the rod's diagonal"
-    assert SPRING_OD + 1 <= BTN_CAV_D and SPRING_OD + 2 * WS_END_LAP <= SEAT_D, "the spring does not fit"
+    assert SPRING_ID > ROD_D + 1, "the spring does not clear the rod's diagonal"
+    assert SPRING_OD + 0.5 <= BTN_CAV_D and SPRING_OD + 0.5 <= SEAT_D, "the spring does not fit"
     assert SPRING_REST < SPRING_L, "no spring preload: shorten BTN_CAV or use a longer spring"
     assert SPRING_PRESSED > SPRING_SOLID + 0.5, "the spring goes solid before the button lands"
     assert ROD_TOP - BTN_Z + BTN_TOP - SOCKET > 0
     assert BTN_CAV_D > ROD_D + 2, "the rod's diagonal does not fit the button cavity"
     assert BTN_CAV > 3, "the spring is too short for this stroke"
     assert SEAT_D < HOP_D - 6, "the spring seat is wider than the lid"
-    assert SPRING_OD - 2 * (WS_B if PRINT_SPRING else 0.8) > ROD_D + 2, "the rod does not fit inside the spring"
-    spring_id = WS_D - WS_B - 2 * WS_END_LAP if PRINT_SPRING else METAL_OD - 2  # Wire of up to 1 mm.
-    assert spring_id > HUB_D + 1, "the hub does not fit inside the spring"
+    assert SPRING_ID > HUB_D + 1, "the hub does not fit inside the spring"
     if PRINT_SPRING:
-        per_ring = (SPRING_L - SPRING_PRESSED) / WS_RINGS
-        assert per_ring <= 0.5 * (WS_H - WS_JOIN), "each ring bends more than half its wave: add rings"
-        assert WS_B >= 2 * LINE - 0.01 and WS_T >= 3 * LAYER - 0.01, "the wave band is too thin to print"
+        assert (TS_OD - TS_ID) / 2 >= 4 * LINE and TS_COIL >= 6 * LAYER - 0.01, "the spring coils are too thin to print"
+        assert TS_SLOT >= 5 * LAYER, "the slots are so low that a sagging ceiling closes them"
+        # Each layer, the slot ceiling moves on round the tube: that strip prints over air.
+        assert LAYER * math.pi * TS_OD / TS_PITCH <= 1.4, "the slot ceilings overhang too far per layer: add a start or raise the coils"
+        assert coil_strain() < 0.02, f"the coils twist {coil_strain() * 100:.1f}% at full press: add turns or lower the coils"
         have, climb, flank = return_budget()
         assert spring_rate() * PRELOAD > 1.5 * SIEVE_LOAD, "the spring cannot hold the full basket up at rest: raise PRELOAD"
         assert have >= 1.3 * climb, (f"the spring has {have:.1f} N at the last tooth but the tongue needs {climb:.1f} N to climb "
@@ -609,52 +627,33 @@ def button(press=0.0):
     return b.translate(0, 0, BODY_Z + BTN_Z - press)
 
 
-def ring_sections(base, sign, h, n):
-    """Return n radial rectangles round the axis whose height follows a cosine with WS_WAVES waves."""
-    r0, r1 = WS_D / 2 - WS_B / 2, WS_D / 2 + WS_B / 2
-    secs = []
-    for k in range(n):
-        th = 2 * math.pi * k / n
-        z = base + h / 2 * (1 + sign * math.cos(WS_WAVES * th))
-        c, s = math.cos(th), math.sin(th)
-        secs.append(Polyline(*[(r * c, r * s, zz) for r, zz in ((r0, z), (r1, z), (r1, z + WS_T), (r0, z + WS_T))],
-                             close=True))
-    return secs
+def tube_spring(length=None):
+    """Return the tube spring on z = 0: a tube with TS_STARTS helical slots, each with round ends.
 
-
-def wave_ring(base, sign, h=WS_H, n=36):
-    """Return one wave ring: a band WS_B wide and WS_T thick whose height follows a cosine.
-
-    A closed smooth loft through 36 radial rectangles makes it.
-    """
-    return loft(ring_sections(base, sign, h, n), closed=True)
-
-
-def wave_spring(length=None):
-    """Return the wave spring on z = 0. With a length, the pitch gets shorter to show it compressed.
-
-    The end rings are WS_END_LAP wider per side than the band.
-    With faces on the same cylinders, the fuse of the end rings and the wave rings fails.
+    With a length, the slots get lower to show it compressed.
+    Under 0.3 mm the slot stays 0.3 and the coils get lower instead, so the length is still right.
     """
     length = SPRING_L if length is None else length
-    pitch = (length - 2 * WS_END + WS_JOIN) / WS_RINGS
-    h = pitch - WS_T + WS_JOIN  # A compressed spring has flatter waves.
+    slot = max(0.3, TS_SLOT - (SPRING_L - length) / TS_GAPS)
+    coil = (length - 2 * TS_END - slot) / TS_GAPS - slot
+    pitch = TS_STARTS * (coil + slot)
+    rm, w = (TS_OD + TS_ID) / 4, (TS_OD - TS_ID) / 2 + 2
+    z0 = TS_END + slot / 2
+    cut = sweep(Rectangle(w, slot), Helix(pitch, TS_TURNS * pitch, rm, center=(0, 0, z0)))
+    for z in (z0, z0 + TS_TURNS * pitch):  # Whole turns, so both ends are at the same angle.
+        cut += Cylinder(slot / 2, w).rotate(Y, 90).translate(rm, 0, z)
+    tube = cyl(TS_OD, length) - cyl(TS_ID, length + 2, -1)
+    for k in range(TS_STARTS):
+        tube -= cut.rotate(Z, 360 / TS_STARTS * k)
+    return tube
 
-    def end(z):
-        return cyl(SPRING_OD + 2 * WS_END_LAP, WS_END, z) - cyl(WS_D - WS_B - 2 * WS_END_LAP, WS_END + 2, z - 1)
 
-    s = wave_ring(WS_END - WS_JOIN, -1, h)
-    for i in range(1, WS_RINGS):
-        s += wave_ring(WS_END - WS_JOIN + i * pitch, -1 if i % 2 == 0 else 1, h)
-    return s + end(0.0) + end(length - WS_END)
-
-
-SPRING_DEPS = ["WS_D", "WS_B", "WS_T", "WS_H", "WS_WAVES", "WS_RINGS", "WS_END", "WS_JOIN", "SPRING_OD", "WS_END_LAP"]
+SPRING_DEPS = ["TS_OD", "TS_ID", "TS_STARTS", "TS_TURNS", "TS_COIL", "TS_SLOT", "TS_END", "SPRING_L"]
 
 
 def spring(press=0.0):
     length = SPRING_REST - press
-    return cached("spring", SPRING_DEPS, wave_spring, length).translate(0, 0, BODY_Z + LID_TOP - SEAT_DEPTH)
+    return cached("spring", SPRING_DEPS, tube_spring, length).translate(0, 0, BODY_Z + LID_TOP - SEAT_DEPTH)
 
 
 FIXED = {}
@@ -730,7 +729,7 @@ def features():
         "Striker tongue": {"at": (ROD_SQ / 2 + ROD_PLAY + TONGUE_T + 0.3, 0, zb + TIP_Z + TONGUE_L / 2), "normal": (1, 0, 0),
                            "params": ["TONGUE_T", "TONGUE_L", "TONGUE_W", "TONGUE_BITE", "TONGUE_FLEX", "TONGUE_ROOT"]},
         "Spring": {"at": (SPRING_OD / 2 + 0.5, 0, zb + LID_TOP + STROKE / 2), "normal": (1, 0, 0),
-                   "params": ["PRINT_SPRING", "WS_D", "WS_T", "WS_H", "WS_WAVES", "WS_RINGS"]},
+                   "params": ["PRINT_SPRING", "PRELOAD", "TS_TURNS", "TS_COIL", "TS_SLOT"]},
     }
     return f
 
@@ -853,7 +852,7 @@ if __name__ == "__main__":
               "spring": (106, 76)}
     boxes = []
     if PRINT_SPRING:
-        ps["spring"] = wave_spring()  # The spring prints at its free length.
+        ps["spring"] = tube_spring()  # The spring prints at its free length.
     for name, p in ps.items():
         assert p.is_valid(), f"{name}: invalid solid"
         assert len(p.solids()) == 1, f"{name}: not one solid"
@@ -861,7 +860,7 @@ if __name__ == "__main__":
         # The STL goes in the cache with the part: the 1,000 holes of the body take a long time to mesh.
         stl_key = KEYS.get("shell" if name == "body" else name)
         if name == "spring":
-            stl_key = part_key("spring-free", SPRING_DEPS, wave_spring)
+            stl_key = part_key("spring-free", SPRING_DEPS, tube_spring)
         cached_stl = CACHE_DIR / f"{name}-{stl_key}-{PRINT_FLIP[name] or 'up'}.stl" if (USE_CACHE and stl_key) else None
         if cached_stl and cached_stl.exists():
             shutil.copyfile(cached_stl, f"{name}.stl")
@@ -887,10 +886,11 @@ if __name__ == "__main__":
     print(f"assembled {hi[0] - lo[0]:.1f} x {hi[1] - lo[1]:.1f} x {hi[2] - lo[2]:.1f} mm; plate {pmax[0]:.0f} x {pmax[1]:.0f} mm")
     print(f"spring {SPRING_REST:.1f} mm at rest, {SPRING_PRESSED:.1f} mm pressed (free {SPRING_L:.1f}, solid {SPRING_SOLID:.1f})")
     if PRINT_SPRING:
-        # A crest-to-crest wave spring estimate with a PETG modulus of about 2000 MPa. Printed parts vary, so test it.
+        # A coil spring estimate for the twisted coils, with PETG at about 2000 MPa. Printed parts vary, so test it.
         k = spring_rate()
         have, climb, flank = return_budget()
-        print(f"spring rate about {k:.1f} N/mm: {k * PRELOAD:.1f} N at rest, {k * (PRELOAD + STROKE):.1f} N pressed")
+        print(f"spring rate about {k:.2f} N/mm: {k * PRELOAD:.1f} N at rest, {k * (PRELOAD + STROKE):.1f} N pressed, "
+              f"coils twist {coil_strain() * 100:.1f}%, slot ceilings move {LAYER * math.pi * TS_OD / TS_PITCH:.2f} mm a layer")
         print(f"return: {have:.1f} N net of the basket load at the last tooth against {climb:.1f} N to climb its {flank:.0f} degree flank "
               f"({have / climb:.1f}x); press peak about {k * (PRELOAD + STROKE) + climb:.0f} N")
     print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json "

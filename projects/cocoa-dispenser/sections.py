@@ -41,7 +41,7 @@ sheet.save(out / "section_rest_pressed.png")
 # Close-up: the lid and the rod at rest, cut through the side of the tongue at y = 0.5.
 # The tongue shows in its pocket, with its nub in the teeth.
 ps = m.parts(0.0)
-box = Box(18, 9.5, 26, align=Align.MIN).translate(-4, -9, m.BODY_Z + m.TIP_Z - 8)
+box = Box(17.5, 9.5, 26, align=Align.MIN).translate(-4, -9, m.BODY_Z + m.TIP_Z - 8)
 piece = [ps["lid"] & box, ps["cup"] & box]
 save(render(piece, view=(0.6, 1, 0.45), colors="distinct", size=(900, 900)), out / "tongue_closeup.png")
 print("wrote views/section_rest_pressed.png, views/tongue_closeup.png")
