@@ -18,13 +18,13 @@ HEAD_D = 9.0         # Screw head diameter, so the two heads of a pair do not to
 
 # 📏 Keyboard top above the holes.
 PANEL_TOP = 25.0     # Height of the top edge of the panel above the holes, measured. [0:150].
-TOP_TILT = 8.0       # Slope of the keyboard top toward the player in degrees, for the ghost. [0:25].
-TOP_DEPTH = 300.0    # Forward reach of the keyboard top from the panel, for the ghost. [100:600].
+TOP_TILT = 8.0       # Slope of the keyboard top toward the player in degrees, for the ghost.
+TOP_DEPTH = 300.0    # Forward reach of the keyboard top from the panel, for the ghost.
 
 # 🎛️ Mixer sleeve from projects/mixer-sleeve, which this riser carries.
-SLEEVE_W = 198.2     # Sleeve width, across. [100:300].
-SLEEVE_L = 213.5     # Sleeve length, along the slope. [100:300].
-SLEEVE_T = 34.0      # Sleeve height off its back plate. [10:80].
+SLEEVE_W = 198.2     # Sleeve width, across.
+SLEEVE_L = 213.5     # Sleeve length, along the slope.
+SLEEVE_T = 34.0      # Sleeve height off its back plate.
 PATTERN = 80.0       # Mount pattern of the sleeve, 80 x 80 mm, M1 to M4. [40:160].
 SLEEVE_SCREW_D = 4.0  # Sleeve screws, M4, through both plate halves into its pads. [3:6].
 
@@ -34,28 +34,28 @@ LINE = 0.45          # Line width, about 1.1 x the nozzle.
 LAYER = 0.2
 
 # 🧱 Bracket: one side profile extruded across BRK_W.
-T = 6.0              # Thickness of the plate and the ledge. [4:12].
-ARM_T = 20.0         # Thickness of the base plate and the arm, which the screws bear on. [6:30].
+T = 6.0              # Thickness of the plate and the ledge.
+ARM_T = 20.0         # Thickness of the base plate and the arm, which the screws bear on.
 BRK_W = 50.0         # Bracket width across the keyboard, with its pair of holes in the centre. [30:100].
-BASE_DOWN = 20.0     # Base plate length below the holes. [10:60].
+BASE_DOWN = 20.0     # Base plate length below the holes.
 LEDGE = 15.0         # Length of the ledge that rests on the keyboard top, over the rear edge. [0:40].
 
 # 📐 Plate on the slope.
 EDGE_GAP = 20.0      # Gap between the keyboard top edge and the plate underside, for a thumb. [14:60].
 TILT = 15.0          # Slope toward the player, in degrees from horizontal. [0:40].
 PLATE_L = 90.0       # Plate reach forward from the arm, along the slope. [60:200].
-PLATE_BACK = 80.0    # Plate reach backward over the arm, so the side view is a T. [0:150].
+PLATE_BACK = 80.0    # Plate reach backward over the arm, so the side view is a T.
 
 # 💪 Stiffness and edges.
 GUSSET = True        # Full-width gusset from the plate underside down to the ledge. [0:1].
-ROUND = 1.5          # Radius on the bottom corners of the base plate. [0:4].
+ROUND = 1.5          # Radius on the bottom corners of the base plate.
 
 # 🪢 Puzzle joint where the two halves meet.
-JOINT = 14.0         # Tongue length into the other half. [8:30].
-JOINT_W = 30.0       # Tongue width at its root. [15:50].
-JOINT_FLARE = 3.0    # Dovetail flare on each side of the tip, so the halves cannot pull apart. [0:6].
+JOINT = 14.0         # Tongue length into the other half.
+JOINT_W = 30.0       # Tongue width at its root.
+JOINT_FLARE = 3.0    # Dovetail flare on each side of the tip, so the halves cannot pull apart.
 JOINT_FIT = 0.2      # Clearance per side between tongue and socket. [0:0.6].
-PLATE_MARGIN = 0.0   # Plate reach beyond the outer bracket face, zero so the face sits on the bed. [0:30].
+PLATE_MARGIN = 0.0   # Plate reach beyond the outer bracket face, zero so the face sits on the bed.
 
 ANG = math.radians(TILT)
 PITCH = (OUTER - INNER) / 2                   # Distance between the two holes of one side.

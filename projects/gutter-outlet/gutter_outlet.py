@@ -15,8 +15,8 @@ from smlibpy import (Align, Box, Circle, Cone, Cylinder, Line, Part, ThreePointA
 GUTTER_ID = 127.0      # Gutter inside diameter, NW 280 half-round. [80:200].
 SHEET = 0.6            # Gutter sheet thickness. [0.4:2].
 FIT = 0.4              # Clearance per side between the skirt and the gutter. [0:1.5].
-BEAD_D = 16.0          # Diameter of the rolled front bead on the ghost, zero for none. [0:25].
-HOOK_D = 8.0           # Diameter of the rear hook on the ghost, zero for none. [0:15].
+BEAD_D = 16.0          # Diameter of the rolled front bead on the ghost, zero for none.
+HOOK_D = 8.0           # Diameter of the rear hook on the ghost, zero for none.
 
 # 🖨️ Printer. The part stands on the spigot tip, so the walls lie across the bed.
 NOZZLE = 0.4
@@ -28,19 +28,19 @@ WALL = 5 * LINE        # Spigot wall of 5 lines, so the bore stays wide.
 FUNNEL_WALL = 8 * LINE  # Skirt and funnel wall of 8 lines, because they carry the water.
 SKIRT_L = 25.0         # Skirt length over the gutter. [10:60].
 SKIRT_TOP = -8.0       # Distance of the skirt top below the gutter top, clear of bead and hook. [-30:0].
-ROUND = 1.0            # Radius on the free edges of the skirt. [0:1.2].
+ROUND = 1.0            # Radius on the free edges of the skirt.
 
 # 🌀 Funnel from the gutter profile to the spigot.
 FUNNEL_L = 50.0        # Funnel length, with sides of about 38 degrees. [30:120].
 DROP = 3.0             # Drop of the floor along the funnel. [0:15].
-LID_START = 12.0       # Open length of the funnel before the lid starts. [0:40].
+LID_START = 12.0       # Open length of the funnel before the lid starts.
 
 # 🪠 Downpipe, which slides over the spigot.
 PIPE_OD = 58.0         # Outlet pipe outside diameter. [40:120].
 PIPE_WALL = 1.0        # Outlet pipe wall, which sets the pipe inside diameter. [0.5:4].
 PIPE_FIT = 0.3         # Clearance per side between the pipe and the spigot. [0:1].
 SPIGOT_L = 40.0        # Spigot length into the pipe. [15:80].
-COLLAR = 2.5           # Radial size of the pipe stop collar beyond the pipe OD. [1:6].
+COLLAR = 2.5           # Radial size of the pipe stop collar beyond the pipe OD.
 
 R_SK_IN = GUTTER_ID / 2 + SHEET + FIT
 R_SK_OUT = R_SK_IN + FUNNEL_WALL         # Skirt and funnel share one outer surface, with no step.

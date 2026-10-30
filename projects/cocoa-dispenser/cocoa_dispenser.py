@@ -14,8 +14,8 @@ from smlibpy import (Align, Box, Circle, Cylinder, Line, Plane, Polygon, Polylin
                      loft, make_face)
 
 # ☕ Coffee cup, only for the ghost view: the dispenser is held just above it.
-CUP_D = 90.0         # Cup rim outside diameter. [60:130].
-CUP_H = 70.0         # Cup height below the rim. [30:120].
+CUP_D = 90.0         # Cup rim outside diameter.
+CUP_H = 70.0         # Cup height below the rim.
 
 # 🖨️ Printer. Every part prints flat, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
@@ -28,14 +28,14 @@ WALL = 4 * LINE      # Tube wall, 4 lines. [1.2:4].
 
 # ✋ Grip.
 GRIP_RIBS = 12       # Number of vertical grip ribs: round rods half sunk into the tube wall. [0:24].
-GRIP_D = 3.0         # Rib diameter. [2:5].
-GRIP_PROUD = 1.8     # Rib height out of the tube wall. [0.8:2.5].
+GRIP_D = 3.0         # Rib diameter.
+GRIP_PROUD = 1.8     # Rib height out of the tube wall.
 
 # 🕳️ Sieve: the floor of the cocoa cup, with fine holes that are vertical in the print.
 SIEVE_D = 60.0       # Cocoa cup outside diameter, which slides in the body bore. [30:62].
 SIEVE_T = 6 * LAYER  # Sieve floor thickness. [0.8:2].
 SIEVE_HOLE = 0.8     # Hole diameter, 0.8 for cocoa and 0.6 to 0.7 for cinnamon. [0.6:1.2].
-SIEVE_PITCH = 1.7    # Hole spacing on a hex grid, so the web is two lines at 0.45. [1.2:3].
+SIEVE_PITCH = 1.7    # Hole spacing on a hex grid, so the web is two lines at 0.45.
 
 # 🧺 Cocoa cup wall and its play in the body bore.
 SKIRT_H = 30.0       # Cup wall above the sieve floor, for a fill of 20 to 25 mm. [10:32].
@@ -43,31 +43,31 @@ SKIRT_W = 4 * LINE   # Cup wall, 4 lines. [1.2:3].
 SIEVE_PLAY = 0.3     # Clearance per side of the cup in the body bore. [0.15:0.6].
 
 # 🔺 Carrier: three ribs in a triangle from the cup rim up to the block that carries the rod.
-RIB_W = 3.0          # Rib width across. [2:5].
-RIB_D = 3.0          # Rib depth along the radius. [2:5].
+RIB_W = 3.0          # Rib width across.
+RIB_D = 3.0          # Rib depth along the radius.
 
 # 🦷 Rod and rack: the tapper.
-ROD_SQ = 6.0         # Rod square side. [5:9].
+ROD_SQ = 6.0         # Rod square side.
 RACK_PITCH = 3.0     # Tooth pitch along the rod, one tap per tooth, longer for a gentler flank. [1:4].
-RACK_DEPTH = 1.3     # Tooth depth into the rod face. [0.5:1.5].
+RACK_DEPTH = 1.3     # Tooth depth into the rod face.
 
 # 🖼️ Stencil: a disc with a grip flange and a collar that goes up into the body bore from below.
 STENCIL_T = 6 * LAYER  # Stencil disc thickness, which is also the grip flange. [0.8:2].
 STENCIL_PLAY = 0.3   # Clearance per side of the collar in the bore. [0.15:0.6].
 COLLAR_W = 3 * LINE  # Collar wall, 3 lines. [1.2:3].
 HEART_W = 46.0       # Heart width; its lobes reach 26 mm from the centre. [15:50].
-EAR_L = 10.0         # Reach of the two grip ears past the flange, to turn the stencil. [0:20].
-EAR_W = 14.0         # Ear width. [8:24].
-EAR_H = 5.0          # Height of each ear outside the bayonet band, a solid tab for the fingers. [1:10].
+EAR_L = 10.0         # Reach of the two grip ears past the flange, to turn the stencil.
+EAR_W = 14.0         # Ear width.
+EAR_H = 5.0          # Height of each ear outside the bayonet band, a solid tab for the fingers.
 
 # 🔒 Bayonet: three lugs on the collar, in L grooves in the body bottom.
-LUG_H = 2.4          # Lug height. [1.6:4].
-LUG_D = 1.0          # Lug reach into the body wall. [0.6:1.6].
-LUG_A = 20.0         # Lug width in degrees. [10:30].
-LOCK_Z = 3.0         # Lug underside above the flange, which leaves body wall under the groove. [2:6].
-TWIST = 35.0         # Twist from the entry slot to the locked place, in degrees. [20:60].
-BAY_WALL = 4.0       # Body wall at the bayonet ring, from the bore out. [3:6].
-DETENT = 0.3         # Bump on the groove floor that the lug clicks over, so taps do not twist it loose. [0:0.5].
+LUG_H = 2.4          # Lug height.
+LUG_D = 1.0          # Lug reach into the body wall.
+LUG_A = 20.0         # Lug width in degrees.
+LOCK_Z = 3.0         # Lug underside above the flange, which leaves body wall under the groove.
+TWIST = 35.0         # Twist from the entry slot to the locked place, in degrees.
+BAY_WALL = 4.0       # Body wall at the bayonet ring, from the bore out.
+DETENT = 0.3         # Bump on the groove floor that the lug clicks over, so taps do not twist it loose.
 
 # 🌫️ Drop chamber, so the hole pattern mixes into an even cloud of cocoa.
 DROP_H = 20.0        # Height between the stencil lip and the sieve at full press. [8:40].
@@ -76,55 +76,55 @@ DROP_H = 20.0        # Height between the stencil lip and the sieve at full pres
 STROKE = 10.0        # Button travel. [4:20].
 ROD_PLAY = 0.3       # Clearance per side of the rod in the square guide of the lid. [0.15:0.6].
 LID_T = 16 * LAYER   # Lid plate thickness. [1.6:5].
-LID_PLUG = 6.0       # Depth of the lid plug in the tube. [3:12].
+LID_PLUG = 6.0       # Depth of the lid plug in the tube.
 LID_FIT = 0.2        # Clearance per side of the lid plug in the tube. [0.05:0.5].
 POUR_ANGLE = 140.0   # Pour opening in the lid: an arc between the button and the plug, on the -X side. [0:220].
 
 # 🧲 Lid hub and spring seat.
-LID_R = 1.0          # Round on the top edge of the guide hub. [0:2].
-HUB_D = 14.0         # Guide hub diameter, with two lines of wall outside the tongue pocket. [10:20].
-HUB_DOWN = 9.0       # Hub reach below the plug, for a longer guide and room for the tongue. [0:12].
+LID_R = 1.0          # Round on the top edge of the guide hub.
+HUB_D = 14.0         # Guide hub diameter, with two lines of wall outside the tongue pocket.
+HUB_DOWN = 9.0       # Hub reach below the plug, for a longer guide and room for the tongue.
 SEAT_DEPTH = 8 * LAYER  # Spring seat depth in the lid top. [0.8:3].
 SPRING_PLAY = 1.0    # Clearance per side around the spring in the seat and the button skirt. [0.3:2].
 
 # 🔲 Button.
 BTN_WALL = 4 * LINE  # Button skirt wall, 4 lines. [1.2:6].
-BTN_TOP = 6.5        # Solid cap above the skirt, which holds the rod socket under the finger dimple. [5:14].
-SOCKET = 4.0         # Rod depth in the button socket. [3:10].
-ROD_PRESS = 0.05     # Tight socket clearance per side, for a drop of glue. [0:0.2].
+BTN_TOP = 6.5        # Solid cap above the skirt, which holds the rod socket under the finger dimple.
+SOCKET = 4.0         # Rod depth in the button socket.
+ROD_PRESS = 0.05     # Tight socket clearance per side, for a drop of glue.
 
 # 👅 Striker tongue: a finger in the lid hub that the rack clicks past.
-TONGUE_T = 2 * LINE  # Tongue thickness of 2 lines, thin enough to flex 1 mm. [0.6:1.8].
+TONGUE_T = 2 * LINE  # Tongue thickness of 2 lines, thin enough to flex 1 mm.
 TONGUE_L = 12.0      # Tongue length from its root to the tip, long so the root bends little. [6:16].
-TONGUE_W = 4.5       # Tongue width. [2:6].
+TONGUE_W = 4.5       # Tongue width.
 TONGUE_BITE = 1.0    # Reach of the tip into the teeth, which is the bend per tooth. [0.3:1.2].
-TONGUE_FLEX = 1.2    # Free room behind the tongue, so it can swing out. [0.8:2].
+TONGUE_FLEX = 1.2    # Free room behind the tongue, so it can swing out.
 
 # 🧮 Tongue root and force estimates.
-TONGUE_ROOT = 2.0    # Solid lid above the tongue root. [1.2:4].
-ROOT_R = 1.0         # Gusset at the tongue root on the flex side. [0:2].
-TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG. [0.2:0.5].
-PETG_E = 2000.0      # Printed PETG modulus in MPa, for the tongue and spring force estimates. [1500:2500].
-PRINT_SPRING = True  # Print the wave spring, or use a bought metal spring.
+TONGUE_ROOT = 2.0    # Solid lid above the tongue root.
+ROOT_R = 1.0         # Gusset at the tongue root on the flex side.
+TOOTH_MU = 0.3       # Friction of the tongue tip on a tooth flank, PETG on PETG.
+PETG_E = 2000.0      # Printed PETG modulus in MPa, for the tongue and spring force estimates.
+SIEVE_LOAD = 1.0     # Weight in N that the spring lifts: the basket and the cocoa on it.
+
+# 🌀 Spring: a printed wave spring or a bought metal spring.
+PRINT_SPRING = True  # Print the wave spring, or use a bought metal spring. [0:1].
 PRELOAD = 2.5        # Spring compression at rest, against rattle and for the return over the last tooth. [0.5:6].
-SIEVE_LOAD = 1.0     # Weight in N that the spring lifts: the basket and the cocoa on it. [0:3].
-
-# 🌀 Printed wave spring.
-WS_D = 18.0          # Wave spring mean diameter, softer when larger. [12:30].
-WS_B = 4 * LINE      # Radial band width, 4 lines. [1.2:4].
-WS_T = 4 * LAYER     # Vertical band thickness: 4 layers of 0.16, 0.64 mm. [0.6:2].
-WS_H = 4.0           # Wave height, crest to trough. [2:8].
-WS_WAVES = 3         # Waves per ring, softer when fewer but with a flatter underside. [2:6].
-
-# 🔁 Wave spring rings.
 WS_RINGS = 7         # Number of wave rings, softer and longer when more. [4:16].
-WS_END = 6 * LAYER   # Flat end ring thickness. [0.8:3].
-WS_JOIN = 0.3        # Overlap where the rings touch, so they print as one part. [0.1:0.6].
+
+# 〰️ Printed wave spring shape.
+WS_D = 18.0          # Wave spring mean diameter, softer when larger.
+WS_B = 4 * LINE      # Radial band width, 4 lines.
+WS_T = 4 * LAYER     # Vertical band thickness: 4 layers of 0.16, 0.64 mm.
+WS_H = 4.0           # Wave height, crest to trough.
+WS_WAVES = 3         # Waves per ring, softer when fewer but with a flatter underside.
+WS_END = 6 * LAYER   # Flat end ring thickness.
+WS_JOIN = 0.3        # Overlap where the rings touch, so they print as one part.
 
 # 🔩 Bought metal spring, when PRINT_SPRING is off.
-METAL_OD = 10.0      # Outside diameter, for wire of 0.6 to 0.8 mm. [6:13].
-METAL_L = 25.0       # Free length. [15:40].
-METAL_SOLID = 8.0    # Fully compressed length. [4:14].
+METAL_OD = 19.0      # Outside diameter, for wire of 0.8 to 1 mm, so it goes over the lid hub. [18:22].
+METAL_L = 32.0       # Free length. [24:40].
+METAL_SOLID = 10.0   # Fully compressed length. [4:16].
 
 # Derived values.
 if PRINT_SPRING:
@@ -217,7 +217,8 @@ def check_design():
     assert BTN_CAV > 3, "the spring is too short for this stroke"
     assert SEAT_D < HOP_D - 6, "the spring seat is wider than the lid"
     assert SPRING_OD - 2 * (WS_B if PRINT_SPRING else 0.8) > ROD_D + 2, "the rod does not fit inside the spring"
-    assert WS_D - WS_B - 2 * WS_END_LAP > HUB_D + 1, "the hub does not fit inside the spring"
+    spring_id = WS_D - WS_B - 2 * WS_END_LAP if PRINT_SPRING else METAL_OD - 2  # Wire of up to 1 mm.
+    assert spring_id > HUB_D + 1, "the hub does not fit inside the spring"
     if PRINT_SPRING:
         per_ring = (SPRING_L - SPRING_PRESSED) / WS_RINGS
         assert per_ring <= 0.5 * (WS_H - WS_JOIN), "each ring bends more than half its wave: add rings"

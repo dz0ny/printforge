@@ -7,76 +7,77 @@
 <script type="importmap">
 { "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" } }
 </script>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script>
+// The colours are the tokens below, so one set of classes serves the light and the dark theme.
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: 'var(--bg)', panel: 'var(--panel)', panel2: 'var(--panel-2)', fg: 'var(--fg)', muted: 'var(--muted)',
+        line: 'var(--line)', accent: 'var(--accent)', 'accent-fg': 'var(--accent-fg)', amber: 'var(--amber)',
+        err: 'var(--err)', 'err-bg': 'var(--err-bg)', dim: 'var(--dim)', input: 'var(--input)', btn: 'var(--btn)',
+      },
+      fontFamily: { mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'] },
+    },
+  },
+};
+</script>
+<style type="text/tailwindcss">
+@layer components {
+  .btn { @apply inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-line bg-btn px-3 text-[13px] text-fg no-underline enabled:hover:border-muted disabled:cursor-default disabled:opacity-55; }
+  .btn-primary { @apply border-accent bg-accent font-semibold text-accent-fg enabled:hover:border-accent enabled:hover:brightness-110; }
+  .seg { @apply inline-flex h-9 flex-none gap-0.5 rounded-[10px] border border-line bg-panel2 p-[3px]; }
+  .seg > button { @apply h-7 rounded-[7px] px-3 text-[13px] text-fg aria-pressed:bg-panel aria-pressed:font-semibold aria-pressed:shadow-sm; }
+  .pill { @apply flex rounded-full border border-line bg-panel p-[3px]; }
+  .pill > button { @apply h-[30px] min-w-[34px] rounded-full px-3 text-[13px] text-fg hover:bg-panel2; }
+  .card { @apply rounded-lg border border-line bg-panel px-3 py-2 text-[13px]; }
+  .menu { @apply absolute right-0 top-[calc(100%+8px)] z-20 flex min-w-[220px] flex-col gap-0.5 rounded-xl border border-line bg-panel p-2 shadow-lg; }
+  .menu > a, .menu > label { @apply flex h-9 cursor-pointer items-center justify-between gap-2 whitespace-nowrap rounded-lg px-2.5 text-[13px] text-fg no-underline hover:bg-panel2; }
+  .tag { @apply pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-full border border-line bg-panel px-2.5 py-1 text-xs text-fg; }
+}
+</style>
 <style>
 :root {
   --bg: #f4f6f8; --panel: #ffffff; --panel-2: #f6f7f9; --fg: #1c2330; --muted: #6b7480; --line: #e1e5eb;
-  --accent: #2563eb; --accent-fg: #ffffff; --amber: #d97706; --dirty: #fff3c4; --err: #b42318; --err-bg: #fdecea; --dim: #15803d;
-  --viewer: #e9edf2; --viewer-grad: linear-gradient(180deg, #f3f5f8, #e6eaf0); --input: #ffffff; --btn: #ffffff;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --accent: #2563eb; --accent-fg: #ffffff; --amber: #d97706; --err: #b42318; --err-bg: #fdecea; --dim: #15803d;
+  --viewer-grad: linear-gradient(180deg, #f3f5f8, #e6eaf0); --input: #ffffff; --btn: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
-    --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80; --dim: #4ade80;
-    --viewer: #0f1319; --input: #11151c; --btn: #242b37;
+    --bg: #14181f; --panel: #1b2029; --panel-2: #161b23; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
+    --accent: #5b8def; --accent-fg: #0b1220; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80;
+    --viewer-grad: #0f1319; --input: #11151c; --btn: #242b37;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #14181f; --panel: #1b2029; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
-  --accent: #5b8def; --accent-fg: #0b1220; --dirty: #4a3f1a; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80;
-  --viewer: #0f1319; --input: #11151c; --btn: #242b37;
+  --bg: #14181f; --panel: #1b2029; --panel-2: #161b23; --fg: #e4e8ee; --muted: #8e98a6; --line: #2c3340;
+  --accent: #5b8def; --accent-fg: #0b1220; --err: #ff8a80; --err-bg: #3d1f1f; --dim: #4ade80;
+  --viewer-grad: #0f1319; --input: #11151c; --btn: #242b37;
 }
-* { box-sizing: border-box; }
+/* Utilities such as flex beat the base [hidden] rule, so the hidden attribute must win here. */
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; }
-body {
-  background: var(--bg); color: var(--fg); display: flex; flex-direction: column;
-  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Header: 56 px, one 36 px control height */
-header {
-  display: flex; flex-wrap: nowrap; align-items: center; gap: 8px;
-  height: 56px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line);
-}
-#model {
-  font-size: 14px; font-weight: 600; flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-#saveMsg { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-#saveMsg.err { color: var(--err); }
-button, .btn {
-  font: inherit; font-size: 13px; color: var(--fg); background: var(--btn); border: 1px solid var(--line);
-  border-radius: 8px; height: 36px; padding: 0 12px; cursor: pointer; text-decoration: none;
-  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-}
-button:hover:not(:disabled) { border-color: #cdd4dd; }
-button:disabled { opacity: .55; cursor: default; }
-#rebuild { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
-#rebuild:hover:not(:disabled) { border-color: var(--accent); filter: brightness(1.06); }
-.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; font-size: 13px; }
-.spin {
-  display: none; width: 12px; height: 12px; border: 2px solid currentColor;
-  border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite;
-}
-#rebuild.busy .spin { display: inline-block; }
+/* States that the script sets by class, and the parts that utilities cannot reach. */
+.spin { display: none; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+#rebuild.busy .spin, #sheetMsg .spin { display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.err { color: var(--err); }
+.group.open > .ghead .chev { transform: rotate(180deg); }
+.row.dirty::before, .row.selected::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.row.dirty::before { background: var(--amber); }
+.row.selected::after { background: var(--accent); }
+.row.dirty.selected::before { left: 3px; }
+.row.selected { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.name:hover .ptitle { text-decoration: underline; }
+#logbox.error { background: var(--err-bg); }
+#logbox.error summary, #logbox.error pre { color: var(--err); }
 
-/* 3D / Drawing segmented control */
-.seg {
-  display: inline-flex; flex: none; height: 36px; padding: 3px; gap: 2px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
-}
-.seg button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font-size: 13px; }
-.seg button:hover:not(:disabled) { border: 0; color: var(--fg); }
-.seg button[aria-pressed="true"] { background: var(--panel); box-shadow: 0 1px 2px rgba(16, 24, 40, .12); font-weight: 600; }
-
-/* Toggle switches */
+/* Toggle switch */
 input[type=checkbox] {
   -webkit-appearance: none; appearance: none; position: relative; flex: none;
-  width: 36px; height: 20px; margin: 0; border-radius: 10px; background: #cdd4dd; cursor: pointer;
-  transition: background .15s;
+  width: 36px; height: 20px; margin: 0; border-radius: 10px; background: #cdd4dd; cursor: pointer; transition: background .15s;
 }
 input[type=checkbox]::after {
   content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
@@ -85,214 +86,40 @@ input[type=checkbox]::after {
 input[type=checkbox]:checked { background: var(--accent); }
 input[type=checkbox]:checked::after { transform: translateX(16px); }
 
-/* Dropdown menus */
-.dd { position: relative; }
-.dd > button[aria-expanded="true"] { border-color: var(--accent); }
-.menu {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 220px;
-  display: flex; flex-direction: column; gap: 2px; padding: 8px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, .12);
-}
-.menu > a, .menu > label {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 36px; padding: 0 10px;
-  border-radius: 8px; color: var(--fg); text-decoration: none; white-space: nowrap; font-size: 13px;
-}
-.menu > a:hover, .menu > label:hover { background: var(--panel-2); }
-.menu > a[hidden], .menu > label[hidden] { display: none; }
+/* Number field without the browser spinners */
+input[type=number] { -moz-appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-main { flex: 1; display: flex; min-height: 0; }
-
-/* Panel: cards on a light grey background */
-aside {
-  width: 340px; flex: none; overflow-y: auto; background: var(--panel-2);
-  border-right: 1px solid var(--line); display: flex; flex-direction: column;
-}
-#groups { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-.group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.ghead {
-  display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 8px 0 14px;
-  cursor: pointer; user-select: none;
-}
-.ghead:hover { background: var(--panel-2); }
-.ghead:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.gicon { flex: none; width: 20px; text-align: center; font-size: 16px; line-height: 1; }
-.gtitle {
-  flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.gdot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-.icon-btn {
-  flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent;
-  color: var(--muted); font-size: 15px; line-height: 1; justify-content: center;
-}
-.icon-btn:hover:not(:disabled) { color: var(--accent); background: var(--panel-2); border: 0; }
-.chev { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); transition: transform .15s; }
-.chev-ico { display: block; }
-button .chev-ico { margin-left: 4px; vertical-align: -2px; color: var(--muted); }
-.group.open > .ghead .chev { transform: rotate(180deg); }
-.gbody { border-top: 1px solid var(--line); }
-.gbody[hidden] { display: none; }
-
-/* Parameter rows */
-.row { position: relative; padding: 12px 14px; }
-.row + .row { border-top: 1px solid var(--line); }
-.row.dirty::before, .row.selected::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-.row.dirty::before { background: var(--amber); }
-.row.selected::after { background: var(--accent); }
-.row.dirty.selected::before { left: 3px; }
-.row.selected { background: color-mix(in srgb, var(--accent) 7%, transparent); }
-.row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.name { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; min-width: 0; cursor: pointer; }
-.name:hover .ptitle { text-decoration: underline; }
-.ptitle { font-size: 13px; font-weight: 600; }
-.ptag { font: 11px/1.2 var(--mono); color: var(--muted); }
-.row-head > div:last-child { flex: none; }
-
-/* Number field with flat steppers */
-.numctl {
-  display: inline-flex; align-items: stretch; flex: none; height: 36px; overflow: hidden;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--input);
-}
-.numctl:focus-within { outline: 2px solid var(--accent); outline-offset: 0; }
-.numctl input {
-  width: 60px; border: 0; border-radius: 0; padding: 0 2px; background: transparent; color: var(--fg);
-  font: 13px var(--mono); text-align: center; outline: none; -moz-appearance: textfield;
-}
-.numctl input::-webkit-outer-spin-button, .numctl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.numctl .step {
-  width: 28px; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent;
-  color: var(--muted); font-size: 16px; line-height: 1; justify-content: center;
-}
-.numctl .step:hover:not(:disabled) { color: var(--fg); background: var(--panel-2); border: 0; }
-.numctl .step:disabled { opacity: .35; }
-
-/* Slider: 4 px track, accent fill up to the thumb */
-.rowbottom { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-input[type=range] {
-  -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 4px; margin: 0; border-radius: 2px; cursor: pointer;
-  background: linear-gradient(to right, var(--accent) var(--p, 0%), var(--line) var(--p, 0%));
-}
-input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
-  background: #fff; border: 1px solid var(--accent); box-shadow: 0 1px 2px rgba(16, 24, 40, .2);
-}
-input[type=range]::-moz-range-thumb {
-  box-sizing: border-box; width: 16px; height: 16px; border-radius: 50%;
-  background: #fff; border: 1px solid var(--accent); box-shadow: 0 1px 2px rgba(16, 24, 40, .2);
-}
-input[type=range]::-moz-range-track { height: 4px; background: transparent; }
-input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-
-/* Build log */
-#logbox { margin-top: auto; border-top: 1px solid var(--line); padding: 8px 14px; background: var(--panel); }
-#logbox summary { cursor: pointer; font-weight: 600; font-size: 13px; }
-#logbox pre {
-  font: 11.5px/1.45 var(--mono); white-space: pre-wrap; word-break: break-word;
-  max-height: 220px; overflow: auto; margin: 6px 0 0; color: var(--muted);
-}
-#logbox.error { background: var(--err-bg); }
-#logbox.error summary, #logbox.error pre { color: var(--err); }
-
-/* Viewer */
-#viewer { flex: 1; position: relative; min-width: 0; background: var(--viewer-grad, var(--viewer)); overflow: hidden; }
+/* Viewer modes: the drawing sheet and the section view hide the 3D overlays */
+#viewer { background: var(--viewer-grad); }
 #viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-#tools {
-  position: absolute; top: 12px; right: 12px; display: flex; padding: 3px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-}
-#tools button {
-  height: 30px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; font-size: 13px;
-}
-#tools button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
-/* Drawing sheet, shown in place of the 3D view */
-#sheet { position: absolute; inset: 0; overflow: hidden; }
-#sheetVp { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
-#pager { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; }
-#sheetVp.panning { cursor: grabbing; }
-#sheetPaper { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-#zoomBar {
-  position: absolute; right: 12px; bottom: 12px; display: flex; gap: 2px; padding: 3px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-}
-#zoomBar button { height: 30px; min-width: 34px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; font-size: 13px; }
-#zoomBar button:hover:not(:disabled) { background: var(--panel-2); border: 0; }
-#zoomBar .check { height: 30px; padding: 0 8px; font-size: 13px; }
-#sheetPaper svg { display: block; width: 960px; height: 680px; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
-#sheetMsg {
-  position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
-}
-#sheetMsg.err { color: var(--err); }
-#sheetMsg .spin { display: inline-block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
-#viewer.drawing #ftip, #viewer.drawing .dimlabel { display: none !important; }
-#viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip,
-#viewer.section .dimlabel { display: none !important; }
-/* Section view: the 3D view cut by a plane, with each part in its own colour and filled cut faces */
-#secView { position: absolute; inset: 0; pointer-events: none; }
-#viewer.section #tools { top: 56px; }
-#secView > * { pointer-events: auto; }
-#secLegend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
-#secLegend span { display: flex; align-items: center; gap: 8px; }
-#secLegend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-#secBar { position: absolute; top: 8px; left: 12px; z-index: 2; display: flex; align-items: center; gap: 10px; }
-#secPos { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; font-size: 13px; }
-#secPos input { width: 180px; }
-#secAt { min-width: 74px; font-variant-numeric: tabular-nums; }
-#secMsg {
-  position: absolute; top: 60px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px;
-}
-#secMsg.err { color: var(--err); }
-#readout {
-  position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-start;
-  gap: 8px; padding: 12px; max-width: calc(100% - 24px); pointer-events: none;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-}
-#info { font: 12px/1.4 var(--mono); color: var(--fg); white-space: nowrap; }
-#info:empty { display: none; }
-#hint { font-size: 12px; color: var(--muted); }
-#flabel, #ftip {
-  position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
-  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 999px;
-  padding: 4px 10px; font-size: 12px;
-}
-#flabel { border-color: var(--accent); }
-#flabel b { margin-right: 6px; font-weight: 600; }
-#flabel .fp { font: 11px var(--mono); color: var(--muted); margin-right: 6px; }
-#ftip { font-weight: 600; }
-.dimlabel {
-  position: absolute; left: 0; top: 0; pointer-events: none; white-space: nowrap;
-  font: 600 12px/1 var(--mono); color: var(--dim); background: var(--panel);
-  border: 1px solid var(--dim); border-radius: 999px; padding: 4px 8px;
-}
-@media (max-width: 799px) {
-  html, body { height: auto; }
-  main { flex-direction: column; flex: none; }
-  aside { width: auto; max-height: 50vh; border-right: 0; border-bottom: 1px solid var(--line); }
-  #viewer { flex: none; height: 70vh; }
-}
+#viewer.drawing #ftip, #viewer.drawing .dimlabel,
+#viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip, #viewer.section .dimlabel { display: none !important; }
+#viewer.section #tools { top: auto; bottom: 12px; }
+#sheetVp.panning { cursor: grabbing; }
+#sheetPaper svg { display: block; width: 960px; height: 680px; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
 </style>
 </head>
-<body>
-<header>
-  <span id="model">loading...</span>
+<body class="flex min-h-screen flex-col bg-bg font-sans text-sm text-fg md:h-screen">
+<header class="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-4 py-2.5">
+  <span id="model" class="min-w-0 flex-1 basis-full truncate font-semibold sm:basis-auto">loading...</span>
   <div class="seg" id="modeSeg" role="group" aria-label="View mode">
     <button type="button" data-mode="3d" aria-pressed="true">3D</button>
     <button type="button" data-mode="drawing" aria-pressed="false">Drawing</button>
     <button type="button" data-mode="section" aria-pressed="false">Section</button>
   </div>
-  <button id="rebuild" disabled><span class="spin"></span>Rebuild</button>
-  <div class="dd" id="viewWrap">
-    <button id="viewBtn" aria-haspopup="true" aria-expanded="false">View <svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <button id="rebuild" class="btn btn-primary" disabled><span class="spin"></span>Rebuild</button>
+  <div class="relative" id="viewWrap">
+    <button id="viewBtn" class="btn aria-expanded:border-accent" aria-haspopup="true" aria-expanded="false">View <svg class="text-muted" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="menu" id="viewMenu" hidden>
-      <label class="check mi"><input type="checkbox" id="auto"> Auto rebuild</label>
-      <label class="check mi" id="devWrap" hidden><input type="checkbox" id="showDev" checked> Show device</label>
-      <label class="check mi"><input type="checkbox" id="showDims" checked> Dimensions</label>
+      <label><span>Auto rebuild</span><input type="checkbox" id="auto"></label>
+      <label id="devWrap" hidden><span>Show device</span><input type="checkbox" id="showDev" checked></label>
+      <label><span>Dimensions</span><input type="checkbox" id="showDims" checked></label>
     </div>
   </div>
-  <div class="dd" id="dlWrap">
-    <button id="dlBtn" aria-haspopup="true" aria-expanded="false" disabled>Download <svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  <div class="relative" id="dlWrap">
+    <button id="dlBtn" class="btn aria-expanded:border-accent" aria-haspopup="true" aria-expanded="false" disabled>Download <svg class="text-muted" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <div class="menu" id="dlMenu" hidden>
       <a id="dlSleeve" href="/api/mesh/shell.stl" download="part.stl">Sleeve STL</a>
       <a id="dlStep" href="/api/step" download="part.step">Sleeve STEP</a>
@@ -301,56 +128,56 @@ input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offs
       <a id="dlDev" href="/api/mesh/device.stl" download="device.stl" hidden>Device STL</a>
     </div>
   </div>
-  <button id="save" disabled>Save to script</button>
-  <span id="saveMsg"></span>
+  <button id="save" class="btn" disabled>Save to script</button>
+  <span id="saveMsg" class="max-w-[220px] truncate text-xs text-muted"></span>
 </header>
-<main>
-  <aside>
-    <div id="groups"></div>
-    <details id="logbox" open>
-      <summary>Build log</summary>
-      <pre id="log"></pre>
+<main class="flex min-h-0 flex-1 flex-col md:flex-row">
+  <aside class="flex max-h-[45vh] flex-none flex-col overflow-y-auto border-b border-line bg-panel2 md:max-h-none md:w-[340px] md:border-b-0 md:border-r">
+    <div id="groups" class="flex flex-1 flex-col gap-2 p-2"></div>
+    <details id="logbox" class="mt-auto border-t border-line bg-panel px-3.5 py-2" open>
+      <summary class="cursor-pointer text-[13px] font-semibold">Build log</summary>
+      <pre id="log" class="mt-1.5 max-h-[220px] overflow-auto whitespace-pre-wrap break-words font-mono text-[11.5px] leading-snug text-muted"></pre>
     </details>
   </aside>
-  <section id="viewer">
-    <div id="tools">
+  <section id="viewer" class="relative h-[70vh] min-w-0 flex-none overflow-hidden md:h-auto md:flex-1">
+    <div id="tools" class="pill absolute right-3 top-3 z-10">
       <button data-view="fit">Fit</button>
       <button data-view="iso">Iso</button>
       <button data-view="top">Top</button>
       <button data-view="front">Front</button>
     </div>
-    <div id="readout">
-      <div id="info"></div>
-      <div id="hint">Click a feature to see its settings</div>
+    <div id="readout" class="pointer-events-none absolute bottom-3 left-3 flex max-w-[calc(100%-24px)] flex-col items-start gap-2 rounded-xl border border-line bg-panel p-3">
+      <div id="info" class="whitespace-nowrap font-mono text-xs empty:hidden"></div>
+      <div id="hint" class="text-xs text-muted">Click a feature to see its settings</div>
     </div>
-    <section id="sheet" hidden>
-      <div class="seg pager" id="pager" role="group" aria-label="Drawing page">
+    <section id="sheet" class="absolute inset-0 overflow-hidden" hidden>
+      <div class="seg absolute left-1/2 top-2 z-10 -translate-x-1/2" id="pager" role="group" aria-label="Drawing page">
         <button type="button" data-page="top">Top</button>
         <button type="button" data-page="front">Front</button>
         <button type="button" data-page="right">Right</button>
         <button type="button" data-page="iso">Iso</button>
       </div>
-      <div id="sheetVp"><div id="sheetPaper"></div></div>
-      <div id="sheetMsg" hidden></div>
-      <div id="zoomBar">
+      <div id="sheetVp" class="absolute inset-x-0 bottom-0 top-[52px] cursor-grab touch-none select-none overflow-hidden"><div id="sheetPaper" class="absolute left-0 top-0 origin-top-left"></div></div>
+      <div id="sheetMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
+      <div id="zoomBar" class="pill absolute bottom-3 right-3 gap-0.5">
         <button type="button" id="zFit">Fit</button>
         <button type="button" id="zOut" aria-label="Zoom out">−</button>
         <button type="button" id="zIn" aria-label="Zoom in">+</button>
         <button type="button" id="z1">1:1</button>
-        <label class="check" id="allWrap"><input type="checkbox" id="showAll"> Show all</label>
+        <label class="flex h-[30px] cursor-pointer items-center gap-2 whitespace-nowrap px-2 text-[13px]" id="allWrap"><input type="checkbox" id="showAll"> Show all</label>
       </div>
     </section>
-    <section id="secView" hidden>
-      <div id="secBar">
+    <section id="secView" class="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto" hidden>
+      <div id="secBar" class="absolute left-3 right-3 top-2 z-10 flex flex-wrap items-center gap-2.5">
         <div class="seg" id="secCut" role="group" aria-label="Section cut">
           <button type="button" data-cut="front" aria-pressed="true">Front</button>
           <button type="button" data-cut="side" aria-pressed="false">Side</button>
           <button type="button" data-cut="top" aria-pressed="false">Top</button>
         </div>
-        <label id="secPos">Cut at <input type="range" id="secSlider" min="1" max="99" step="1" value="50"> <span id="secAt">50 %</span></label>
+        <label id="secPos" class="flex h-9 items-center gap-2 rounded-full border border-line bg-panel px-3 text-[13px]">Cut at <input type="range" id="secSlider" class="w-36 cursor-pointer accent-accent sm:w-44" min="1" max="99" step="1" value="50"> <span id="secAt" class="min-w-[74px] tabular-nums">50 %</span></label>
       </div>
-      <div id="secLegend" hidden></div>
-      <div id="secMsg" hidden></div>
+      <div id="secLegend" class="card absolute bottom-3 left-3 flex flex-col gap-1" hidden></div>
+      <div id="secMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
     </section>
   </section>
 </main>
@@ -363,6 +190,8 @@ const state = {
   features: [], selected: null, groups: new Map(), buildKey: null, model: '', stem: 'part',
 };
 let viewer = null;
+const SLIDER = 'min-w-0 flex-1 cursor-pointer accent-accent';
+const STEP = 'inline-flex w-7 items-center justify-center text-base leading-none text-muted enabled:hover:bg-panel2 enabled:hover:text-fg disabled:opacity-35';
 
 function showLog(text, bad) {
   $('log').textContent = text || '(no output)';
@@ -437,19 +266,19 @@ async function build() {
 }
 
 function makeRow(p, group) {
-  const row = el('div', 'row');
-  const head = el('div', 'row-head');
+  const row = el('div', 'row relative px-3.5 py-3 [&+&]:border-t [&+&]:border-line');
+  const head = el('div', 'flex items-start justify-between gap-3');
   const left = el('div');
-  const name = el('div', 'name');
-  const title = el('span', 'ptitle'); title.textContent = p.description || p.name;
-  const tag = el('span', 'ptag'); tag.textContent = p.name;
+  const name = el('div', 'name flex min-w-0 cursor-pointer flex-wrap items-baseline gap-1.5');
+  const title = el('span', 'ptitle text-[13px] font-semibold'); title.textContent = p.description || p.name;
+  const tag = el('span', 'font-mono text-[11px] text-muted'); tag.textContent = p.name;
   name.append(title, tag);
   name.addEventListener('click', () => {
     const f = state.features.find((x) => x.params.includes(p.name));
     if (f) select(f.name);
   });
   left.append(name);
-  const ctl = el('div');
+  const ctl = el('div', 'flex-none');
   head.append(left, ctl);
   row.append(head);
   let sync;
@@ -461,13 +290,12 @@ function makeRow(p, group) {
   } else {
     const step = Number.isInteger(p.value) ? 1 : 0.1;
     const clamp = (v) => Math.min(p.max ?? Infinity, Math.max(p.min ?? -Infinity, v));
-    const numctl = el('div', 'numctl');
-    const minus = el('button', 'step'); minus.type = 'button'; minus.textContent = '−'; minus.title = 'Decrease';
-    const plus = el('button', 'step'); plus.type = 'button'; plus.textContent = '+'; plus.title = 'Increase';
-    const num = el('input'); num.type = 'number'; num.step = step;
+    const numctl = el('div', 'inline-flex h-9 flex-none overflow-hidden rounded-lg border border-line bg-input focus-within:outline focus-within:outline-2 focus-within:outline-accent');
+    const minus = el('button', STEP); minus.type = 'button'; minus.textContent = '−'; minus.title = 'Decrease';
+    const plus = el('button', STEP); plus.type = 'button'; plus.textContent = '+'; plus.title = 'Increase';
+    const num = el('input', 'w-[60px] bg-transparent px-0.5 text-center font-mono text-[13px] text-fg outline-none'); num.type = 'number'; num.step = step;
     numctl.append(minus, num, plus);
     let rng = null;
-    const paint = (r) => r.style.setProperty('--p', `${Math.min(100, Math.max(0, ((r.value - r.min) / (r.max - r.min)) * 100))}%`);
     const bounds = (v) => {
       minus.disabled = p.min != null && v <= p.min;
       plus.disabled = p.max != null && v >= p.max;
@@ -485,27 +313,26 @@ function makeRow(p, group) {
       const v = parseFloat(num.value);
       if (Number.isNaN(v)) return;
       setValue(p.name, v);
-      if (rng) { rng.value = v; paint(rng); }
+      if (rng) { rng.value = v; }
       bounds(v);
     });
     if (p.min != null || p.max != null) {
-      rng = el('input'); rng.type = 'range'; rng.step = step;
+      rng = el('input', SLIDER); rng.type = 'range'; rng.step = step;
       rng.min = p.min ?? 0;
       rng.max = p.max ?? Math.max(10, p.value * 2);
       rng.addEventListener('input', () => {
-        paint(rng);
         num.value = rng.value;
         bounds(parseFloat(rng.value));
         setValue(p.name, parseFloat(rng.value));
       });
       // MakerWorld layout: value box on the left of the slider, under the title.
-      const bottom = el('div', 'rowbottom');
+      const bottom = el('div', 'mt-2 flex items-center gap-3');
       bottom.append(numctl, rng);
       row.append(bottom);
     } else {
       ctl.append(numctl);
     }
-    sync = (v) => { num.value = v; if (rng) { rng.value = v; paint(rng); } bounds(v); };
+    sync = (v) => { num.value = v; if (rng) { rng.value = v; } bounds(v); };
   }
   sync(p.value);
   state.ctl[p.name] = { row, sync, group };
@@ -535,14 +362,14 @@ function renderPanel(groups, model) {
   openMap = loadOpen();
   const wrap = $('groups');
   groups.forEach((g, i) => {
-    const sec = el('section', 'group');
-    const head = el('div', 'ghead');
+    const sec = el('section', 'group overflow-hidden rounded-xl border border-line bg-panel');
+    const head = el('div', 'ghead flex h-11 cursor-pointer select-none items-center gap-2 pl-3.5 pr-2 hover:bg-panel2 focus-visible:-outline-offset-2');
     head.tabIndex = 0;
     head.setAttribute('role', 'button');
-    const icon = el('span', 'gicon'); icon.textContent = g.icon || '▪';
-    const title = el('span', 'gtitle'); title.textContent = g.title;
-    const dot = el('span', 'gdot'); dot.hidden = true; dot.title = 'Changed, not built yet';
-    const reset = el('button', 'icon-btn');
+    const icon = el('span', 'w-5 flex-none text-center text-base leading-none'); icon.textContent = g.icon || '▪';
+    const title = el('span', 'min-w-0 flex-1 truncate font-semibold'); title.textContent = g.title;
+    const dot = el('span', 'h-1.5 w-1.5 flex-none rounded-full bg-accent'); dot.hidden = true; dot.title = 'Changed, not built yet';
+    const reset = el('button', 'inline-flex h-7 w-7 flex-none items-center justify-center rounded-lg text-[15px] leading-none text-muted hover:bg-panel2 hover:text-accent');
     reset.type = 'button';
     reset.textContent = '↺';
     reset.title = 'Reset group';
@@ -555,9 +382,9 @@ function renderPanel(groups, model) {
       }
       changed();
     });
-    const chev = el('span', 'chev'); chev.innerHTML = '<svg class="chev-ico" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    const chev = el('span', 'chev inline-flex h-5 w-5 flex-none items-center justify-center text-muted transition-transform'); chev.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     head.append(icon, title, dot, reset, chev);
-    const body = el('div', 'gbody');
+    const body = el('div', 'border-t border-line');
     for (const p of g.params) body.append(makeRow(p, g.title));
     sec.append(head, body);
     wrap.append(sec);
@@ -624,18 +451,18 @@ document.addEventListener('click', (e) => { for (const m of menus) if (!m.wrap.c
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') for (const m of menus) m.close(); });
 $('save').addEventListener('click', async () => {
   const msg = $('saveMsg'), btn = $('save');
-  btn.disabled = true; msg.className = ''; msg.textContent = 'Saving...';
+  btn.disabled = true; msg.classList.remove('err'); msg.textContent = 'Saving...';
   try {
     const r = await fetch('/api/save', json({ values: { ...state.values } }));
     const res = await r.json();
     if (res.ok) {
       msg.textContent = res.changed && res.changed.length ? `Saved ${res.changed.join(', ')}` : 'Nothing to save';
     } else {
-      msg.className = 'err';
+      msg.classList.add('err');
       msg.textContent = `Save failed: ${res.log || res.error || 'unknown error'}`;
     }
   } catch (e) {
-    msg.className = 'err';
+    msg.classList.add('err');
     msg.textContent = `Save failed: ${e.message}`;
   } finally {
     btn.disabled = false;
@@ -695,8 +522,8 @@ function makeViewer(T, STLLoader, OrbitControls) {
   const marker = new T.Mesh(new T.SphereGeometry(1, 16, 12), new T.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }));
   marker.visible = false;
   scene.add(marker);
-  const label = el('div'); label.id = 'flabel'; label.hidden = true;
-  const tip = el('div'); tip.id = 'ftip'; tip.hidden = true;
+  const label = el('div', 'tag border-accent'); label.id = 'flabel'; label.hidden = true;
+  const tip = el('div', 'tag font-semibold'); tip.id = 'ftip'; tip.hidden = true;
   host.append(label, tip);
   const canvas = renderer.domElement;
   let features = [], anchored = null, anchorPos = null;
@@ -765,7 +592,7 @@ function makeViewer(T, STLLoader, OrbitControls) {
       { at: [yo, zo, (min.z + max.z) / 2], v: size.z },
     ];
     for (const d of dims) {
-      const e = el('div', 'dimlabel');
+      const e = el('div', 'dimlabel tag border-dim px-2 font-mono font-semibold leading-none text-dim');
       e.textContent = `${d.v.toFixed(1)} mm`;
       host.append(e);
       dimLabels.push({ el: e, at: new T.Vector3(...d.at) });
@@ -990,8 +817,8 @@ function makeViewer(T, STLLoader, OrbitControls) {
       anchorPos = at ? at.clone() : new T.Vector3(...f.at);
       marker.position.copy(anchorPos);
       label.replaceChildren();
-      const b = el('b'); b.textContent = f.name; label.append(b);
-      for (const pn of f.params) { const s = el('span', 'fp'); s.textContent = pn; label.append(s); }
+      const b = el('b', 'mr-1.5 font-semibold'); b.textContent = f.name; label.append(b);
+      for (const pn of f.params.filter((x) => state.ctl[x])) { const s = el('span', 'mr-1.5 font-mono text-[11px] text-muted'); s.textContent = pn; label.append(s); }
       placeLabel();
     },
     async show(b) {
@@ -1665,7 +1492,7 @@ const secPct = { front: 50, side: 50, top: 50 };  // The slider place per cut, i
 function showSecMsg(text, bad) {
   const m = $('secMsg');
   m.hidden = !text;
-  m.className = bad ? 'err' : '';
+  m.classList.toggle('err', !!bad);
   m.textContent = text || '';
 }
 function applyCut(look) {
@@ -1692,7 +1519,7 @@ async function ensureSection() {
     }
     const lg = $('secLegend');
     lg.replaceChildren(...v.legend().map((p) => {
-      const row = el('span'); const sw = el('i'); sw.style.background = p.color;
+      const row = el('span', 'flex items-center gap-2'); const sw = el('i', 'inline-block h-3 w-3 rounded-[3px]'); sw.style.background = p.color;
       row.append(sw, document.createTextNode(p.name));
       return row;
     }));

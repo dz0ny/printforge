@@ -4,9 +4,10 @@ Two ways in:
 - `python -m printforge_configurator path/to/model.py [--port 8765]` for any script.
 - `from printforge_configurator import serve; serve(__file__)` from the script itself,
   for example behind a `--serve` flag in its `__main__` block.
-The page lists the top-level constants of the model, rebuilds the model with new
-values in a worker process, and serves the shell and device meshes. Save writes the
-values back into the model file and keeps each line's comment.
+The page lists the top-level constants of the model that carry a [min:max] range,
+rebuilds the model with new values in a worker process, and serves the shell and
+device meshes. Save writes the values back into the model file and keeps each
+line's comment.
 
 The server itself needs no CAD library. The worker runs with `uv run --project` in
 the model's own project (the folder with its pyproject.toml), so it builds with the
@@ -122,8 +123,12 @@ def parse_model(path):
                         title = text
                         icons[title] = icon
                 pending = []
+                # Only a setting with a [min:max] range is shown; a switch takes [0:1].
+                # The others are fixed design values and stay in the script.
                 if is_param(node):
-                    groups.setdefault(title or "Settings", []).append(param_of(node, lines))
+                    p = param_of(node, lines)
+                    if "min" in p:
+                        groups.setdefault(title or "Settings", []).append(p)
             continue
         if lineno in covered:
             continue

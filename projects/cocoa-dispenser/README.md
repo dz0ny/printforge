@@ -79,8 +79,8 @@ pitch 10, length 32 (about 0.9 N/mm, solid at 14.4 mm).
 
 No bought parts. Print the spring, the cup and the lid in PETG: the tongue and the
 spring flex, PLA creeps. Food-safe PETG or PLA for the rest. Set
-`PRINT_SPRING = False` for a bought metal spring (OD 9 to 10 mm, free length about
-25 mm). The model uses 0.16 mm layers.
+`PRINT_SPRING = False` for a bought metal spring that goes over the 14 mm hub (OD 19 mm,
+wire 0.8 to 1 mm, free length about 32 mm). The model uses 0.16 mm layers.
 
 ## Assembly
 
@@ -132,6 +132,8 @@ because meshing the holes for every check took minutes. A warm run takes about 3
   not fuse them.
 - `cocoa_dispenser.3mf` is the project saved from Bambu Studio. It still holds version 3.
   Make a new project from `cocoa_dispenser_plate.stl` before printing version 4.
-- `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768. Its Section
+- `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768. It shows
+  the 23 settings a user should change: sizes, fits, the taps, the tongue and the spring.
+  The other values are fixed in the script. Its Section
   view cuts the assembly from the front, the side or the top, with a slider for the
   place of the cut and each part named on its cut face.

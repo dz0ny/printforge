@@ -28,7 +28,7 @@ LINE = 0.45        # Line width, about 1.1 x the nozzle.
 LAYER = 0.28
 
 # 📐 Sleeve size in mm.
-CLEAR = 0.5       # Gap on each side and at the end stop.
+CLEAR = 0.5       # Gap on each side and at the end stop. [0.2:1.5].
 CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400].
 WALL_H = 34.0     # Outer side wall height, from the floor to the lip top. [20:100].
@@ -43,17 +43,17 @@ ROUND = 1.0       # Radius on the outer edges and lip tips.
 END = 6 * LINE    # End stop thickness of 6 lines: 3 wall loops on each side, no infill.
 END_H = 16.0      # End stop height, low for the curved mixer edge.
 END_FILLET = 2.0  # Fillet at the end stop, small for the mixer corners.
-END_TRI = 20.0    # Width of the corner triangles that tie the stop to the walls, zero for a plain slope. [0:60].
+END_TRI = 20.0    # Width of the corner triangles that tie the stop to the walls, zero for a plain slope.
 
 # 🪝 Lips that hold the mixer in, with a fill underneath so the part prints flat.
 LIP = 6.8         # Lip reach over the mixer edge, of which only 2.4 mm gets the fill at a 34 mm wall.
 LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
 LIP_FREE = 80.0   # Length at the open end without a lip.
-LIP_FILL_SLACK = 4.5  # Allowed depth shortfall of the lip fill, 1.0 for near 45 degrees, 4.5 for a ramp that may sag. [0:10].
+LIP_FILL_SLACK = 4.5  # Allowed depth shortfall of the lip fill, 1.0 for near 45 degrees, 4.5 for a ramp that may sag.
 LIP_SLOPE_GAP = 3.0  # Distance between the end of the lips and the bottom slope.
 
 # 🔺 Gussets: 45 degree ribs on the outside of each wall, against side knocks.
-GUSSETS = False    # Ribs on the outside of the walls, off for smooth walls.
+GUSSETS = False    # Ribs on the outside of the walls, off for smooth walls. [0:1].
 GUSSET = 10.0      # Gusset reach out from the wall and height up the wall.
 GUSSET_T = 6 * LINE  # Gusset thickness along the slide axis, 6 lines.
 GUSSET_PITCH = 40.0  # Distance between gussets.
@@ -71,7 +71,7 @@ VENT_WEB = 6 * LINE  # Material between two hexes, 6 lines.
 VENT_MARGIN = 8.0   # Solid border around each vent area.
 
 # 🪟 Side and end vents.
-SIDE_VENTS = False  # Side vents, off because they made the walls weak.
+SIDE_VENTS = False  # Side vents, off because they made the walls weak. [0:1].
 SIDE_HEX = 9.0      # Side vent hex size.
 SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
 
