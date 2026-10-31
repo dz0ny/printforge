@@ -45,3 +45,8 @@ box = Box(17.5, 9.5, 26, align=Align.MIN).translate(-4, -9, m.BODY_Z + m.TIP_Z -
 piece = [ps["lid"] & box, ps["cup"] & box]
 save(render(piece, view=(0.6, 1, 0.45), colors="distinct", size=(900, 900)), out / "tongue_closeup.png")
 print("wrote views/section_rest_pressed.png, views/tongue_closeup.png")
+
+# The five stencils from above, as the shape falls on the coffee.
+row = [m.stencil(n).translate(92 * i, 0, 0) for i, n in enumerate(m.STENCILS)]
+save(render(row, view=(0, 0, 1), colors="distinct", size=(1800, 380)), out / "stencils.png")
+print("wrote views/stencils.png")

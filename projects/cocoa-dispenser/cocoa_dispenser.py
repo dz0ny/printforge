@@ -8,10 +8,11 @@ Parts: body, stencil, cocoa cup with the sieve and the rack rod, lid with tongue
 Z is up from the body underside and the rack faces +X.
 Run `uv run cocoa_dispenser.py` for the STEPs, STLs and labels, or add `--serve` for the configurator.
 """
+import inspect
 import math
 
-from smlibpy import (Align, Box, Circle, Cylinder, Helix, Line, Plane, Polygon, Rectangle, Sphere, ThreePointArc,
-                     Wire, X, Y, Z, make_face, sweep)
+from smlibpy import (Align, ArcSlot, Box, Circle, Cylinder, Ellipse, Helix, Line, Plane, Polygon, Polyline, Rectangle,
+                     Slot, Sphere, Stroke, ThreePointArc, Wire, X, Y, Z, make_face, sweep)
 
 # ☕ Coffee cup, only for the ghost view: the dispenser is held just above it.
 CUP_D = 90.0         # Cup rim outside diameter.
@@ -55,7 +56,9 @@ RACK_DEPTH = 1.3     # Tooth depth into the rod face.
 STENCIL_T = 6 * LAYER  # Stencil disc thickness, which is also the grip flange. [0.8:2].
 STENCIL_PLAY = 0.3   # Clearance per side of the collar in the bore. [0.15:0.6].
 COLLAR_W = 3 * LINE  # Collar wall, 3 lines. [1.2:3].
-HEART_W = 46.0       # Heart width; its lobes reach 26 mm from the centre. [15:50].
+STENCIL = 0          # Shape: 0 heart, 1 the year 2027, 2 bear, 3 smiling face, 4 euro sign. [0:4].
+SHAPE_W = 46.0       # Heart width, 26 mm from the centre to its lobes; the other shapes reach as far. [36:48].
+BRIDGE = 1.6         # Width of the bridges that hold the islands of a shape, such as the bear's eyes.
 EAR_L = 10.0         # Reach of the two grip ears past the flange, to turn the stencil.
 EAR_W = 14.0         # Ear width.
 EAR_H = 5.0          # Height of each ear outside the bayonet band, a solid tab for the fingers.
@@ -216,9 +219,11 @@ def return_budget():
 def check_design():
     assert SIEVE_HOLE >= 2 * NOZZLE, "sieve holes this small close up"
     assert SIEVE_PITCH - SIEVE_HOLE >= 2 * LINE - 0.01, "sieve webs thinner than two lines"
-    assert HEART_W < SIEVE_D - 4, "the heart is wider than the sieve area"
-    heart_r = max(math.hypot(x, y) for x, y in heart_points(HEART_W))
-    assert heart_r < COLLAR_ID / 2 - 0.5, f"the heart reaches {heart_r:.1f} mm, past the collar"
+    assert SHAPE_W < SIEVE_D - 4, "the shape is wider than the sieve area"
+    shape_r = reach(Polygon(heart_points(SHAPE_W)))
+    assert shape_r < COLLAR_ID / 2 - 0.5, f"the shape reaches {shape_r:.1f} mm, past the collar"
+    name = STENCILS[STENCIL]
+    assert FINEST[name] * shape_scale(name) >= 2 * LINE, f"the finest line of the {name} is under two lines wide: raise SHAPE_W"
     assert GROOVE_FLOOR >= 1.5, "too little body wall under the bayonet grooves"
     assert BAY_WALL - LUG_D - 0.2 >= 2 * LINE, "the body wall behind the grooves is thinner than two lines"
     assert HOP_D / 2 + GRIP_PROUD <= HOP_ID / 2 + BAY_WALL, "the grip ribs stick out past the bayonet band they stand on"
@@ -370,6 +375,89 @@ def heart_points(w, n=120):
     return [(x, y - mid) for x, y in pts]
 
 
+# The other stencil shapes, drawn about 46 mm wide. A cut-out with an island in it, such as the counter of
+# the 0 or the bear's eyes, holds the island with bridges b wide; the stencil stays one part.
+
+def bridge(a, b, w):
+    return Stroke(Line(a, b), w, ends="flat")
+
+
+def year_2027(b):
+    """Return the year in block digits 3.6 mm thick. The 0 has a bridge at the top and the bottom."""
+    s, w, h, pitch = 3.6, 11.0, 20.0, 12.8
+    cx, cy = w / 2 - s / 2, h / 2 - s / 2  # The centerline box of a digit.
+    two = Stroke(Wire([ThreePointArc((-cx, cy - cx), (0, cy), (cx, cy - cx)), Line((cx, cy - cx), (-cx, -cy)),
+                       Line((-cx, -cy), (cx, -cy))]), s)
+    zero = Slot(h, w, rotation=90) - Slot(h - 2 * s, w - 2 * s, rotation=90)
+    zero -= bridge((0, h / 2 + 1), (0, h / 2 - s - 1), b) + bridge((0, -h / 2 - 1), (0, -h / 2 + s + 1), b)
+    seven = Stroke(Polyline((-cx, cy), (cx, cy), (-1.2, -cy)), s)
+    return (two.translate(-1.5 * pitch, 0) + zero.translate(-0.5 * pitch, 0) + two.translate(0.5 * pitch, 0)
+            + seven.translate(1.5 * pitch, 0))
+
+
+def bear_face(b):
+    """Return a bear's head with ears. The eyes hang on the muzzle, the muzzle on the chin and two whiskers."""
+    head = Circle(16).translate(0, -2) + Circle(6.5).translate(-12.5, 11) + Circle(6.5).translate(12.5, 11)
+    eyes = Circle(2.3).translate(-5.5, 1.5) + Circle(2.3).translate(5.5, 1.5)
+    muzzle = Ellipse(7.5, 5.8).translate(0, -7.5)
+    nose = Ellipse(3.2, 2.2).translate(0, -5.2)
+    mouth = (Stroke(Wire([Line((0, -6.5), (0, -9)), ThreePointArc((0, -9), (-1.6, -10.4), (-3.2, -9.2))]), 1.2)
+             + Stroke(ThreePointArc((0, -9), (1.6, -10.4), (3.2, -9.2)), 1.2))
+    head -= bridge((-5.5, 1.5), (-5.5, -5), b) + bridge((5.5, 1.5), (5.5, -5), b) + bridge((0, -7.5), (0, -20), b)
+    head -= bridge((-5, -8.5), (-18, -9.5), b) + bridge((5, -8.5), (18, -9.5), b)
+    return head - eyes - (muzzle - nose - mouth)
+
+
+def smiling_face(b):
+    """Return a round face that winks and grins with its tongue out. Each island hangs on a ray out of the face."""
+    face = Circle(24)
+    eye = Ellipse(3.0, 4.2).translate(-8, 8)
+    wink = Stroke(ThreePointArc((4, 7), (8.5, 10), (13, 7)), 2.6)
+    grin = ArcSlot(14, 4.2, 150, rotation=195).translate(0, 4)
+    tongue = Circle(4).translate(4.5, -11.5) - Stroke(Line((4.5, -9.5), (4.5, -13)), 1.2)
+    grin_ends = [(14 * math.cos(math.radians(a)), 4 + 14 * math.sin(math.radians(a))) for a in (195, 345)]
+    for x, y in [(-8, 8), (8.5, 10)] + grin_ends:
+        d = math.hypot(x, y - 4)  # Out along the radius from the middle of the grin.
+        face -= bridge((x, y), (x + x / d * 30, y + (y - 4) / d * 30), b)
+    return face - eye - wink - grin - tongue
+
+
+def euro_sign(b):
+    """Return the euro sign: an open ring and two bars. It has no islands."""
+    bars = Stroke(Line((-24, 3.4), (6, 3.4)), 3.4) + Stroke(Line((-24, -3.4), (6, -3.4)), 3.4)
+    return ArcSlot(17, 5.0, 280, rotation=40) + bars
+
+
+STENCILS = ["heart", "2027", "bear", "smile", "euro"]
+SHAPES = {"2027": year_2027, "bear": bear_face, "smile": smiling_face, "euro": euro_sign}
+FINEST = {"heart": SHAPE_W, "2027": 3.6, "bear": 1.2, "smile": 1.2, "euro": 3.4}  # The thinnest line of each drawing.
+
+
+def reach(sketch):
+    """Return how far the sketch reaches from the origin, from points along its edges."""
+    return max(math.hypot(p.x, p.y) for e in sketch.edges() for p in (e.point_at(i / 48) for i in range(49)))
+
+
+def centred(sketch):
+    bb = sketch.bbox()
+    return sketch.translate(-(bb.min.x + bb.max.x) / 2, -(bb.min.y + bb.max.y) / 2)
+
+
+def shape_scale(name):
+    """Return the scale of a drawing, so that it reaches as far as the heart of SHAPE_W."""
+    if name == "heart":
+        return 1.0
+    return reach(Polygon(heart_points(SHAPE_W))) / reach(centred(SHAPES[name](BRIDGE)))
+
+
+def stencil_cut(name):
+    """Return the cut-out of a stencil as a sketch, centred, with bridges BRIDGE wide after the scale."""
+    if name == "heart":
+        return Polygon(heart_points(SHAPE_W))
+    f = shape_scale(name)
+    return centred(SHAPES[name](BRIDGE / f)).scale(f)
+
+
 # Parts, each in the use frame.
 
 def sector(r0, r1, a0, a1, h, z):
@@ -382,16 +470,18 @@ def sector(r0, r1, a0, a1, h, z):
     return ring & wedge
 
 
-STENCIL_DEPS = ["STENCIL_T", "COLLAR_OD", "COLLAR_ID", "COLLAR_H", "HOP_D", "HOP_ID", "HEART_W", "LUG_H", "LUG_D", "LUG_A",
+SHAPE_SRC = "".join(inspect.getsource(f) for f in (heart_points, bridge, stencil_cut, shape_scale, *SHAPES.values()))
+STENCIL_DEPS = ["STENCIL_T", "COLLAR_OD", "COLLAR_ID", "COLLAR_H", "HOP_D", "HOP_ID", "SHAPE_W", "BRIDGE", "SHAPE_SRC", "LUG_H", "LUG_D", "LUG_A",
                 "LOCK_Z", "TWIST", "CAP_DROP", "BAY_ANGLES", "EAR_L", "EAR_W", "EAR_H", "BAY_WALL"]
 
 
-def stencil():
-    return cached("stencil", STENCIL_DEPS, stencil_build)
+def stencil(name=None):
+    name = STENCILS[STENCIL] if name is None else name
+    return cached("stencil" if name == STENCILS[STENCIL] else f"stencil_{name}", STENCIL_DEPS, stencil_build, name)
 
 
-def stencil_build():
-    """Return the stencil, locked: a grip flange with the heart, a collar and three bayonet lugs.
+def stencil_build(name):
+    """Return the stencil, locked: a grip flange with the cut-out shape, a collar and three bayonet lugs.
 
     The flange is as wide as the tube, with notches round its edge and two ears with lips for the fingers.
     The lugs stand 1 mm out of the collar, so their undersides print as short overhangs.
@@ -412,7 +502,7 @@ def stencil_build():
             ear -= rect(2 * (HOP_ID / 2 + BAY_WALL + 1.0), EAR_W + 2, h + 2, 0, 0, 0.0)
             st += ear.rotate(Z, a)
     st += cyl(COLLAR_OD, COLLAR_H + 0.01, -0.01) - cyl(COLLAR_ID, COLLAR_H + 2, -1)
-    st -= Polygon(heart_points(HEART_W)).translate(0, 0, -STENCIL_T - 1).extrude(STENCIL_T + 2)
+    st -= stencil_cut(name).translate(0, 0, -STENCIL_T - 1).extrude(STENCIL_T + 2)
     return st.translate(0, 0, -CAP_DROP) + bayonet_lugs(COLLAR_OD / 2)
 
 
@@ -706,7 +796,7 @@ def device():
 def features():
     zb = BODY_Z
     f = {
-        "Heart": {"at": (0, 0, -STENCIL_T - CAP_DROP - 0.5), "normal": (0, 0, -1), "params": ["HEART_W"]},
+        "Stencil shape": {"at": (0, 0, -STENCIL_T - CAP_DROP - 0.5), "normal": (0, 0, -1), "params": ["STENCIL", "SHAPE_W"]},
         "Stencil flange": {"at": (HOP_D / 2 - 1.5, 0, -STENCIL_T - CAP_DROP - 0.5), "normal": (0, 0, -1),
                            "params": ["STENCIL_T", "STENCIL_PLAY", "COLLAR_W"]},
         "Bayonet": {"at": (HOP_ID / 2 + BAY_WALL + 0.5, 0, BAY_H / 2), "normal": (1, 0, 0),
@@ -792,6 +882,7 @@ def merge_stls(items, out):
 
 if __name__ == "__main__":
     import json
+    import os
     import shutil
     import sys
     import time
@@ -879,6 +970,12 @@ if __name__ == "__main__":
         for b in boxes[i + 1:]:
             assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], "parts overlap on the plate"
     merge_stls([(f"{n}.stl", layout[n]) for n in ps], "cocoa_dispenser_plate.stl")
+    # Every stencil shape, to print and swap: the plate carries the one STENCIL names.
+    os.makedirs("stencils", exist_ok=True)
+    for name in STENCILS:
+        st = stencil(name)
+        assert st.is_valid() and len(st.solids()) == 1, f"stencil {name}: an island has no bridge"
+        export_stl(for_print(st, PRINT_FLIP["stencil"]), f"stencils/stencil_{name}.stl", tolerance=0.05, angle=12.0)
     pmax = (max(b[2] for b in boxes), max(b[3] for b in boxes))
     asm = list(parts().values())
     lo = [min(p.bbox().min[i] for p in asm) for i in range(3)]
@@ -893,5 +990,6 @@ if __name__ == "__main__":
               f"coils twist {coil_strain() * 100:.1f}%, slot ceilings move {LAYER * math.pi * TS_OD / TS_PITCH:.2f} mm a layer")
         print(f"return: {have:.1f} N net of the basket load at the last tooth against {climb:.1f} N to climb its {flank:.0f} degree flank "
               f"({have / climb:.1f}x); press peak about {k * (PRELOAD + STROKE) + climb:.0f} N")
-    print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, labels.json "
+    print(f"wrote cocoa_dispenser.step, cocoa_dispenser_pressed.step, {len(ps)} part STLs, cocoa_dispenser_plate.stl, "
+          f"{len(STENCILS)} stencils in stencils/, labels.json "
           f"in {time.monotonic() - t_run:.0f} s" + ("" if USE_CACHE else " without the cache"))

@@ -14,6 +14,7 @@ cocoa cup.
 ![section, rest and pressed](views/section_rest_pressed.png)
 ![bayonet in the body bottom](views/bayonet_body.png)
 ![stencil with its bayonet lugs](views/bayonet_stencil.png)
+![the five stencils from above](views/stencils.png)
 ![tongue close-up](views/tongue_closeup.png)
 ![views](views/sheet.png)
 
@@ -35,7 +36,7 @@ from the CAD views. The CAD views are the truth.
   starts in the air.
 - The **stencil** goes in from below and locks with a **bayonet**: push it up, turn it
   35°, and it clicks over a 0.3 mm bump. Three lugs on its collar ride in L grooves in
-  a thicker ring at the body bottom. The bayonet also sets the way the heart points.
+  a thicker ring at the body bottom. The bayonet also sets the way the shape points.
   Two ears on the flange end in solid 5 mm tabs, outside the band, for the fingers. Between the stencil and the sieve is a 20 mm drop
   chamber.
 - The **rod** is square. One face carries a **rack**: 5 triangular teeth, 3 mm pitch,
@@ -68,12 +69,24 @@ from the CAD views. The CAD views are the truth.
 - The **button** is 32 mm wide and 32 mm tall. Its skirt hides the spring, so the spring
   sets its size.
 
+## Stencils
+
+`STENCIL` picks the shape: 0 a heart, 1 the year 2027, 2 a bear, 3 a smiling face that
+winks with its tongue out, 4 the euro sign. `SHAPE_W` is the heart's width, and every
+other shape is scaled to reach as far from the centre as that heart, 26 mm at 46.
+A shape with islands holds them with 1.6 mm bridges (`BRIDGE`), so each stencil
+prints as one part: the 0 has one at its top and bottom, the bear's eyes hang on its
+muzzle and the muzzle on its chin and two whiskers, and the face's eyes and grin hang
+on rays out to its edge. The bridges leave thin pale lines in the cocoa, which the cloud
+may partly fill (not tried yet). The build stops if a shape's finest line gets thinner
+than two lines, so `SHAPE_W` goes from 36 to 48.
+
 ## Parts
 
 | Part | Print orientation | Notes |
 |---|---|---|
 | Body | bayonet band down, as used | tube, a bayonet band at each end with three L grooves and 45° faces to the tube, twelve grip ribs between the bands; 69 mm wide, 106 mm tall |
-| Stencil | flange down | heart cut-out in a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
+| Stencil | flange down | heart or another shape cut out of a notched flange with two grip ears; the collar, lugs and ear tabs stand up; the lug undersides are 1 mm overhangs |
 | Cup | floor down, as used | sieve, wall, three ribs and the rack rod in one part, 112 mm tall. The holes print vertical, the ribs stand 30° from vertical, a steep cone holds the block, and the down flanks of the teeth are 41° from vertical: no supports |
 | Lid | upside down | plug with three bayonet lugs (1 mm overhangs), notched plate, square guide hole, spring seat, pour opening; the tongue stands vertical in its pocket |
 | Button | upside down | square socket, skirt hides the spring and stops on the lid |
@@ -128,6 +141,9 @@ because meshing the holes for every check took minutes. A warm run takes about 3
 - `cocoa_dispenser.step` assembly at rest, `cocoa_dispenser_pressed.step` at full press.
 - `body.stl`, `stencil.stl`, `cup.stl`, `lid.stl`, `button.stl`, `spring.stl`: six parts
   in print orientation, and `cocoa_dispenser_plate.stl` with all six on one plate.
+- `stencils/` has a stencil for each shape: `stencil_heart.stl`, `stencil_2027.stl`,
+  `stencil_bear.stl`, `stencil_smile.stl` and `stencil_euro.stl`. `STENCIL` picks the one
+  on the plate and in the views.
 - `sections.py` draws `views/section_rest_pressed.png` and `views/tongue_closeup.png`.
 - `uv run check_part.py cocoa_dispenser.py --max-overhang-area 600 --skip spring` checks
   each part and the assembly. Most of the lid's 506 mm2 of overhang is the floor of the
@@ -142,7 +158,8 @@ because meshing the holes for every check took minutes. A warm run takes about 3
 - `cocoa_dispenser.3mf` is the project saved from Bambu Studio. It still holds version 3.
   Make a new project from `cocoa_dispenser_plate.stl` before printing version 4.
 - `uv run cocoa_dispenser.py --serve` opens the configurator on port 8768. It shows
-  the 24 settings a user should change: sizes, fits, the taps, the tongue and the spring.
+  the 25 settings a user should change: the stencil shape, sizes, fits, the taps, the
+  tongue and the spring.
   The other values are fixed in the script. Its Section
   view cuts the assembly from the front, the side or the top, with a slider for the
   place of the cut and each part named on its cut face.
