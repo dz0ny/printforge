@@ -60,7 +60,7 @@ STENCIL = 0          # Shape: 0 heart, 1 the year 2027, 2 bear, 3 smiling face, 
 SHAPE_W = 46.0       # Heart width, 26 mm from the centre to its lobes; the other shapes reach as far. [36:48].
 BRIDGE = 1.6         # Width of the bridges that hold the islands of a shape, such as the bear's eyes.
 EAR_L = 10.0         # Reach of the two grip ears past the flange, to turn the stencil.
-EAR_W = 14.0         # Ear width.
+EAR_W = 34.0         # Ear width, a wide lip for the fingers.
 EAR_H = 5.0          # Height of each ear outside the bayonet band, a solid tab for the fingers.
 
 # 🔒 Bayonet: three lugs on the collar, in L grooves in the body bottom.
@@ -492,11 +492,15 @@ def stencil_build(name):
         st -= cyl(2.0, STENCIL_T + 2, -STENCIL_T - 1).translate(HOP_D / 2 * math.cos(a), HOP_D / 2 * math.sin(a), 0)
     if EAR_L > 0:
         # Two ears at +X and -X. Outside the bayonet band each ear is a solid tab EAR_H high for the fingers.
-        r_tip = HOP_D / 2 + EAR_L - EAR_W / 2
+        # The outer corners are rounded with 7 mm, so a wide ear ends in a straight lip.
+        tip, rc = HOP_D / 2 + EAR_L, min(7.0, EAR_W / 2)
         for a in (0, 180):
             h = STENCIL_T + CAP_DROP + EAR_H
-            ear = rect(r_tip - HOP_D / 2 + 2, EAR_W, h, (HOP_D / 2 - 2 + r_tip) / 2, 0, -STENCIL_T)
-            ear += cyl(EAR_W, h, -STENCIL_T).translate(r_tip, 0, 0)
+            ear = rect(tip - rc - HOP_D / 2 + 2, EAR_W, h, (HOP_D / 2 - 2 + tip - rc) / 2, 0, -STENCIL_T)
+            if EAR_W > 2 * rc:
+                ear += rect(rc, EAR_W - 2 * rc, h, tip - rc / 2, 0, -STENCIL_T)
+            for y in (-1, 1):
+                ear += cyl(2 * rc, h, -STENCIL_T).translate(tip - rc, y * (EAR_W / 2 - rc), 0)
             # Under the band the ear stays as thin as the flange, with 1 mm of room to the band.
             # A flat inner face keeps the tab corners square.
             ear -= rect(2 * (HOP_ID / 2 + BAY_WALL + 1.0), EAR_W + 2, h + 2, 0, 0, 0.0)

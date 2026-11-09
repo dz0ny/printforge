@@ -37,7 +37,7 @@ from the CAD views. The CAD views are the truth.
 - The **stencil** goes in from below and locks with a **bayonet**: push it up, turn it
   35°, and it clicks over a 0.3 mm bump. Three lugs on its collar ride in L grooves in
   a thicker ring at the body bottom. The bayonet also sets the way the shape points.
-  Two ears on the flange end in solid 5 mm tabs, outside the band, for the fingers. Between the stencil and the sieve is a 20 mm drop
+  Two 34 mm wide ears on the flange end in solid 5 mm tabs, outside the band, for the fingers. Between the stencil and the sieve is a 20 mm drop
   chamber.
 - The **rod** is square. One face carries a **rack**: 5 triangular teeth, 3 mm pitch,
   1.3 mm deep, placed so the tongue is on the rack over the whole stroke.
