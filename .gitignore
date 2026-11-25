@@ -6,3 +6,6 @@ hero/
 view.svg
 .codex_image.log
 .cache/
+
+# The rack lives in mayetrx/muro (rack/enclosure), not here
+projects/rack-10in-8u/
