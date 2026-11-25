@@ -141,6 +141,12 @@ def parse_model(path):
     return [{"title": t, "icon": icons.get(t), "params": ps} for t, ps in groups.items()], has_device
 
 
+def has_hook(path, name):
+    """True when the model defines a top-level function of that name."""
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"), filename=str(path))
+    return any(isinstance(n, ast.FunctionDef) and n.name == name for n in tree.body)
+
+
 def param_table(path):
     groups, _ = parse_model(path)
     return {p["name"]: p for g in groups for p in g["params"]}
@@ -490,6 +496,17 @@ def worker(model_path):
                         parts.append({"name": item["name"], "ghost": item["ghost"], "color": color, "opacity": opacity,
                                       "volume_cm3": volume, "light": bool(item.get("light"))})
                     reply = {"ok": True, "parts": parts}
+                elif req["cmd"] == "air":
+                    # The model describes its enclosure in airflow(); the solve is in airflow.py.
+                    hook = last_ns.get("airflow")
+                    if not callable(hook):
+                        raise RuntimeError("the model has no airflow()")
+                    # Loaded from the file beside this one: the model's project need not have this package installed.
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location("_configurator_airflow", Path(__file__).with_name("airflow.py"))
+                    airflow = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(airflow)
+                    reply = {"ok": True, "air": airflow.solve(hook())}
         except AssertionError as e:
             # A design rule from the model's own asserts: say it plainly, no traceback.
             buf.write(f"Design rule: {e}\n")
@@ -664,6 +681,24 @@ def export_parts(srv):
         return entry, None
 
 
+def export_air(srv):
+    """The airflow of the current build, solved on demand and kept with the entry."""
+    with srv.lock:
+        entry = srv.last
+        if not entry:
+            return None, "no build yet"
+        if entry.get("air") is None:
+            if srv.worker_key != entry["key"]:
+                fresh = build_entry(srv, entry["key"], entry["values"])
+                if not fresh["ok"]:
+                    return None, fresh["log"]
+            reply = srv.worker.request({"cmd": "air"})
+            if not reply.get("ok"):
+                return None, reply.get("log", "airflow failed")
+            entry["air"] = reply["air"]
+        return {"ok": True, "key": entry["key"], **entry["air"]}, None
+
+
 def export_step(srv):
     """The STEP of the current build, exported on demand and then kept in memory."""
     with srv.lock:
@@ -774,7 +809,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/params":
                 groups, has_device = parse_model(srv.model)
                 return self._json(200, {"model": srv.model.name, "groups": groups,
-                                        "has_device": has_device})
+                                        "has_device": has_device, "has_air": has_hook(srv.model, "airflow")})
             if path == "/api/mesh/shell.stl":
                 return self._mesh("shell")
             if path == "/api/mesh/device.stl":
@@ -792,6 +827,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True, "key": k, "parts": [
                     {**{n: v for n, v in p.items() if n != "stl"}, "url": f"/api/parts/{i}.stl?key={k[:12]}"}
                     for i, p in enumerate(entry["parts"])]})
+            if path == "/api/air":
+                data, err = export_air(srv)
+                if err:
+                    return self._json(200, {"ok": False, "log": err})
+                return self._json(200, data)
             m = re.fullmatch(r"/api/parts/(\d+)\.stl", path)
             if m:
                 parts = (srv.last or {}).get("parts") or []

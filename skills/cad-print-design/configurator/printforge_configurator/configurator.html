@@ -95,6 +95,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
 #viewer.drawing #ftip, #viewer.drawing .dimlabel,
+#viewer.air > canvas, #viewer.air #tools, #viewer.air #readout, #viewer.air #flabel, #viewer.air #ftip, #viewer.air .dimlabel,
 #viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip, #viewer.section .dimlabel,
 #viewer.parts #readout, #viewer.parts #flabel { display: none !important; }
 #viewer.section #tools, #viewer.parts #tools { top: auto; bottom: 12px; }
@@ -110,6 +111,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
     <button type="button" data-mode="drawing" aria-pressed="false">Drawing</button>
     <button type="button" data-mode="section" aria-pressed="false">Section</button>
     <button type="button" data-mode="parts" aria-pressed="false">Parts</button>
+    <button type="button" data-mode="air" aria-pressed="false" hidden>Air</button>
   </div>
   <button id="rebuild" class="btn btn-primary" disabled><span class="spin"></span>Rebuild</button>
   <div class="relative" id="viewWrap">
@@ -180,6 +182,20 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
       </div>
       <div id="secLegend" class="card absolute bottom-3 left-3 flex max-h-[60%] flex-col gap-1 overflow-y-auto" hidden></div>
       <div id="secMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
+    </section>
+    <section id="airView" class="absolute inset-0 overflow-hidden" hidden>
+      <canvas id="airField" class="!pointer-events-none"></canvas>
+      <canvas id="airTrail"></canvas>
+      <div id="airBar" class="pointer-events-none absolute left-3 right-3 top-2 z-10 flex flex-wrap items-center gap-2.5 [&>*]:pointer-events-auto">
+        <div class="seg" id="airShow" role="group" aria-label="Colour">
+          <button type="button" data-show="theta" aria-pressed="true">Temperature</button>
+          <button type="button" data-show="speed" aria-pressed="false">Speed</button>
+        </div>
+        <span id="airScale" class="flex h-9 items-center gap-2 rounded-full border border-line bg-panel px-3 text-[13px] tabular-nums"></span>
+      </div>
+      <div id="airPanel" class="card absolute bottom-3 left-3 top-14 flex w-72 flex-col gap-2 overflow-y-auto [&.low]:top-auto [&.low]:max-h-[38%] [&.low]:w-[calc(100%-24px)]" hidden></div>
+      <div id="airTip" class="tag z-10" hidden></div>
+      <div id="airMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
     </section>
     <section id="partView" class="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto" hidden>
       <div id="partBar" class="!pointer-events-none absolute left-3 right-3 top-2 z-10 flex flex-wrap items-center gap-2.5 [&>*]:pointer-events-auto">
@@ -266,6 +282,7 @@ async function build() {
       select(state.selected); // re-anchor the same feature, or clear if it is gone
       if (drawingMode) ensureDrawing();
       if (sectionMode || partsMode) ensureParts();
+      if (airMode) ensureAir();
     }
   } catch (e) {
     showLog(String(e), true);
@@ -423,6 +440,7 @@ async function init() {
     $('dlStep').textContent = `${stem}.step`; $('dlStep').download = `${stem}.step`;
     $('dlDev').textContent = `${stem}_device.stl`; $('dlDev').download = `${stem}_device.stl`;
     $('devWrap').hidden = !data.has_device;
+    document.querySelector('#modeSeg [data-mode="air"]').hidden = !data.has_air;
     for (const g of data.groups) {
       for (const p of g.params) { state.values[p.name] = p.value; state.initial[p.name] = p.value; }
     }
@@ -1683,6 +1701,230 @@ document.querySelectorAll('#secCut button').forEach((b) => b.addEventListener('c
 // The plane follows the slider live: the page cuts the meshes itself.
 $('secSlider').addEventListener('input', (e) => { secPct[secCut] = Number(e.target.value); applyCut(false); });
 
+// ---- Air view: the flow and the air temperature in a side section, from the model's airflow()
+let airMode = false, airSeq = 0;
+const air = (() => {
+  const field = $('airField'), trail = $('airTrail'), fx = field.getContext('2d'), tx = trail.getContext('2d');
+  let data = null, show = 'theta', raf = 0, dots = [], map = null, last = 0, spawn = null;
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // Blue for room air through yellow to red, and a single blue ramp for speed.
+  const ramp = (t, stops) => {
+    const x = Math.min(1, Math.max(0, t)) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i;
+    return stops[i].map((a, k) => Math.round(a + (stops[i + 1][k] - a) * f));
+  };
+  const HOT = [[70, 130, 220], [120, 200, 220], [250, 220, 110], [240, 140, 60], [205, 50, 45]];
+  const FAST = [[235, 240, 248], [150, 190, 240], [60, 120, 220], [30, 60, 150]];
+  const top = () => show === 'theta' ? Math.max(2, Math.ceil(data.max_rise)) : Math.max(0.5, Math.ceil((data.scale_speed ?? data.max_speed) * 2) / 2);
+  const cell = (u, v) => {
+    const [u0, v0, u1, v1] = data.box;
+    const i = Math.floor((u - u0) / (u1 - u0) * data.nu), j = Math.floor((v - v0) / (v1 - v0) * data.nv);
+    return i < 0 || j < 0 || i >= data.nu || j >= data.nv ? -1 : j * data.nu + i;
+  };
+  function layout() {
+    const w = field.clientWidth, h = field.clientHeight, dpr = window.devicePixelRatio || 1;
+    for (const c of [field, trail]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    fx.setTransform(dpr, 0, 0, dpr, 0, 0); tx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // The numbers stand beside the section when the viewer is wide, and below it otherwise.
+    const [u0, v0, u1, v1] = data.box, wide = w >= 900;
+    $('airPanel').classList.toggle('low', !wide);
+    const left = wide ? 288 + 24 + 190 : 158, right = wide ? 150 : 128, topPad = 64, bottom = wide ? 28 : h * 0.38 + 24;
+    const k = Math.max(0.1, Math.min((w - left - right) / (u1 - u0), (h - topPad - bottom) / (v1 - v0)));
+    const ox = left + (w - left - right - k * (u1 - u0)) / 2, oy = topPad + (h - topPad - bottom - k * (v1 - v0)) / 2;
+    map = { k, w, h, x: (u) => ox + (u - u0) * k, y: (v) => oy + (v1 - v) * k, u: (x) => u0 + (x - ox) / k, v: (y) => v1 - (y - oy) / k };
+  }
+  function drawField() {
+    const { nu, nv } = data, [u0, v0, u1, v1] = data.box, img = new ImageData(nu, nv), hi = top();
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const n = j * nu + i, o = ((nv - 1 - j) * nu + i) * 4;
+      const val = show === 'theta' ? data.theta[n] : Math.hypot(data.vu[n], data.vv[n]);
+      const c = ramp(val / hi, show === 'theta' ? HOT : FAST);
+      img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = data.eps[n] > 0 ? 235 : 0;
+    }
+    const tmp = document.createElement('canvas'); tmp.width = nu; tmp.height = nv; tmp.getContext('2d').putImageData(img, 0, 0);
+    fx.clearRect(0, 0, map.w, map.h);
+    fx.imageSmoothingEnabled = true;
+    fx.drawImage(tmp, map.x(u0), map.y(v1), map.k * (u1 - u0), map.k * (v1 - v0));
+    const fg = css('--fg'), muted = css('--muted'), panel = css('--panel');
+    // The parts in the section: darker the more of the width they take.
+    fx.font = '12px ui-sans-serif, system-ui, sans-serif'; fx.textBaseline = 'middle';
+    for (const b of data.blocks) {
+      const [a, c, d, e] = b.box, x = map.x(a), y = map.y(e), bw = (d - a) * map.k, bh = (e - c) * map.k;
+      fx.globalAlpha = 0.25 + 0.7 * Math.min(1, b.fill); fx.fillStyle = b.color || muted; fx.fillRect(x, y, bw, bh);
+      fx.globalAlpha = 1; fx.strokeStyle = fg; fx.lineWidth = 1; fx.strokeRect(x + 0.5, y + 0.5, bw - 1, bh - 1);
+      if (b.label && bw > 60 && bh > 16) {
+        const text = `${b.name} · ${Math.round(b.watts)} W`;
+        const tw = fx.measureText(text).width + 10;
+        fx.fillStyle = panel; fx.globalAlpha = 0.85; fx.fillRect(x + 6, y + bh / 2 - 9, tw, 18); fx.globalAlpha = 1;
+        fx.fillStyle = fg; fx.textAlign = 'left'; fx.fillText(text, x + 11, y + bh / 2);
+      }
+    }
+    // The walls, with a break at every opening, and a label for each flow.
+    const walls = { front: [], back: [], bottom: [], top: [] };
+    for (const q of data.ports) walls[q.side].push(q);
+    fx.strokeStyle = fg; fx.lineWidth = 3; fx.lineCap = 'butt';
+    for (const side of Object.keys(walls)) {
+      const upright = side === 'front' || side === 'back', lo = upright ? v0 : u0, hi2 = upright ? v1 : u1;
+      const at = side === 'front' ? map.x(u0) : side === 'back' ? map.x(u1) : side === 'bottom' ? map.y(v0) : map.y(v1);
+      let from = lo;
+      const seg = (a, b) => { if (b - a < 0.5) return; fx.beginPath(); if (upright) { fx.moveTo(at, map.y(a)); fx.lineTo(at, map.y(b)); } else { fx.moveTo(map.x(a), at); fx.lineTo(map.x(b), at); } fx.stroke(); };
+      for (const q of walls[side].slice().sort((a, b) => a.span[0] - b.span[0])) { seg(from, q.span[0]); from = Math.max(from, q.span[1]); }
+      seg(from, hi2);
+    }
+    let lastY = { front: -1e9, back: -1e9 };
+    for (const q of data.ports.slice().sort((a, b) => b.span[0] + b.span[1] - a.span[0] - a.span[1])) {
+      const mid = (q.span[0] + q.span[1]) / 2, inward = q.m3h > 0, upright = q.side === 'front' || q.side === 'back';
+      if (!upright) continue;
+      const x = q.side === 'front' ? map.x(u0) : map.x(u1), y = map.y(mid), dir = (q.side === 'front') === inward ? 1 : -1;
+      const out = q.side === 'front' ? -1 : 1, colour = q.kind === 'fan' ? css('--accent') : fg;
+      if (q.kind === 'fan') { fx.strokeStyle = colour; fx.lineWidth = 5; fx.beginPath(); fx.moveTo(x, map.y(q.span[0])); fx.lineTo(x, map.y(q.span[1])); fx.stroke(); }
+      // The arrow sits outside the wall and points the way the air moves.
+      const ax = x + out * 26, tip = ax + dir * 9, tail = ax - dir * 9;
+      fx.strokeStyle = colour; fx.fillStyle = colour; fx.lineWidth = 2;
+      fx.beginPath(); fx.moveTo(tail, y); fx.lineTo(tip, y); fx.stroke();
+      fx.beginPath(); fx.moveTo(tip + dir * 5, y); fx.lineTo(tip - dir * 2, y - 5); fx.lineTo(tip - dir * 2, y + 5); fx.closePath(); fx.fill();
+      let ty = Math.max(y, lastY[q.side] + 34); lastY[q.side] = ty;
+      fx.textAlign = q.side === 'front' ? 'right' : 'left'; fx.fillStyle = fg;
+      const lx = x + out * 44;
+      fx.fillText(`${Math.abs(q.m3h).toFixed(0)} m³/h${q.kind === 'fan' ? ` · +${q.rise.toFixed(1)} K` : ` · ${(100 * q.share).toFixed(0)} %`}`, lx, ty - 7);
+      fx.fillStyle = muted; fx.fillText(q.name, lx, ty + 8);
+    }
+    fx.fillStyle = muted; fx.textAlign = 'center';
+    fx.fillText('front', map.x(u0), map.y(v1) - 12); fx.fillText('back', map.x(u1), map.y(v1) - 12);
+  }
+  function seed() {
+    // New dots start where air comes in: at the openings and at the outlets of devices that move their own air.
+    const [u0, v0, u1, v1] = data.box, h = (u1 - u0) / data.nu, list = [];
+    for (const q of data.ports) if (q.m3h > 0) {
+      const u = q.side === 'front' ? u0 + h * 0.3 : q.side === 'back' ? u1 - h * 0.3 : null, v = q.side === 'bottom' ? v0 + h * 0.3 : q.side === 'top' ? v1 - h * 0.3 : null;
+      list.push({ w: q.m3h, at: () => { const s = q.span[0] + Math.random() * (q.span[1] - q.span[0]); return u === null ? [s, v] : [u, s]; } });
+    }
+    for (const b of data.blocks) if (b.through) {
+      const [a, c, d, e] = b.box, side = b.through.outlet;
+      list.push({ w: b.through.flow, at: () => side === 'back' ? [d + h * 1.2, c + Math.random() * (e - c)] : side === 'front' ? [a - h * 1.2, c + Math.random() * (e - c)]
+        : side === 'top' ? [a + Math.random() * (d - a), e + h * 1.2] : [a + Math.random() * (d - a), c - h * 1.2] });
+    }
+    const sum = list.reduce((t, x) => t + x.w, 0) || 1;
+    spawn = () => { let r = Math.random() * sum; for (const x of list) { r -= x.w; if (r <= 0) return x.at(); } return list.length ? list[0].at() : [u0, v0]; };
+    dots = Array.from({ length: 900 }, () => { const [u, v] = spawn(); return { u, v, age: 0 }; });
+    for (let i = 0; i < 400; i++) step(0.004, null);   // Run ahead, so the dots are already spread along their paths.
+  }
+  function swallowed(d) {
+    // A dot that reaches the inlet of a device that moves its own air goes in there.
+    const h = (data.box[2] - data.box[0]) / data.nu * 1.5;
+    for (const b of data.blocks) if (b.through) {
+      const [a, c, e, f] = b.box, s = b.through.inlet;
+      if (s === 'bottom' && d.u > a && d.u < e && d.v < c && d.v > c - h) return true;
+      if (s === 'top' && d.u > a && d.u < e && d.v > f && d.v < f + h) return true;
+      if (s === 'front' && d.v > c && d.v < f && d.u < a && d.u > a - h) return true;
+      if (s === 'back' && d.v > c && d.v < f && d.u > e && d.u < e + h) return true;
+    }
+    return false;
+  }
+  function tick(now) {
+    raf = requestAnimationFrame(tick);
+    const dt = Math.min(0.05, (now - last) / 1000 || 0.016) * 0.12;   // Slow motion: one second on screen is 0.12 s of air.
+    last = now;
+    tx.globalCompositeOperation = 'destination-out'; tx.fillStyle = 'rgba(0,0,0,0.07)'; tx.fillRect(0, 0, map.w, map.h);
+    tx.globalCompositeOperation = 'source-over'; tx.strokeStyle = css('--fg'); tx.globalAlpha = 0.75; tx.lineWidth = 1.2; tx.beginPath();
+    step(dt, tx);
+    tx.stroke(); tx.globalAlpha = 1;
+  }
+  function step(dt, pen) {
+    // Move every dot by dt seconds of air. A dot that leaves, stalls or gets old starts again at an inlet.
+    for (const d of dots) {
+      const n = cell(d.u, d.v);
+      let dead = n < 0 || data.eps[n] === 0 || d.age > 3 || swallowed(d);
+      if (!dead) {
+        const du = data.vu[n] * 1000 * dt, dv = data.vv[n] * 1000 * dt;
+        if (Math.hypot(du, dv) < 1e-5) dead = true;
+        else {
+          if (pen) pen.moveTo(map.x(d.u), map.y(d.v));
+          d.u += du; d.v += dv; d.age += dt;
+          if (pen) pen.lineTo(map.x(d.u), map.y(d.v));
+        }
+      }
+      if (dead) { [d.u, d.v] = spawn(); d.age = 0; }
+    }
+  }
+  function panel() {
+    const row = (a, b, cls) => { const r = el('div', `flex items-baseline justify-between gap-3 ${cls || ''}`); const l = el('span', 'min-w-0 truncate'); l.textContent = a; const v = el('span', 'flex-none tabular-nums'); v.textContent = b; r.append(l, v); return r; };
+    const head = (t) => { const h = el('div', 'mt-1 text-xs font-semibold uppercase tracking-wide text-muted'); h.textContent = t; return h; };
+    const out = [head('Balance'),
+      row('Flow through the enclosure', `${data.flow_m3h.toFixed(0)} m³/h`),
+      row('Free flow of the fans', `${data.free_m3h.toFixed(0)} m³/h`),
+      row('Pressure inside', `${data.pressure.toFixed(1)} Pa`),
+      row('Heat', `${data.watts.toFixed(0)} W`),
+      row('Air leaves at', `${(data.room + (data.rise ?? 0)).toFixed(1)} °C (+${(data.rise ?? 0).toFixed(1)} K)`, 'font-semibold'),
+      row('Air changes', `${data.changes_per_min} per minute`),
+      head('Openings')];
+    for (const q of data.ports) out.push(row(q.name, q.m3h > 0 ? `in ${q.m3h.toFixed(0)} · ${(100 * q.share).toFixed(0)} %` : `out ${(-q.m3h).toFixed(0)} · +${q.rise.toFixed(1)} K`));
+    const hot = data.blocks.filter((b) => b.watts > 0);
+    if (hot.length) out.push(head('Air around the devices'));
+    for (const b of hot) {
+      out.push(row(`${b.name}, ${b.watts.toFixed(0)} W`, b.through ? `in +${b.intake.toFixed(1)} · out +${b.exhaust.toFixed(1)} K` : `+${(b.around ?? 0).toFixed(1)} K`));
+    }
+    const note = el('div', 'mt-1 text-xs leading-snug text-muted');
+    note.textContent = ['A simplified model in one side section, not a measurement: the air has no inertia, so jets and eddies are missing.', ...data.notes].join(' ');
+    out.push(note);
+    // The solve checks itself: what flows in must flow out, and the heat must leave with the air.
+    const c = data.checks, off = (a, b) => Math.abs(a - b) > 0.02 * Math.max(Math.abs(a), Math.abs(b), 1e-9);
+    if (off(c.in_m3h, c.out_m3h) || off(c.heat_in_w, c.heat_out_w)) {
+      const warn = el('div', 'err text-xs');
+      warn.textContent = `The solve does not balance: ${c.in_m3h} m³/h in and ${c.out_m3h} out, ${c.heat_in_w} W in and ${c.heat_out_w} out.`;
+      out.push(warn);
+    }
+    $('airPanel').replaceChildren(...out); $('airPanel').hidden = false;
+  }
+  function scale() {
+    const hi = top(), stops = show === 'theta' ? HOT : FAST, bar = el('i', 'inline-block h-2.5 w-28 rounded-full');
+    bar.style.background = `linear-gradient(90deg, ${stops.map((c) => `rgb(${c.join(',')})`).join(',')})`;
+    const a = el('span'), b = el('span');
+    a.textContent = show === 'theta' ? `${data.room.toFixed(0)} °C` : '0'; b.textContent = show === 'theta' ? `${(data.room + hi).toFixed(0)} °C` : `${hi} m/s`;
+    $('airScale').replaceChildren(a, bar, b);
+  }
+  function redraw() { if (!data || $('airView').hidden) return; layout(); drawField(); scale(); tx.clearRect(0, 0, map.w, map.h); }
+  trail.addEventListener('pointermove', (e) => {
+    if (!data || !map) return;
+    const r = trail.getBoundingClientRect(), n = cell(map.u(e.clientX - r.left), map.v(e.clientY - r.top)), tip = $('airTip');
+    if (n < 0 || data.eps[n] === 0) { tip.hidden = true; return; }
+    tip.textContent = `${(data.room + data.theta[n]).toFixed(1)} °C · ${Math.hypot(data.vu[n], data.vv[n]).toFixed(2)} m/s`;
+    tip.style.transform = `translate(${e.clientX - r.left + 14}px, ${e.clientY - r.top + 14}px)`; tip.hidden = false;
+  });
+  trail.addEventListener('pointerleave', () => { $('airTip').hidden = true; });
+  new ResizeObserver(redraw).observe($('airView'));
+  return {
+    get key() { return data && data.key; },
+    set(d) { data = d; panel(); redraw(); seed(); this.start(); },
+    setShow(s) { show = s; redraw(); },
+    start() { if (!raf && data) { last = performance.now(); raf = requestAnimationFrame(tick); } },
+    stop() { cancelAnimationFrame(raf); raf = 0; },
+  };
+})();
+function showAirMsg(text, bad) {
+  const m = $('airMsg');
+  m.hidden = !text; m.classList.toggle('err', !!bad); m.textContent = text || '';
+}
+async function ensureAir() {
+  if (!airMode || !state.buildKey) return;
+  if (air.key === state.buildKey) { showAirMsg(''); air.start(); return; }
+  const seq = ++airSeq;
+  showAirMsg('Solving the airflow…', false);
+  try {
+    const r = await fetch('/api/air');
+    const data = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}` }));
+    if (seq !== airSeq || !airMode) return;
+    if (!data.ok) { showAirMsg(data.log || data.error || 'The airflow could not be solved', true); return; }
+    showAirMsg('');
+    air.set(data);
+  } catch (e) {
+    if (seq === airSeq) showAirMsg(String(e), true);
+  }
+}
+document.querySelectorAll('#airShow button').forEach((b) => b.addEventListener('click', () => {
+  for (const x of document.querySelectorAll('#airShow button')) x.setAttribute('aria-pressed', String(x === b));
+  air.setShow(b.dataset.show);
+}));
+
 // ---- Parts view: the assembly exploded by a slider, and one part alone after a click on it or on its row
 let partsMode = false, partSel = null;
 function renderPartList() {
@@ -1741,6 +1983,10 @@ function setMode(mode) {
   drawingMode = mode === 'drawing';
   sectionMode = mode === 'section';
   partsMode = mode === 'parts';
+  airMode = mode === 'air';
+  $('viewer').classList.toggle('air', airMode);
+  $('airView').hidden = !airMode;
+  if (airMode) ensureAir(); else air.stop();
   $('viewer').classList.toggle('drawing', drawingMode);
   $('viewer').classList.toggle('section', sectionMode);
   $('viewer').classList.toggle('parts', partsMode);
