@@ -30,7 +30,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 RANGE = re.compile(r"\[\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*\]\s*\.?\s*$")
 DEF_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
@@ -145,6 +145,15 @@ def has_hook(path, name):
     """True when the model defines a top-level function of that name."""
     tree = ast.parse(Path(path).read_text(encoding="utf-8"), filename=str(path))
     return any(isinstance(n, ast.FunctionDef) and n.name == name for n in tree.body)
+
+
+def bom_module():
+    """The reader of BOM.md, loaded from its file so the server also runs as a plain script."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_configurator_bom", Path(__file__).with_name("bom.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def param_table(path):
@@ -809,7 +818,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/params":
                 groups, has_device = parse_model(srv.model)
                 return self._json(200, {"model": srv.model.name, "groups": groups,
-                                        "has_device": has_device, "has_air": has_hook(srv.model, "airflow")})
+                                        "has_device": has_device, "has_air": has_hook(srv.model, "airflow"),
+                                        "has_bom": bom_module().find(srv.model) is not None})
             if path == "/api/mesh/shell.stl":
                 return self._mesh("shell")
             if path == "/api/mesh/device.stl":
@@ -827,6 +837,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"ok": True, "key": k, "parts": [
                     {**{n: v for n, v in p.items() if n != "stl"}, "url": f"/api/parts/{i}.stl?key={k[:12]}"}
                     for i, p in enumerate(entry["parts"])]})
+            if path == "/api/bom":
+                data = bom_module().read(srv.model)
+                if data is None:
+                    return self._json(200, {"ok": False, "log": "no BOM.md beside the model"})
+                return self._json(200, {"ok": True, **data})
+            if path.startswith("/api/bom/file/"):
+                body, kind = bom_module().picture(srv.model, unquote(path[len("/api/bom/file/"):]))
+                if body is None:
+                    return self._json(404, {"ok": False, "error": "no such picture"})
+                return self._send(200, body, kind, {"Cache-Control": "no-store"})
             if path == "/api/air":
                 data, err = export_air(srv)
                 if err:

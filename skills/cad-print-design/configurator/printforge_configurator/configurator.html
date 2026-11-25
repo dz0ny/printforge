@@ -95,6 +95,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
 #viewer.drawing #ftip, #viewer.drawing .dimlabel,
+#viewer.bom > canvas, #viewer.bom #tools, #viewer.bom #readout, #viewer.bom #flabel, #viewer.bom #ftip, #viewer.bom .dimlabel,
 #viewer.air > canvas, #viewer.air #tools, #viewer.air #readout, #viewer.air #flabel, #viewer.air #ftip, #viewer.air .dimlabel,
 #viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip, #viewer.section .dimlabel,
 #viewer.parts #readout, #viewer.parts #flabel { display: none !important; }
@@ -112,6 +113,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
     <button type="button" data-mode="section" aria-pressed="false">Section</button>
     <button type="button" data-mode="parts" aria-pressed="false">Parts</button>
     <button type="button" data-mode="air" aria-pressed="false" hidden>Air</button>
+    <button type="button" data-mode="bom" aria-pressed="false" hidden>BOM</button>
   </div>
   <button id="rebuild" class="btn btn-primary" disabled><span class="spin"></span>Rebuild</button>
   <div class="relative" id="viewWrap">
@@ -182,6 +184,10 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
       </div>
       <div id="secLegend" class="card absolute bottom-3 left-3 flex max-h-[60%] flex-col gap-1 overflow-y-auto" hidden></div>
       <div id="secMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
+    </section>
+    <section id="bomView" class="absolute inset-0 overflow-y-auto bg-bg" hidden>
+      <div id="bomPage" class="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4"></div>
+      <div id="bomMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
     </section>
     <section id="airView" class="absolute inset-0 overflow-hidden" hidden>
       <canvas id="airField" class="!pointer-events-none"></canvas>
@@ -441,6 +447,7 @@ async function init() {
     $('dlDev').textContent = `${stem}_device.stl`; $('dlDev').download = `${stem}_device.stl`;
     $('devWrap').hidden = !data.has_device;
     document.querySelector('#modeSeg [data-mode="air"]').hidden = !data.has_air;
+    document.querySelector('#modeSeg [data-mode="bom"]').hidden = !data.has_bom;
     for (const g of data.groups) {
       for (const p of g.params) { state.values[p.name] = p.value; state.initial[p.name] = p.value; }
     }
@@ -1979,7 +1986,127 @@ $('partBack').addEventListener('click', () => pickPart(null));
 $('exSlider').addEventListener('input', (e) => viewer && viewer.setExplode(Number(e.target.value) / 100 * 1.5));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && partsMode) pickPart(null); });
 
+// ---- BOM: the BOM.md beside the model, read by the server and drawn as tables
+let bomMode = false, bomSeq = 0;
+function showBomMsg(text, bad) {
+  const m = $('bomMsg');
+  m.hidden = !text; m.classList.toggle('err', !!bad); m.textContent = text || '';
+}
+function bomNode(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function bomInline(parent, pieces, big) {
+  for (const p of pieces) {
+    if (p.kind === 'image') {
+      const img = bomNode('img', big ? 'max-h-64 rounded-lg border border-line bg-panel' : 'h-16 w-24 rounded-md object-contain');
+      img.src = p.src; img.alt = p.alt || ''; img.loading = 'lazy';
+      parent.append(img);
+    } else if (p.kind === 'link') {
+      const a = bomNode('a', 'text-accent underline [overflow-wrap:anywhere]', p.text);
+      a.href = p.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      parent.append(a);
+    } else if (p.kind === 'code') parent.append(bomNode('code', 'rounded bg-bg px-1 font-mono text-xs', p.text));
+    else if (p.kind === 'bold') parent.append(bomNode('strong', '', p.text));
+    else parent.append(document.createTextNode(p.text));
+  }
+}
+function bomText(pieces) { return pieces.map((p) => p.text || '').join(' ').toLowerCase(); }
+function drawBom(data) {
+  const page = $('bomPage');
+  page.replaceChildren();
+  const head = bomNode('div', 'flex flex-wrap items-end gap-3');
+  const title = bomNode('div', 'min-w-0 flex-1');
+  title.append(bomNode('h2', 'text-lg font-semibold', data.title || 'Bill of materials'),
+    bomNode('div', 'text-xs text-muted', `${data.parts} kinds of part, ${data.pieces} pieces, from ${data.file}`));
+  const find = bomNode('input', 'h-9 w-56 rounded-full border border-line bg-panel px-3 text-[13px] outline-none focus:border-accent');
+  find.type = 'search'; find.placeholder = 'Filter parts'; find.setAttribute('aria-label', 'Filter parts');
+  head.append(title, find);
+  page.append(head);
+  const notes = [];
+  if (data.stale) notes.push(`${data.file} is older than the model file. Run the model script to write it again.`);
+  for (const text of data.problems || []) notes.push(text);
+  if (notes.length) {
+    const box = bomNode('div', 'card flex flex-col gap-1 text-[13px]');
+    for (const text of notes) box.append(bomNode('div', '', text));
+    page.append(box);
+  }
+  for (const block of data.lead || []) {
+    const para = bomNode('p', 'flex flex-wrap items-start gap-3 text-[13px] text-muted');
+    const onlyPictures = block.every((p) => p.kind === 'image' || !p.text.trim());
+    if (onlyPictures) bomInline(para, block.filter((p) => p.kind === 'image'), true);
+    else { para.className = 'text-[13px] text-muted'; bomInline(para, block); }
+    page.append(para);
+  }
+  const rows = [];
+  for (const s of data.sections) {
+    const card = bomNode('section', 'card flex flex-col gap-2 !p-0 overflow-hidden');
+    const bar = bomNode('div', 'flex items-baseline gap-2 px-3 pt-3');
+    bar.append(bomNode('h3', 'font-semibold', s.heading));
+    if (s.pieces != null) bar.append(bomNode('span', 'text-xs text-muted', `${s.rows.length} kinds, ${s.pieces} pieces`));
+    card.append(bar);
+    for (const block of s.text) {
+      const para = bomNode('p', 'px-3 pb-3 text-[13px]');
+      bomInline(para, block);
+      card.append(para);
+    }
+    if (s.columns.length) {
+      const wrap = bomNode('div', 'overflow-x-auto');
+      const table = bomNode('table', 'w-full border-collapse text-[13px]');
+      const tr = bomNode('tr', 'text-left text-xs text-muted');
+      s.columns.forEach((c, i) => tr.append(bomNode('th', 'border-b border-line px-3 py-1.5 font-medium' + (i === s.picture ? ' w-28' : ''), c)));
+      const thead = bomNode('thead'); thead.append(tr);
+      const body = bomNode('tbody');
+      for (const row of s.rows) {
+        const line = bomNode('tr', 'align-middle');
+        row.forEach((cell, i) => {
+          const td = bomNode('td', 'border-b border-line px-3 py-1.5' + (i === s.qty ? ' whitespace-nowrap font-semibold tabular-nums' : '')
+            + (i === s.part ? ' font-medium' : ''));
+          bomInline(td, cell);
+          line.append(td);
+        });
+        body.append(line);
+        rows.push({ line, card, text: row.map(bomText).join(' ') });
+      }
+      table.append(thead, body);
+      wrap.append(table);
+      card.append(wrap);
+    }
+    page.append(card);
+  }
+  find.addEventListener('input', () => {
+    const q = find.value.trim().toLowerCase();
+    const shown = new Map();
+    for (const r of rows) {
+      const ok = !q || r.text.includes(q);
+      r.line.hidden = !ok;
+      shown.set(r.card, (shown.get(r.card) || 0) + (ok ? 1 : 0));
+    }
+    for (const [card, n] of shown) card.hidden = !!q && !n;
+  });
+}
+async function ensureBom() {
+  if (!bomMode) return;
+  const seq = ++bomSeq;
+  try {
+    const r = await fetch('/api/bom');
+    const data = await r.json().catch(() => ({ ok: false, log: `HTTP ${r.status}` }));
+    if (seq !== bomSeq || !bomMode) return;
+    if (!data.ok) { showBomMsg(data.log || data.error || 'The list could not be read', true); return; }
+    showBomMsg('');
+    drawBom(data);
+  } catch (e) {
+    if (seq === bomSeq) showBomMsg(String(e), true);
+  }
+}
+
 function setMode(mode) {
+  bomMode = mode === 'bom';
+  $('viewer').classList.toggle('bom', bomMode);
+  $('bomView').hidden = !bomMode;
+  if (bomMode) ensureBom();
   drawingMode = mode === 'drawing';
   sectionMode = mode === 'section';
   partsMode = mode === 'parts';

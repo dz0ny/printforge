@@ -180,7 +180,7 @@ For a part built around a device, give the user a page where they can adjust the
     "port": 8765}
    ```
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view, a Section view, a Parts view, an Air view for models with an `airflow()`, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view, a Section view, a Parts view, an Air view for models with an `airflow()`, a BOM view for models with a `BOM.md`, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
 
 ### The parts view
 
@@ -193,6 +193,33 @@ The Air view is off unless the model asks for it. Add `airflow()` only when it i
 When a model defines `airflow()`, the page gets an Air view: the flow and the air temperature in one side section, with moving tracer dots, the flow through every opening and the air temperature around every device. The hook returns a dict in mm, described at the top of `printforge_configurator/airflow.py`: the inside `box` of the section and the `width` across it, the `openings` (side, span, open area), the `fans` (free flow in m3/h and highest pressure in Pa from the data sheet), and the `blocks` (a box, the share of the width it fills, its heat in W, and `through` for a device that moves its own air). Compute all of it from the model's parameters, so the view follows the sliders.
 
 It is a simplified model, not a measurement, and a reply must say so. The flow through each opening comes from a balance of orifices against a straight fan curve. The field has no inertia, so it shows paths but no jets and no eddies, and it knows nothing across the width. Trust the totals (flow, mean warming of the air) more than the map. The response checks itself: `checks` holds the flow in and out and the heat in and out, which must agree.
+
+### The BOM view
+
+When a `BOM.md` lies beside the model, the page gets a BOM view: the bill of materials as tables with pictures, links, a count of parts and pieces, and a filter. The server reads the file on every visit, so it shows what the model script last wrote, and says so when the file is older than the script. Write `BOM.md` from the model script, with quantities counted from the model, in this one shape:
+
+```markdown
+# Rack 8U, bill of materials
+
+One or more paragraphs about the whole list.
+
+## Frame
+
+| | Part | Qty | Size | Note |
+| --- | --- | --- | --- | --- |
+| ![](bom/profile.png) | Aluminum profile 30 × 30 | 4 | 416 mm | Cut from [500 mm bars](https://example.com). |
+
+## Not in the list
+
+A section may also be plain text, without a table.
+```
+
+- One `#` title, then one `##` heading for each section. A section holds text, one table, or both.
+- The column without a name holds the picture, with a path relative to `BOM.md`. Only pictures inside the model's folder are shown.
+- `Part` and `Qty` are required, and `Qty` is a whole number. Other columns are free; keep them the same in every table.
+- A cell may hold text, `code`, bold, a link and a picture, as Markdown or as `<a href>` and `<img src>`.
+
+The view lists what breaks these rules. The reader is `printforge_configurator/bom.py`.
 
 ### The drawing sheet
 
