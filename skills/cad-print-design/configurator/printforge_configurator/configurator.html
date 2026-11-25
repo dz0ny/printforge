@@ -95,8 +95,9 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
 #viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #viewer.drawing > canvas, #viewer.drawing #tools, #viewer.drawing #readout, #viewer.drawing #flabel,
 #viewer.drawing #ftip, #viewer.drawing .dimlabel,
-#viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip, #viewer.section .dimlabel { display: none !important; }
-#viewer.section #tools { top: auto; bottom: 12px; }
+#viewer.section #readout, #viewer.section #flabel, #viewer.section #ftip, #viewer.section .dimlabel,
+#viewer.parts #readout, #viewer.parts #flabel { display: none !important; }
+#viewer.section #tools, #viewer.parts #tools { top: auto; bottom: 12px; }
 #sheetVp.panning { cursor: grabbing; }
 #sheetPaper svg { display: block; width: 960px; height: 680px; box-shadow: 0 1px 3px rgba(16, 24, 40, .1); }
 </style>
@@ -108,6 +109,7 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
     <button type="button" data-mode="3d" aria-pressed="true">3D</button>
     <button type="button" data-mode="drawing" aria-pressed="false">Drawing</button>
     <button type="button" data-mode="section" aria-pressed="false">Section</button>
+    <button type="button" data-mode="parts" aria-pressed="false">Parts</button>
   </div>
   <button id="rebuild" class="btn btn-primary" disabled><span class="spin"></span>Rebuild</button>
   <div class="relative" id="viewWrap">
@@ -176,8 +178,18 @@ input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner
         </div>
         <label id="secPos" class="flex h-9 items-center gap-2 rounded-full border border-line bg-panel px-3 text-[13px]">Cut at <input type="range" id="secSlider" class="w-36 cursor-pointer accent-accent sm:w-44" min="1" max="99" step="1" value="50"> <span id="secAt" class="min-w-[74px] tabular-nums">50 %</span></label>
       </div>
-      <div id="secLegend" class="card absolute bottom-3 left-3 flex flex-col gap-1" hidden></div>
+      <div id="secLegend" class="card absolute bottom-3 left-3 flex max-h-[60%] flex-col gap-1 overflow-y-auto" hidden></div>
       <div id="secMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
+    </section>
+    <section id="partView" class="pointer-events-none absolute inset-0 [&>*]:pointer-events-auto" hidden>
+      <div id="partBar" class="!pointer-events-none absolute left-3 right-3 top-2 z-10 flex flex-wrap items-center gap-2.5 [&>*]:pointer-events-auto">
+        <label id="exWrap" class="flex h-9 items-center gap-2 rounded-full border border-line bg-panel px-3 text-[13px]">Explode <input type="range" id="exSlider" class="w-36 cursor-pointer accent-accent sm:w-44" min="0" max="100" step="1" value="0"></label>
+        <button type="button" id="partBack" class="btn" hidden>← All parts</button>
+        <span id="partInfo" class="flex h-9 items-center rounded-full border border-line bg-panel px-3 text-[13px] tabular-nums" hidden></span>
+        <a id="partStl" class="btn" title="As placed in the assembly" hidden>Download STL</a>
+      </div>
+      <div id="partList" class="card absolute left-3 top-14 flex max-h-[calc(100%-68px)] w-56 flex-col gap-0.5 overflow-y-auto !px-1.5 !py-1.5 max-md:max-h-[40%] max-md:w-44" hidden></div>
+      <div id="partMsg" class="card absolute left-1/2 top-[60px] flex -translate-x-1/2 items-center gap-2" hidden></div>
     </section>
   </section>
 </main>
@@ -253,7 +265,7 @@ async function build() {
       if (v) await v.show(res);
       select(state.selected); // re-anchor the same feature, or clear if it is gone
       if (drawingMode) ensureDrawing();
-      if (sectionMode) ensureSection();
+      if (sectionMode || partsMode) ensureParts();
     }
   } catch (e) {
     showLog(String(e), true);
@@ -507,11 +519,15 @@ function makeViewer(T, STLLoader, OrbitControls) {
   const loader = new STLLoader();
   let shell = null, device = null, grid = null, fitted = false, devOn = true, shownKey = null;
   let center = new T.Vector3(), radius = 50;
+  let home = null, shellBox = null;  // The framing and the size box of the whole model, for the modes that leave them.
 
+  let padLeft = 0;  // Width in px that a list covers on the left: the view centers on the rest.
   const resize = () => {
     const w = Math.max(host.clientWidth, 1), h = Math.max(host.clientHeight, 1);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    if (padLeft) camera.setViewOffset(w, h, -padLeft / 2, 0, w, h);
+    else camera.clearViewOffset();
     camera.updateProjectionMatrix();
   };
   new ResizeObserver(resize).observe(host);
@@ -644,7 +660,10 @@ function makeViewer(T, STLLoader, OrbitControls) {
     if (!downAt) return;
     const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4;
     downAt = null;
-    if (!moved) {
+    if (!moved && partsOn) {
+      const p = partAt(e.clientX, e.clientY);
+      if (api.onPick) api.onPick(p ? info(p) : null);
+    } else if (!moved) {
       const r = featureAt(e.clientX, e.clientY);
       select(r ? r.f.name : null, r?.at);
     }
@@ -656,8 +675,14 @@ function makeViewer(T, STLLoader, OrbitControls) {
     hoverFrame = requestAnimationFrame(() => {
       hoverFrame = 0;
       if (!hoverAt) return hideTip();
-      const picked = hoverAt.dragging ? null : featureAt(hoverAt.x, hoverAt.y);
-      const f = picked && picked.f;
+      let f = null;
+      if (partsOn) {
+        f = hoverAt.dragging || isolated ? null : partAt(hoverAt.x, hoverAt.y);
+        setHot(f);
+      } else {
+        const picked = hoverAt.dragging ? null : featureAt(hoverAt.x, hoverAt.y);
+        f = picked && picked.f;
+      }
       if (!f) return hideTip();
       const r = host.getBoundingClientRect();
       tip.textContent = f.name;
@@ -666,11 +691,11 @@ function makeViewer(T, STLLoader, OrbitControls) {
       canvas.style.cursor = 'pointer';
     });
   });
-  canvas.addEventListener('pointerleave', () => { hoverAt = null; hideTip(); });
+  canvas.addEventListener('pointerleave', () => { hoverAt = null; hideTip(); if (partsOn) setHot(null); });
 
   const frame = (dir) => {
     const v = T.MathUtils.degToRad(camera.fov) / 2;
-    const h = Math.atan(Math.tan(v) * camera.aspect);
+    const h = Math.atan(Math.tan(v) * camera.aspect * (1 - padLeft / Math.max(host.clientWidth, 1)));
     const dist = (radius / Math.sin(Math.min(v, h))) * 1.1;
     camera.near = dist / 100; camera.far = dist * 100;
     camera.updateProjectionMatrix();
@@ -683,7 +708,8 @@ function makeViewer(T, STLLoader, OrbitControls) {
     ? camera.position.clone().sub(controls.target)
     : new T.Vector3(...VIEWS[name]));
 
-  const load = (url) => new Promise((ok, fail) => loader.load(url, ok, undefined, fail));
+  const loadOnce = (url) => new Promise((ok, fail) => loader.load(url, ok, undefined, fail));
+  const load = (url) => loadOnce(url).catch(() => loadOnce(url));  // One more try for a dropped connection.
   const mesh = (geo, mat) => {
     geo.computeVertexNormals();
     return new T.Mesh(geo, mat);
@@ -724,17 +750,83 @@ function makeViewer(T, STLLoader, OrbitControls) {
     side: { axis: 'x', n: [1, 0, 0], cam: [-1, 0, 0.001] },
     top: { axis: 'z', n: [0, 0, -1], cam: [0.001, -0.001, 1] },
   };
+  // Parts: one plain mesh per part in its own color. The explode slider moves each part away from the middle
+  // of the assembly, and one part can be shown alone. The geometries are shared with the section meshes.
+  const partGroup = new T.Group();
+  partGroup.visible = false;
+  scene.add(partGroup);
+  const pieces = [];
+  let partsOn = false, isolated = null, explode = 0, asmBox = null;
   const clearParts = () => {
-    for (const o of secGroup.children) {
-      if (o.material.map) o.material.map.dispose();
-      o.material.dispose();
-      if (o.geometry !== capGeo) o.geometry.dispose();
+    const geos = new Set();
+    for (const g of [secGroup, partGroup]) {
+      for (const o of g.children) {
+        if (o.material.map) o.material.map.dispose();
+        o.material.dispose();
+        if (o.geometry !== capGeo) geos.add(o.geometry);
+      }
+      g.clear();
     }
-    secGroup.clear();
+    for (const g of geos) g.dispose();
     caps.length = 0;
+    pieces.length = 0;
+    isolated = null;
   };
-  const addPart = (geo, color, i) => {
-    geo.computeVertexNormals();
+  const addPiece = (p, index, geo, eg, pal) => {
+    const opacity = p.ghost ? Math.min(p.opacity ?? 1, 0.3) : (p.opacity ?? 1);
+    const color = new T.Color(p.color || pal);
+    const mesh = new T.Mesh(geo, new T.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 }));
+    const edges = new T.LineSegments(eg, new T.LineBasicMaterial({ color: EDGE, transparent: true, opacity: opacity < 1 ? 0.35 : 0.8 }));
+    partGroup.add(mesh, edges);
+    const box = geo.boundingBox.clone();
+    const piece = { index, name: p.name, ghost: !!p.ghost, mesh, edges, box, center: box.getCenter(new T.Vector3()),
+                    url: p.url, volume: p.volume_cm3, light: !!p.light, color: `#${color.getHexString()}` };
+    mesh.userData.piece = piece;
+    pieces.push(piece);
+  };
+  const info = (p) => ({ index: p.index, name: p.name, ghost: p.ghost, color: p.color, url: p.url, volume: p.volume, light: p.light,
+                         size: p.box.getSize(new T.Vector3()).toArray() });
+  const layoutPieces = () => {
+    if (!asmBox) return;
+    const mid = asmBox.getCenter(new T.Vector3());
+    for (const p of pieces) {
+      const off = isolated ? new T.Vector3() : p.center.clone().sub(mid).multiplyScalar(explode);
+      p.mesh.position.copy(off);
+      p.edges.position.copy(off);
+      p.mesh.visible = p.edges.visible = isolated ? p === isolated : (!p.ghost || devOn);
+    }
+  };
+  // Highlight one part, or every part with a name.
+  const setHot = (target) => {
+    for (const p of pieces) {
+      const on = !!target && (p === target || p.name === target);
+      p.mesh.material.emissive.set(on ? accent : 0x000000);
+      p.mesh.material.emissiveIntensity = on ? 0.45 : 1;
+    }
+  };
+  // The part under the pointer. A see-through part counts only when nothing solid is behind it.
+  const partAt = (x, y) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(pieces.filter((p) => p.mesh.visible).map((p) => p.mesh), false);
+    const hit = hits.find((h) => !h.object.userData.piece.ghost) || hits[0];
+    return hit ? hit.object.userData.piece : null;
+  };
+  // Frame and measure what the mode shows: one part, the exploded assembly or the whole model.
+  const focus = () => {
+    if (partsOn && secKey && asmBox) {
+      const b = isolated ? isolated.box : asmBox;
+      center = b.getCenter(new T.Vector3());
+      radius = (b.getSize(new T.Vector3()).length() / 2) * (isolated ? 1 : 1 + explode);
+      box = isolated ? isolated.box.clone() : null;
+    } else {
+      if (home) { center = home.center.clone(); radius = home.radius; }
+      box = shellBox;
+    }
+    rebuildDims();
+  };
+  const addPart = (geo, eg, color, i) => {
     const order = 1 + 3 * i;
     const count = (side, op) => new T.MeshBasicMaterial({
       side, clippingPlanes: [clip], colorWrite: false, depthWrite: false, depthTest: false,
@@ -751,21 +843,54 @@ function makeViewer(T, STLLoader, OrbitControls) {
     cap.onAfterRender = (r) => r.clearStencil();
     const body = new T.Mesh(geo, new T.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, clippingPlanes: [clip], side: T.DoubleSide }));
     body.renderOrder = order + 2;
-    const edges = new T.LineSegments(new T.EdgesGeometry(geo, 30), new T.LineBasicMaterial({ color: EDGE, clippingPlanes: [clip] }));
+    const edges = new T.LineSegments(eg, new T.LineBasicMaterial({ color: EDGE, clippingPlanes: [clip] }));
     edges.renderOrder = order + 2;
     secGroup.add(back, front, cap, body, edges);
     caps.push(cap);
   };
   const showSection = () => {
+    const plain = !sectionOn && !partsOn;
     secGroup.visible = sectionOn && !!secKey;
-    if (shell) shell.visible = !sectionOn;
-    if (device) device.visible = devOn && !sectionOn;
+    partGroup.visible = partsOn && !sectionOn && !!secKey;
+    if (shell) shell.visible = plain;
+    if (device) device.visible = devOn && plain;
     dimGroup.visible = !sectionOn;
-    marker.visible = !sectionOn && !!anchored;
+    marker.visible = plain && !!anchored;
+    layoutPieces();
   };
 
-  return {
+  const api = {
     view,
+    onPick: null,  // Called with the part that was clicked in the parts view, or null.
+    pieces: () => pieces.map(info),
+    hot: setHot,
+    setPad(px) { if (px !== padLeft) { padLeft = px; resize(); view('fit'); } },
+    setParts(on) {
+      if (on === partsOn && !on) return;
+      partsOn = on;
+      if (!on) { isolated = null; setHot(null); }
+      hideTip();
+      showSection();
+      focus();
+      if (!sectionOn) view('fit');
+    },
+    setExplode(k) {
+      explode = k;
+      if (!partsOn || isolated) return;
+      layoutPieces();
+      focus();
+      view('fit');
+    },
+    // Show one part alone, or all of them again with null. Returns the part.
+    isolate(index) {
+      isolated = index == null ? null : pieces.find((p) => p.index === index) || null;
+      setHot(null);
+      hideTip();
+      showSection();
+      focus();
+      view('fit');
+      return isolated && info(isolated);
+    },
     probe: (x, y) => featureAt(x, y),  // for debugging from the console
     setDevice(on) { devOn = on; showSection(); },
     hasParts: (key) => !!key && key === secKey,
@@ -774,15 +899,30 @@ function makeViewer(T, STLLoader, OrbitControls) {
       const geos = await Promise.all(list.map((p) => load(p.url)));
       clearParts();
       secBox = new T.Box3();
-      legend = list.map((p, i) => {
-        const color = PALETTE[i % PALETTE.length];
-        geos[i].computeBoundingBox();
-        secBox.union(geos[i].boundingBox);
-        addPart(geos[i], color, i);
-        return { name: p.name, color: `#${color.toString(16).padStart(6, '0')}` };
+      asmBox = new T.Box3();
+      legend = [];
+      const names = new Map();  // Parts with the same name share a color and one legend row.
+      let cut = 0;
+      list.forEach((p, i) => {
+        const geo = geos[i];
+        geo.computeVertexNormals();
+        geo.computeBoundingBox();
+        const eg = new T.EdgesGeometry(geo, 30);
+        const fresh = !names.has(p.name);
+        if (fresh) names.set(p.name, names.size);
+        const color = PALETTE[names.get(p.name) % PALETTE.length];
+        asmBox.union(geo.boundingBox);
+        if (!p.ghost) {
+          secBox.union(geo.boundingBox);
+          addPart(geo, eg, color, cut++);
+          if (fresh) legend.push({ name: p.name, color: `#${color.toString(16).padStart(6, '0')}` });
+        }
+        addPiece(p, i, geo, eg, color);
       });
+      if (secBox.isEmpty()) secBox.copy(asmBox);
       secKey = key;
       showSection();
+      focus();
     },
     setSection(on) { sectionOn = on; showSection(); },
     // Put the plane at pct percent across the parts along the cut axis; return its place in mm.
@@ -833,12 +973,12 @@ function makeViewer(T, STLLoader, OrbitControls) {
       if (device) { device.visible = devOn; root.add(device); }
       sg.computeBoundingBox();
       const bb = sg.boundingBox;
-      center = bb.getCenter(new T.Vector3());
       const s = bb.getSize(new T.Vector3());
-      radius = s.length() / 2;
+      home = { center: bb.getCenter(new T.Vector3()), radius: s.length() / 2 };
+      shellBox = bb.clone();
       marker.scale.setScalar(Math.min(1.5, Math.max(0.3, 0.004 * Math.max(s.x, s.y, s.z))));
-      box = bb.clone();
-      rebuildDims();
+      showSection();
+      focus();
       if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); }
       const g = Math.max(10, Math.ceil((Math.max(s.x, s.y) * 1.5) / 10) * 10);
       grid = new T.GridHelper(g, g / 10, 0x8a939e, 0xb8c0ca);
@@ -848,6 +988,7 @@ function makeViewer(T, STLLoader, OrbitControls) {
       if (!fitted) { fitted = true; view('iso'); }
     },
   };
+  return api;
 }
 
 /* ---- Technical drawing sheet ---- */
@@ -1490,7 +1631,7 @@ document.querySelectorAll('#pager button').forEach((b) => b.addEventListener('cl
 let sectionMode = false, secCut = 'front', secSeq = 0;
 const secPct = { front: 50, side: 50, top: 50 };  // The slider place per cut, in percent of the assembly.
 function showSecMsg(text, bad) {
-  const m = $('secMsg');
+  const m = $(partsMode ? 'partMsg' : 'secMsg');
   m.hidden = !text;
   m.classList.toggle('err', !!bad);
   m.textContent = text || '';
@@ -1500,9 +1641,9 @@ function applyCut(look) {
   const at = viewer.setCut(secCut, secPct[secCut], look);
   $('secAt').textContent = `${{ front: 'y', side: 'x', top: 'z' }[secCut]} ${at.toFixed(1)} mm`;
 }
-async function ensureSection() {
+async function ensureParts() {
   const v = await viewerReady;
-  if (!v || !sectionMode) return;
+  if (!v || !(sectionMode || partsMode)) return;
   const seq = ++secSeq;
   if (!v.hasParts(state.buildKey)) {
     showSecMsg('Loading the parts…', false);
@@ -1524,10 +1665,14 @@ async function ensureSection() {
       return row;
     }));
     lg.hidden = false;
+    partSel = null;
+    renderPartList();
   }
   showSecMsg('');
   v.setSection(sectionMode);
-  applyCut(true);
+  v.setParts(partsMode);
+  if (sectionMode) applyCut(true);
+  else showPart();
 }
 document.querySelectorAll('#secCut button').forEach((b) => b.addEventListener('click', () => {
   secCut = b.dataset.cut;
@@ -1538,15 +1683,74 @@ document.querySelectorAll('#secCut button').forEach((b) => b.addEventListener('c
 // The plane follows the slider live: the page cuts the meshes itself.
 $('secSlider').addEventListener('input', (e) => { secPct[secCut] = Number(e.target.value); applyCut(false); });
 
+// ---- Parts view: the assembly exploded by a slider, and one part alone after a click on it or on its row
+let partsMode = false, partSel = null;
+function renderPartList() {
+  const byName = new Map();
+  for (const p of viewer.pieces()) byName.set(p.name, [...(byName.get(p.name) || []), p]);
+  const list = $('partList');
+  list.replaceChildren(...[...byName].map(([name, ps]) => {
+    const row = el('button', 'flex w-full flex-none items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-panel2 aria-pressed:bg-panel2 aria-pressed:font-semibold');
+    row.type = 'button';
+    row.dataset.name = name;
+    const sw = el('i', 'inline-block h-3 w-3 flex-none rounded-[3px] border border-line'); sw.style.background = ps[0].color;
+    const text = el('span', 'min-w-0 flex-1 truncate'); text.textContent = name;
+    row.append(sw, text);
+    if (ps.length > 1) { const n = el('span', 'text-xs tabular-nums text-muted'); n.textContent = `× ${ps.length}`; row.append(n); }
+    // A second click on the row of the shown part goes to the next part with that name.
+    row.addEventListener('click', () => {
+      const at = partSel && partSel.name === name ? ps.findIndex((p) => p.index === partSel.index) : -1;
+      pickPart(ps[(at + 1) % ps.length]);
+    });
+    row.addEventListener('pointerenter', () => { if (!partSel) viewer.hot(name); });
+    row.addEventListener('pointerleave', () => viewer.hot(null));
+    return row;
+  }));
+  list.hidden = !byName.size;
+  padView();
+}
+// Keep the model clear of the part list, unless the list lies over a narrow view.
+function padView() {
+  const list = $('partList'), wide = $('viewer').clientWidth >= 520;
+  if (viewer) viewer.setPad(partsMode && wide && !list.hidden ? list.offsetWidth + 12 : 0);
+}
+function showPart() {
+  const p = partSel;
+  for (const id of ['partBack', 'partInfo', 'partStl']) $(id).hidden = !p;
+  if (p && p.light) $('partStl').hidden = true;  // A simplified shape is not the part to print.
+  $('exWrap').hidden = !!p;
+  for (const row of $('partList').children) row.setAttribute('aria-pressed', String(!!p && row.dataset.name === p.name));
+  if (!p) return;
+  const same = viewer.pieces().filter((x) => x.name === p.name);
+  const nth = same.length > 1 ? ` · ${same.findIndex((x) => x.index === p.index) + 1} of ${same.length}` : '';
+  const vol = p.volume == null ? '' : ` · ${p.volume < 10 ? p.volume.toFixed(1) : Math.round(p.volume)} cm³`;
+  $('partInfo').textContent = `${p.name}${nth} · ${p.size.map((v) => v.toFixed(1)).join(' × ')} mm${vol}`;
+  $('partStl').href = p.url;
+  $('partStl').download = `${p.name.replace(/[^\w.-]+/g, '_')}.stl`;
+}
+function pickPart(p) {
+  if (!viewer || !partsMode || (!p && !partSel)) return;
+  partSel = viewer.isolate(p ? p.index : null);
+  showPart();
+}
+$('partBack').addEventListener('click', () => pickPart(null));
+$('exSlider').addEventListener('input', (e) => viewer && viewer.setExplode(Number(e.target.value) / 100 * 1.5));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && partsMode) pickPart(null); });
+
 function setMode(mode) {
   drawingMode = mode === 'drawing';
   sectionMode = mode === 'section';
+  partsMode = mode === 'parts';
   $('viewer').classList.toggle('drawing', drawingMode);
   $('viewer').classList.toggle('section', sectionMode);
+  $('viewer').classList.toggle('parts', partsMode);
   $('sheet').hidden = !drawingMode;
   $('secView').hidden = !sectionMode;
-  if (sectionMode) ensureSection();
-  else if (viewer) viewer.setSection(false);
+  $('partView').hidden = !partsMode;
+  if (viewer && !sectionMode) viewer.setSection(false);
+  if (viewer && !partsMode) { viewer.setParts(false); partSel = null; }
+  padView();
+  if (sectionMode || partsMode) ensureParts();
   for (const b of document.querySelectorAll('#modeSeg button')) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
   if (drawingMode) {
     if (!zoom.fitted) fitSheet();
@@ -1585,7 +1789,10 @@ for (const [id, all] of [['dlDrawing', false], ['dlAll', true]]) {
   });
 }
 
-const viewerReady = loadViewer().then((v) => (viewer = v, window.__viewer = v));
+const viewerReady = loadViewer().then((v) => {
+  if (v) v.onPick = pickPart;
+  return (viewer = v, window.__viewer = v);
+});
 init();
 </script>
 </body>

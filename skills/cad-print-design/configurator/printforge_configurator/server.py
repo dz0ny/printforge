@@ -240,7 +240,8 @@ class SmlibpyBackend:
             data = tmp.read_bytes()
             tmp.unlink()
             self.meshes[key] = data
-            while len(self.meshes) > 64:
+            # Keep up to 400 MB of meshes: an assembly can have hundreds of small bodies, or a few of several MB.
+            while len(self.meshes) > 1 and sum(len(m) for m in self.meshes.values()) > 400e6:
                 del self.meshes[next(iter(self.meshes))]
         return data
 
@@ -394,18 +395,41 @@ def smlibpy_drawing_views(sm, part):
     return views
 
 
+def color_of(shape):
+    """The display color of a body as ("#rrggbb" or None, opacity)."""
+    color = getattr(shape, "color", None)
+    if isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{8}", color):
+        return color[:7], int(color[7:], 16) / 255
+    if isinstance(color, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        return color, 1.0
+    if isinstance(color, (list, tuple)) and len(color) >= 3:
+        return "#" + "".join(f"{round(255 * min(1.0, max(0.0, float(v)))):02x}" for v in color[:3]), 1.0
+    return None, 1.0
+
+
 def section_items(last, ns):
-    """Return the parts to cut as (name, shape) pairs.
+    """Return the parts for the section and the parts view as a list of dicts.
 
     A model can define section_shapes() -> {name: shape}, for example with lighter parts.
-    Next comes parts() -> {name: shape}, and last the pieces of build() as part 1, part 2.
+    Next comes parts() -> {name: shape}, and last the pieces of build(), each with the name the model gave the body.
+    The pieces of device() follow as ghosts: the parts view draws them see-through and the section leaves them out.
     """
+    items = None
     for hook in ("section_shapes", "parts"):
         fn = ns.get(hook)
         if callable(fn):
-            return list(fn().items())
-    pieces = list(last) if isinstance(last, (list, tuple)) else [last]
-    return [(f"part {i + 1}", p) for i, p in enumerate(pieces)]
+            # The shapes of section_shapes() can be lighter than the real parts, so they are not for download.
+            items = [{"name": name, "shape": shape, "ghost": False, "light": hook == "section_shapes"} for name, shape in fn().items()]
+            break
+    if items is None:
+        pieces = list(last) if isinstance(last, (list, tuple)) else [last]
+        items = [{"name": getattr(p, "name", None) or f"part {i + 1}", "shape": p, "ghost": False} for i, p in enumerate(pieces)]
+    device = ns.get("device")
+    if callable(device):
+        ghost = device()
+        for p in ghost if isinstance(ghost, (list, tuple)) else [ghost]:
+            items.append({"name": getattr(p, "name", None) or "device", "shape": p, "ghost": True})
+    return items
 
 
 def worker(model_path):
@@ -452,13 +476,20 @@ def worker(model_path):
                     if last is None:
                         raise RuntimeError("no build yet")
                     items = section_items(last, last_ns)
-                    backend = backend_for([p for _, p in items])
-                    names = []
-                    for i, (name, piece) in enumerate(items):
+                    backend = backend_for([item["shape"] for item in items])
+                    parts = []
+                    for i, item in enumerate(items):
+                        piece = item["shape"]
                         f = Path(req["out"]) / f"part_{i}.stl"
                         f.write_bytes(backend.piece_stl(piece, f))
-                        names.append(name)
-                    reply = {"ok": True, "names": names}
+                        color, opacity = color_of(piece)
+                        try:
+                            volume = None if item.get("light") else piece.volume / 1000
+                        except Exception:
+                            volume = None
+                        parts.append({"name": item["name"], "ghost": item["ghost"], "color": color, "opacity": opacity,
+                                      "volume_cm3": volume, "light": bool(item.get("light"))})
+                    reply = {"ok": True, "parts": parts}
         except AssertionError as e:
             # A design rule from the model's own asserts: say it plainly, no traceback.
             buf.write(f"Design rule: {e}\n")
@@ -521,6 +552,8 @@ class Worker:
 # ---- server ----
 
 class Server(ThreadingHTTPServer):
+    request_queue_size = 128  # The page asks for the meshes of all parts of an assembly at once.
+
     def __init__(self, addr, handler, model, page):
         super().__init__(addr, handler)
         self.model = model
@@ -625,7 +658,7 @@ def export_parts(srv):
                 reply = srv.worker.request({"cmd": "parts", "out": str(root)})
                 if not reply.get("ok"):
                     return None, reply.get("log", "part export failed")
-                entry["parts"] = [(name, (root / f"part_{i}.stl").read_bytes()) for i, name in enumerate(reply["names"])]
+                entry["parts"] = [dict(p, stl=(root / f"part_{i}.stl").read_bytes()) for i, p in enumerate(reply["parts"])]
             finally:
                 shutil.rmtree(root, ignore_errors=True)
         return entry, None
@@ -757,14 +790,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, {"ok": False, "log": err})
                 k = entry["key"]
                 return self._json(200, {"ok": True, "key": k, "parts": [
-                    {"name": name, "url": f"/api/parts/{i}.stl?key={k[:12]}"} for i, (name, _) in enumerate(entry["parts"])]})
+                    {**{n: v for n, v in p.items() if n != "stl"}, "url": f"/api/parts/{i}.stl?key={k[:12]}"}
+                    for i, p in enumerate(entry["parts"])]})
             m = re.fullmatch(r"/api/parts/(\d+)\.stl", path)
             if m:
                 parts = (srv.last or {}).get("parts") or []
                 i = int(m.group(1))
                 if i >= len(parts):
                     return self._json(404, {"ok": False, "error": "no such part mesh"})
-                return self._send(200, parts[i][1], "model/stl", {"Cache-Control": "no-store"})
+                return self._send(200, parts[i]["stl"], "model/stl", {"Cache-Control": "no-store"})
             if path == "/api/step":
                 data, err = export_step(srv)
                 if err:

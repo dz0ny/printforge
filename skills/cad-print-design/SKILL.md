@@ -180,7 +180,11 @@ For a part built around a device, give the user a page where they can adjust the
     "port": 8765}
    ```
 
-The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view, a Section view, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+The page has Rebuild, an auto-rebuild switch, a Dimensions toggle that draws the overall size on the part, a Drawing view, a Section view, a Parts view, a Download menu with the shell STL, the shell STEP, the device STL and the drawing SVG, and Save to script, which writes the values back into the Python file and keeps every comment. The server keeps one warm worker running inside the project's own uv environment, so a rebuild costs only the model's own time (under 2 s for the mixer sleeve), repeats of the same values come from an in-memory cache, and the STEP is exported only when it is downloaded. A broken edit shows its traceback in the build log and the worker restarts on the next build. The committed script stays the source of truth, so after the user saves, rebuild the views and 3MF with the usual commands.
+
+### The parts view
+
+The Parts view shows an assembly as its bodies. A slider explodes it: each body moves away from the middle of the assembly. A click on a body, or on its row in the list, shows that body alone with its name, size, volume and an STL download; Escape or All parts goes back. Bodies with the same name share one row with a count, and a second click on the row goes to the next one. The names and colors come from the model: give each body of `build()` a `.named(...)` and a `.colored(...)`, or define `parts() -> {name: shape}`. The pieces of `device()` are drawn see-through.
 
 ### The drawing sheet
 
