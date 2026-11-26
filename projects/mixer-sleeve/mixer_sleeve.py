@@ -8,7 +8,7 @@ Add `--serve` to adjust the part in the browser.
 import math
 
 from smlibpy import (Align, Box, Circle, Cylinder, Line, Locations, Part, Plane, Polygon,
-                     RegularPolygon, Spline, Wire, Y, make_face, ruled, stitch)
+                     RegularPolygon, Spline, Wire, X, Y, make_face, ruled, stitch)
 
 # 🎛️ Mixer body width in mm, which is barrel shaped.
 MIX_W = 190.0   # Width at the widest point of the body. [100:300].
@@ -18,8 +18,11 @@ MIX_W_AT = 110.0      # Distance from the bottom edge to the widest point. [0:25
 
 # 📏 Mixer body depth and height in mm.
 MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400].
-MIX_H = 26.0    # Body thickness with feet, without knobs. [10:80].
-FOOT_H = 3.0    # Height of the rubber feet, which lift the edges of the body. [0:10].
+MIX_H = 29.5    # Body thickness with feet, without knobs, measured over a foot: 29.5. The bare side edge is 26.3. [10:80].
+FOOT_H = 3.2    # Height of the rubber feet, which lift the edges of the body: 29.5 over a foot, 26.3 beside it. [0:10].
+REAR_H = 35.7   # Thickness with feet over the raised jack block at the rear, measured. [10:80].
+REAR_L = 78.0   # Length of that block from the rear edge, with its slope. Estimated from a side photo. [0:150].
+FRONT_R = 9.0   # Radius of the rounded top front edge of the body. Estimated from a side photo: measure it. [0:20].
 EDGE_R = 3.0    # Radius of the bottom edges of the body, which the floor fillet must clear. [0:10].
 
 # 🖨️ Printer. The part prints flat on its back, so X and Y use lines and Z uses layers.
@@ -29,9 +32,9 @@ LAYER = 0.28
 
 # 📐 Sleeve size in mm.
 CLEAR = 0.5       # Gap on each side and at the end stop. [0.2:1.5].
-CLEAR_TOP = 2 * LAYER  # Gap above the body, under the lips, 2 layers.
+CLEAR_TOP = 4 * LAYER  # Gap above the body, under the lips, 4 layers.
 SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400].
-WALL_H = 34.0     # Outer side wall height, from the floor to the lip top. [20:100].
+WALL_H = 43.5    # Outer side wall height, from the floor to the lip top. 34 was too low and the lip broke. [20:100].
 
 # 🧱 Walls and base.
 WALL = 8 * LINE   # Side wall thickness of 8 lines, because the first print broke at 6.
@@ -41,16 +44,20 @@ ROUND = 1.0       # Radius on the outer edges and lip tips.
 
 # 🛑 End stop, which the mixer rests on.
 END = 6 * LINE    # End stop thickness of 6 lines: 3 wall loops on each side, no infill.
-END_H = 16.0      # End stop height, low for the curved mixer edge.
+END_H = 28.0      # End stop height in the middle, when there is no front lip. [10:60].
 END_FILLET = 2.0  # Fillet at the end stop, small for the mixer corners.
 END_TRI = 20.0    # Width of the corner triangles that tie the stop to the walls, zero for a plain slope.
 
 # 🪝 Lips that hold the mixer in, with a fill underneath so the part prints flat.
-LIP = 6.8         # Lip reach over the mixer edge, of which only 2.4 mm gets the fill at a 34 mm wall.
-LIP_T = 7 * LAYER  # Lip thickness, 7 layers.
-LIP_FREE = 80.0   # Length at the open end without a lip.
-LIP_FILL_SLACK = 4.5  # Allowed depth shortfall of the lip fill, 1.0 for near 45 degrees, 4.5 for a ramp that may sag.
-LIP_SLOPE_GAP = 3.0  # Distance between the end of the lips and the bottom slope.
+LIP = 6.8         # Lip reach over the mixer edge, with a fill under it at about 45 degrees.
+LIP_T = 10 * LAYER  # Lip thickness, 10 layers, because 7 broke.
+LIP_FREE = 80.0   # Length at the open end without a lip, past the raised jack block. [40:150].
+FRONT_LIP = True  # A rounded hood on the end stop that curls over the front edge of the body, in place of a low stop. [0:1].
+WALL_SLOPE = True  # Cut the top front corner of each wall along the outside of the hood, then at 45 degrees to the wall top. [0:1].
+HOOD_L = 4.0      # Length of the straight end of that hood, past its curve, at 45 degrees so it prints without supports.
+LIP_TAPER = 8.0   # Length over which each lip end runs down to the wall as a triangle, zero for a square end. [0:30].
+LIP_FILL_SLACK = 1.0  # Allowed depth shortfall of the lip fill, 1.0 for near 45 degrees, 4.5 for a ramp that may sag.
+LIP_SLOPE_GAP = 6.0  # Gap between the end of the side lips and the hood, or the bottom slope.
 
 # 🔺 Gussets: 45 degree ribs on the outside of each wall, against side knocks.
 GUSSETS = False    # Ribs on the outside of the walls, off for smooth walls. [0:1].
@@ -72,6 +79,7 @@ VENT_MARGIN = 8.0   # Solid border around each vent area.
 
 # 🪟 Side and end vents.
 SIDE_VENTS = False  # Side vents, off because they made the walls weak. [0:1].
+END_VENTS = False   # Vents in the end stop, off: the front is solid. [0:1].
 SIDE_HEX = 9.0      # Side vent hex size.
 SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
 
@@ -85,6 +93,44 @@ IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
 LEN = SLEEVE_H - END
 TOTAL_LEN = LEN + END
 FILL = max(0.0, min(LIP, IN_H - MIX_H - CLEAR_TOP))  # Fill depth under the lips: the room above the mixer, up to LIP.
+
+
+def hood_profile():
+    """The hood on the end stop as (x, z) points: a shell as thick as the stop that follows the front edge of the body.
+
+    Its inside is an arc around the rounded edge, CLEAR away from it, up to 45 degrees, then a straight end at 45
+    degrees. Nothing in it overhangs more than that, so it prints without supports.
+    """
+    rin, zi = FRONT_R + CLEAR, BASE + MIX_H + CLEAR_TOP
+    xc, zc = LEN - rin, zi - rin
+    steps = [math.radians(a) for a in range(0, 46, 5)]
+    c = math.sqrt(0.5)
+
+    def side(r):
+        arc = [(xc + r * math.cos(a), zc + r * math.sin(a)) for a in steps]
+        return arc + [(arc[-1][0] - HOOD_L * c, arc[-1][1] + HOOD_L * c)]
+
+    return side(rin) + side(rin + END)[::-1], zc
+
+
+def wall_profile(top):
+    """The cut of the top front corner of a wall as (x, z) points, up to the height top.
+
+    It is the outside of the hood, with its straight end carried on at 45 degrees, so wall and hood are one surface.
+    """
+    points, zc = hood_profile()
+    outer = points[len(points) // 2:][::-1]        # The outside of the hood, from the stop upward.
+    arc, (xo, zo) = outer[:-1], outer[-2]          # Without the tip: the 45 degree line starts at the arc's end.
+    return arc + [(xo - (top - zo), top), (TOTAL_LEN + 1, top), (TOTAL_LEN + 1, zc)]
+
+
+def lip_end():
+    """Where the side lips end at the end stop: a gap before the hood, or before the low stop."""
+    if FRONT_LIP:
+        points, zc = hood_profile()
+        slope = min(x for x, _ in wall_profile(OUT_H)) if WALL_SLOPE else TOTAL_LEN   # Where the walls start to slope.
+        return min(min(x for x, _ in points) - LIP_SLOPE_GAP, slope - 1)
+    return TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
 
 
 def box(x0, y0, z0, x1, y1, z1):
@@ -160,7 +206,7 @@ def vents():
         plane = Plane(origin=(0, y, 0), x_dir=(0, 0, 1), z_dir=(0, 1, 0))
         cut += hex_prisms(side, SIDE_HEX, plane, WALL + 2)
     ys = (WALL + END_FILLET + m, OUT_D - WALL - END_FILLET - m)
-    end = hex_grid(zs[0], min(zs[1], END_H - SIDE_MARGIN), *ys, size=SIDE_HEX)
+    end = hex_grid(zs[0], min(zs[1], (hood_profile()[1] if FRONT_LIP else END_H) - SIDE_MARGIN), *ys, size=SIDE_HEX) if END_VENTS else []
     plane = Plane(origin=(LEN + END / 2, 0, 0), x_dir=(0, 0, 1), z_dir=(1, 0, 0))
     cut += hex_prisms([(z, -y) for z, y in end], SIDE_HEX, plane, END + 2)
     print(f"vents: back {len(back)}, each side {len(side)}, end stop {len(end)}")
@@ -179,6 +225,13 @@ def check_design():
         f"raise WALL_H to at least {BASE + MIX_H + CLEAR_TOP + LIP - LIP_FILL_SLACK + LIP_T:.1f}, lower LIP to "
         f"{FILL + LIP_FILL_SLACK:.1f}, or raise LIP_FILL_SLACK")
     assert LEN <= MIX_D + CLEAR, "sleeve is longer than the mixer"
+    block_end = REAR_L - (MIX_D + CLEAR - LEN)  # End of the raised jack block, from the open end.
+    assert LIP_FREE >= block_end + 3, f"the side lips start on the raised jack block: raise LIP_FREE to {block_end + 3:.0f}"
+    assert BASE + REAR_H <= OUT_H, "the walls are lower than the raised jack block"
+    if FRONT_LIP:
+        points, zc = hood_profile()
+        assert zc >= BASE + END_FILLET + 2, "the front edge radius is too large for this body thickness"
+        assert max(z for _, z in points) <= OUT_H, "the hood is higher than the walls"
     assert max(MIX_W_BOTTOM, MIX_W_TOP) <= MIX_W, "MIX_W must be the widest point of the body"
     assert 0 < MIX_W_AT < LEN, "MIX_W_AT must lie inside the sleeve"
 
@@ -205,7 +258,7 @@ def outline(extra, **kw):
     return make_face(Wire(outline_edges(extra, **kw)))
 
 
-def round_edges(part, lip_end):
+def round_edges(part, lip_end, avoid=lambda p: False):
     """Round the outer edges and the wall tops, then each lip end and open end edge that rounds.
 
     The first group always rounds in one call.
@@ -235,6 +288,8 @@ def round_edges(part, lip_end):
             if e.geom_type != "line":
                 continue
             q = (e.point_at(0), e.point_at(1), e.center())
+            if any(avoid(p) for p in q):   # Edges of the cut for the hood stay sharp: the hood covers them.
+                continue
             if any(all(t(p) for p in q) for t in tests):
                 out.append(e)
         return out
@@ -278,10 +333,13 @@ def build():
     # The lip opening is the cavity outline LIP further in, so the lips follow the body too.
     part -= outline(CLEAR - LIP, x_bottom=LEN).extrude(OUT_H - zt + 2).translate(0, 0, zt - 1)
 
-    # Remove the lips near the open end and before the bottom slope.
-    lip_end = TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
-    part -= box(-1, y0, zt, LIP_FREE, y1, OUT_H + 1)
-    part -= box(lip_end, y0, zt, LEN, y1, OUT_H + 1)
+    # Remove the lips near the open end and before the end stop. The cut follows the cavity, not a straight box,
+    # so the walls keep one smooth inner face up to their top there, with no step.
+    lip_end_x = lip_end()
+    above = outline(CLEAR, x_bottom=LEN).extrude(OUT_H + 2 - zt).translate(0, 0, zt - 0.01)
+    part -= above & box(-2, -1, zt - 1, LIP_FREE, OUT_D + 1, OUT_H + 3)
+    if lip_end_x < LEN:
+        part -= above & box(lip_end_x, -1, zt - 1, LEN + 1, OUT_D + 1, OUT_H + 3)
 
     # The fill under the lips is a slab of the cavity outline, FILL deep, minus a core.
     # The core goes from the lip edge at the top to the cavity wall at the bottom.
@@ -292,10 +350,24 @@ def build():
         high = outline_edges(CLEAR - LIP, x_bottom=LEN, z=zt)
         core = stitch([ruled(a, b) for a, b in zip(low, high)], make_face(Wire(low)), make_face(Wire(high)))
         assert isinstance(core, Part), "the core under the lips did not close"
-        part += (slab - core) & box(LIP_FREE, -1, zt - FILL - 1, lip_end, OUT_D + 1, zt + 1)
+        part += (slab - core) & box(LIP_FREE, -1, zt - FILL - 1, lip_end_x, OUT_D + 1, zt + 1)
+
+    # Each lip ends in a triangle, seen from above: over LIP_TAPER its reach goes straight down to nothing at the
+    # wall, at 45 degrees. The fill under it is cut by the same plane. The cut stays inside the cavity outline.
+    if LIP_TAPER > 0:
+        z_low = zt - FILL - 0.5
+        inside = outline(CLEAR, x_bottom=LEN).extrude(OUT_H + 2 - z_low).translate(0, 0, z_low)
+        far = BOW + LIP + 0.3                      # Past the lip edge, measured from the outermost wall face.
+        for x_end, back in ((lip_end_x, -1), (LIP_FREE, 1)):
+            for y_wall, side in ((y0, 1), (y1, -1)):
+                tri = [(x_end + back * LIP_TAPER, y_wall + side * far), (x_end, y_wall - side * 0.3),
+                       (x_end, y_wall + side * far)]
+                part -= Polygon(tri).extrude(OUT_H + 2 - z_low).translate(0, 0, z_low) & inside
 
     top = OUT_H + 10
-    if END_TRI > 0:
+    if FRONT_LIP:
+        pass  # The stop keeps its full height for the inner fillets below. The hood replaces its top after them.
+    elif END_TRI > 0:
         # Lower the end stop in the middle only.
         # At each wall the stop keeps the full wall height and goes down to END_H over END_TRI.
         yb0, yb1 = y0 + BOW, y1 - BOW  # The inner face of the stop meets the walls here.
@@ -311,7 +383,30 @@ def build():
     part = part.fillet(edges_in(part, (0, y0, zf, LEN, y0 + b, zf), (0, y1 - b, zf, LEN, y1, zf)), FILLET)
     part = part.fillet(edges_in(part, (LEN, y0, zf, LEN, y0 + b, zf + 5), (LEN, y1 - b, zf, LEN, y1, zf + 5),
                                 (LEN, y0, zf, LEN, y1, zf)), END_FILLET)
-    part = round_edges(part, lip_end)
+    if FRONT_LIP:
+        # The corners stay plain: the walls keep their full height, and the side lips end a gap before the hood.
+        # From wall to wall the stop ends where the front edge of the body starts to curve, and the hood goes on.
+        # The rounds in the corners between the walls and the stop go with it, cut along the cavity itself.
+        yb0, yb1 = y0 + BOW, y1 - BOW
+        points, zc = hood_profile()
+        part -= box(LEN, yb0, zc, TOTAL_LEN + 1, yb1, top)
+        part -= outline(CLEAR, x_bottom=LEN).extrude(top - zc).translate(0, 0, zc) & box(
+            LEN - END_FILLET - 1, -1, zc - 1, LEN + 1, OUT_D + 1, top + 1)
+    if FRONT_LIP:
+        part = round_edges(part, lip_end_x, lambda p: p.x > LEN - END_FILLET - 1.5 and p.z > zc - 0.05
+                           and yb0 - 0.05 < p.y < yb1 + 0.05)
+    else:
+        part = round_edges(part, lip_end_x)
+    if FRONT_LIP:
+        # The hood goes on after the rounding, with a skirt that reaches into the stop.
+        skirt = [(TOTAL_LEN, zc - 1), (LEN, zc - 1)]
+        part += Polygon(points + skirt).on(Plane.XZ).extrude(-(yb1 - yb0 + 1)).translate(0, yb0 - 0.5, 0)
+        if WALL_SLOPE:
+            # The top front corner of each wall follows the outside of the hood and goes on at 45 degrees to the
+            # wall top, so the wall runs into the hood without a step. The cut comes after the rounding.
+            wedge = wall_profile(top)
+            for ya, yb in ((-1, yb0), (yb1, OUT_D + 1)):
+                part -= Polygon(wedge).on(Plane.XZ).extrude(-(yb - ya)).translate(0, ya, 0)
 
     part -= Locations(*hole_points()) * Circle(MARK_D / 2).extrude(MARK_DEPTH)
     part -= vents()
@@ -321,9 +416,9 @@ def build():
     t = 1.5
     for y, s in ((0, -1), (OUT_D, 1)):
         tri = [(y + s * GUSSET, 0), (y - s * t, 0), (y - s * t, GUSSET + t)]
-        for x in gusset_points(lip_end):
+        for x in gusset_points(lip_end_x):
             part += Polygon(tri).on(Plane.YZ).extrude(GUSSET_T).translate(x - GUSSET_T / 2, 0, 0)
-    print(f"gussets: {len(gusset_points(lip_end))} per side")
+    print(f"gussets: {len(gusset_points(lip_end_x))} per side")
     return part
 
 
@@ -342,6 +437,15 @@ def device():
             body = body.fillet([e for e in body.edges() if abs(e.center().z - z0) < 0.01], EDGE_R)
         except Exception:
             pass  # A fillet along the splines can fail, and the ghost then has square bottom edges.
+    if REAR_L > 0 and REAR_H > MIX_H:
+        top = BASE + MIX_H
+        block = outline(0.0, x_open=x0).extrude(REAR_H - MIX_H + 1).translate(0, 0, top - 1)
+        body += block & box(x0 - 1, -1, top - 2, x0 + REAR_L, OUT_D + 1, BASE + REAR_H)
+    if FRONT_R > 0:
+        top = BASE + MIX_H
+        corner = box(x1 - FRONT_R, -1, top - FRONT_R, x1 + 1, OUT_D + 1, top + 1)
+        corner -= Cylinder(FRONT_R, OUT_D + 4).rotate(X, 90).translate(x1 - FRONT_R, OUT_D / 2, top - FRONT_R)
+        body -= corner
     for fx in (x0 + 15, x1 - 15):
         for fy in (y0 + 15, y0 + MIX_W - 15):
             body += Cylinder(6, max(FOOT_H, 0.01), align=(Align.CENTER, Align.CENTER, Align.MIN)).translate(fx, fy, BASE)
@@ -355,7 +459,8 @@ def features():
     The labels() function turns the anchors into the tags on the rendered views.
     """
     pts = hole_points()
-    lip_end = TOTAL_LEN - (OUT_H - END_H) - LIP_SLOPE_GAP
+    lip_end_x = lip_end()
+    stop_h = hood_profile()[1] if FRONT_LIP else END_H
     f = {
         "Back plate": ((TOTAL_LEN / 2, OUT_D / 2, -0.5), (0, 0, -1),
                        ["BASE", "VENT_HEX", "VENT_WEB", "VENT_MARGIN"]),
@@ -366,11 +471,11 @@ def features():
         "Right wall": ((TOTAL_LEN / 2, OUT_D + 0.5, OUT_H / 2), (0, 1, 0),
                        ["WALL", "WALL_H", "FILLET", "SIDE_VENTS", "SIDE_HEX"]),
         "Open end": ((-0.5, WALL / 2, OUT_H / 2), (-1, 0, 0), ["SLEEVE_H", "LIP_FREE"]),
-        "End stop": ((TOTAL_LEN + 0.5, OUT_D / 2, END_H / 2), (1, 0, 0),
-                     ["END", "END_H", "END_FILLET", "CLEAR"]),
-        "Left lip": (((LIP_FREE + lip_end) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1),
+        "End stop": ((TOTAL_LEN + 0.5, OUT_D / 2, stop_h / 2), (1, 0, 0),
+                     ["END", "END_H", "END_FILLET", "CLEAR", "FRONT_LIP"]),
+        "Left lip": (((LIP_FREE + lip_end_x) / 2, WALL + LIP / 2, OUT_H + 0.5), (0, 0, 1),
                      ["LIP", "LIP_T", "LIP_SLOPE_GAP", "CLEAR_TOP", "LIP_FILL_SLACK"]),
-        "Right lip": (((LIP_FREE + lip_end) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1),
+        "Right lip": (((LIP_FREE + lip_end_x) / 2, OUT_D - WALL - LIP / 2, OUT_H + 0.5), (0, 0, 1),
                       ["LIP", "LIP_T", "LIP_SLOPE_GAP", "CLEAR_TOP", "LIP_FILL_SLACK"]),
         "Lip-free zone": ((LIP_FREE / 2, WALL / 2, OUT_H + 0.5), (0, 0, 1), ["LIP_FREE"]),
         "Bottom slope": ((TOTAL_LEN - (OUT_H - END_H) / 2, WALL / 2, (OUT_H + END_H) / 2),
@@ -382,7 +487,12 @@ def features():
         "Mixer": ((LEN - MIX_D / 2, OUT_D / 2, BASE + MIX_H + 0.5), (0, 0, 1),
                   ["MIX_W", "MIX_W_BOTTOM", "MIX_W_TOP", "MIX_W_AT", "MIX_D", "MIX_H", "FOOT_H", "EDGE_R", "CLEAR", "CLEAR_TOP"]),
     }
-    del f["Corner triangle" if END_TRI <= 0 else "Bottom slope"]
+    if FRONT_LIP:
+        del f["Corner triangle"], f["Bottom slope"]
+        tip = max(hood_profile()[0], key=lambda q: q[1])
+        f["Front hood"] = ((tip[0] + 1, OUT_D / 2, tip[1] + 0.5), (0.7, 0, 0.7), ["FRONT_LIP", "FRONT_R", "HOOD_L", "END", "CLEAR", "CLEAR_TOP"])
+    else:
+        del f["Corner triangle" if END_TRI <= 0 else "Bottom slope"]
     if GUSSETS:
         f["Gusset"] = ((GUSSET_FIRST, -GUSSET / 2 - 0.3, GUSSET / 2 - 0.3), (0, -0.7, 0.7),
                        ["GUSSETS", "GUSSET", "GUSSET_T", "GUSSET_PITCH", "GUSSET_FIRST"])
