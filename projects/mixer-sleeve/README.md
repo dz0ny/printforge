@@ -9,10 +9,10 @@ reachable through the open front, and the rear jacks stay free at the top.
   <img src="./views/sheet.png" alt="Labeled views of the mixer sleeve" width="900" />
 </p>
 
-**Printed and fitted on 2026-10-23**, at commit d45bee2: 190/188/189 mm
-widths, 34 mm walls, 3.4 mm lips, 80 mm lip-free zone. The first print at
-191 mm straight walls had side play and a wall broke off; this one is the
-keeper.
+**Reworked on 2026-11-26, not printed yet.** The print of 2026-10-23 (commit d45bee2) fitted in width, but a
+side lip broke: the model took the mixer as 26 mm thick, which left 2.4 mm under a 2 mm lip. The mixer measures
+29.5 mm over a foot and 35.7 mm over the jack block at the rear. The sleeve now has 43.5 mm walls, 2.8 mm lips on a
+full 45° fill, and a rounded hood over the front edge in place of the low end stop.
 
 ## Files
 
@@ -27,7 +27,7 @@ keeper.
 | `make_3mf.py` | Builds the 3MF from the STL, the settings and the template |
 | `labels.json` | Named anchor points that `render_views.py` draws as tags |
 | `render_views.py` | Renders the labeled views in `views/` |
-| `check_part.py` | The checker. With `LIP` 6.8 and `LIP_FILL_SLACK` 4.5 it flags about 1,000 mm² of overhang: the 19° ramp under the lips, which may sag printed flat |
+| `check_part.py` | The checker: thin walls, knife edges, overhangs in the print orientation and a clash with the mixer. The sleeve passes all of them |
 | `device()`, `features()` in `mixer_sleeve.py` | The mixer body as a ghost for the configurator, and the named features with the settings behind each, used for the view tags and for click-to-highlight |
 | `sections.png` | Cross-sections through the lip and the end stop |
 
@@ -63,40 +63,46 @@ Use these names when you ask for a change.
 | Back plate / Mount face | The flat back that screws to the wall mount |
 | Mount marks M1–M4 | Small marks for the mount screws, 80 × 80 mm apart, each in a solid pad |
 | Left wall, Right wall | The long sides that grip the mixer. Their inner faces bow to follow the body, from a spline through the three measured widths |
-| Left lip, Right lip | 6.8 mm lips over the mixer's front edge, with a fill underneath that is only 2.4 mm deep at a 34 mm wall, a 19° ramp |
-| Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily |
+| Left lip, Right lip | 6.8 mm lips over the mixer's front edge, 2.8 mm thick, with a fill underneath at 45°. Each end runs down to the wall as a triangle |
+| Lip-free zone | The top 80 mm, where the lips stop so the mixer goes in easily and the raised jack block has room |
 | Open end | The top, where the mixer slides in |
-| End stop | The low 16 mm stop at the bottom that carries the mixer |
-| Corner triangles | At each wall the end stop keeps the wall's full 34 mm and runs down to 16 mm over 20 mm, a triangle that ties the stop to the wall so the corner cannot fold |
-| Back vents | 11.5 mm hexes in the back. The side walls are solid since the first print broke there |
+| End stop | The solid stop at the bottom that carries the mixer, up to where the mixer's front edge starts to curve |
+| Front hood | A shell as thick as the stop that curls over the rounded front edge of the mixer, up to 45° and then straight, so it prints without supports |
+| Wall ends | The top front corner of each wall is cut along the outside of the hood and then at 45° to the wall top, so wall and hood are one surface |
+| Back vents | 11.5 mm hexes in the back. The side walls and the end stop are solid |
 | Floor fillet | The 6 mm rounding between the walls and the back plate |
 | Gussets | Optional 10 mm ribs at 45° on the outside of each wall, off by default (`GUSSETS`) |
 
 ## Main settings
 
+The configurator shows only the measured sizes of the mixer and the feature switches. Everything else is a fixed
+value in the script.
+
 | Setting | Value | Meaning |
 |---|---|---|
-| `MIX_W × MIX_D × MIX_H` | 190 × 215 × 26 mm | Widest point, depth and thickness as the sleeve uses them |
-| `MIX_W_BOTTOM`, `MIX_W_TOP`, `MIX_W_AT` | 188, 189, 110 mm | The body is barrel shaped: width at the bottom edge, at the sleeve's open end, and where the widest point sits. Measure these three |
-| `FOOT_H`, `EDGE_R` | 4, 3 mm | The mixer's feet and bottom edge radius, on the ghost, so the checker knows the floor fillet clears the body |
-| `CLEAR` | 0.5 mm | Gap on each side and at the end stop |
+| `MIX_W`, `MIX_W_BOTTOM`, `MIX_W_TOP` | 190, 188, 189 mm | The body is barrel shaped: width at the widest point, at the bottom edge, and at the sleeve's open end |
+| `MIX_D` | 215 mm | Depth, front to back |
+| `MIX_H` | 29.5 mm | Thickness over a foot, without knobs. Beside a foot the side edge is 26.3 mm |
+| `REAR_H`, `REAR_L` | 35.7, 78 mm | Thickness over the raised jack block at the rear, and its length. The length is an estimate from a photo |
+| `FRONT_R` | 9 mm | Radius of the rounded top front edge, which the hood follows. An estimate from a photo |
+| `FRONT_LIP` | on | The rounded hood. Off brings back the low end stop with corner triangles |
+| `WALL_SLOPE` | on | The wall ends cut along the hood |
+| `GUSSETS`, `SIDE_VENTS`, `END_VENTS` | off | Ribs on the walls, vents in the walls, vents in the end stop |
+
+Fixed in the script, among others:
+
+| Value | | Meaning |
+|---|---|---|
+| Wall height | 43.5 mm | Follows the mixer: the body, the gap above it, the lip fill and the lip, and never lower than the jack block |
+| Lip-free length | 80 mm | Follows the jack block, and is at least 80 mm |
 | `SLEEVE_H` | 213.5 mm | Total height, kept below a microphone arm hinge |
-| `WALL_H` | 34 mm | Outer side wall height. The fill under the lips is as deep as the room above the mixer allows; up to `LIP_FILL_SLACK` less than `LIP` is accepted, beyond that `build()` says what to change |
-| `WALL` | 3.6 mm | 8 lines: 4 wall loops per side, no infill |
-| `END` | 2.7 mm | 6 lines: 3 wall loops per side, no infill |
-| `FILLET` | 6 mm | Floor fillet between the walls and the back plate |
-| `GUSSETS` | off | Ribs on the outside of each wall, 10 mm at 45°, 40 mm apart, for a stiffer wall joint |
-| `BASE` | 3.08 mm | 11 layers at 0.28 mm |
-| `LIP`, `LIP_T` | 6.8 mm, 1.96 mm | Lip reach and thickness. At a 34 mm wall there is 2.4 mm above the mixer for the fill, so the lips' underside is a 19° ramp |
-| `LIP_FILL_SLACK` | 4.5 mm | How much shallower than `LIP` the fill under the lips may be. 1.0 keeps a 45° fill, which at 6.8 mm lips needs `WALL_H` 38 |
-| `LIP_FREE` | 80 mm | No lip on this length at the open end |
-| `END_H` | 16 mm | End stop height in the middle, low for the mixer's curved edge |
-| `END_TRI` | 20 mm | Width of the corner triangles; 0 brings back the 45° bottom slope from the walls down to the stop |
+| `CLEAR`, `CLEAR_TOP` | 0.5, 1.12 mm | Gap on each side and at the end stop, and above the body under the lips |
+| `WALL`, `END`, `BASE` | 3.6, 2.7, 3.08 mm | Side walls of 8 lines, end stop of 6 lines, back plate of 11 layers |
+| `LIP`, `LIP_T`, `LIP_TAPER` | 6.8, 2.8, 8 mm | Lip reach, thickness and the length of its triangular ends |
 | `HOLE_PATTERN` | 80 × 80 mm | Mount screw spacing |
-| `VENT_HEX`, `SIDE_HEX` | 11.5 mm, 9 mm | Back and side vent sizes. `SIDE_VENTS` is off |
 | `NOZZLE`, `LINE`, `LAYER` | 0.4, 0.45, 0.28 mm | Printer settings the thicknesses are counted in |
 
-Outside size: 198.2 × 34 × 213.5 mm.
+Outside size: 198.2 × 43.5 × 213.5 mm.
 
 ## Print settings
 
@@ -106,6 +112,5 @@ Outside size: 198.2 × 34 × 213.5 mm.
 - 0.4 mm nozzle, 0.28 mm layers (0.2 mm first layer), 4 wall loops
 - 15% gyroid sparse infill, 4 top and 3 bottom shell layers, aligned seam, auto brim
 
-On a P1S this slices to 122 layers, about 3 h 14 min and 153 g of PLA.
-The floor edge at the open end stays sharp: smlibpy cannot round it where it runs into the floor fillets. The template uses PLA;
-for a part that holds weight on a wall for years, switch the filament to PETG or ASA.
+The rebuilt project has not been sliced, so its print time and weight are not known. The part is about 181 cm³.
+The floor edge at the open end stays sharp: smlibpy cannot round it where it runs into the floor fillets. The template uses PLA. A lip of the first print broke, and the part holds weight for years, so PETG or ASA is the better choice.
