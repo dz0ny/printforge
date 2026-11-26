@@ -10,20 +10,25 @@ import math
 from smlibpy import (Align, Box, Circle, Cylinder, Line, Locations, Part, Plane, Polygon,
                      RegularPolygon, Spline, Wire, X, Y, make_face, ruled, stitch)
 
-# 🎛️ Mixer body width in mm, which is barrel shaped.
+# 🎛️ Mixer size in mm: measure these on the mixer. The body is barrel shaped, so the width has three values.
 MIX_W = 190.0   # Width at the widest point of the body. [100:300].
 MIX_W_BOTTOM = 188.0  # Width at the bottom edge, which rests on the end stop. [100:300].
 MIX_W_TOP = 189.0     # Width where the open end of the sleeve crosses the body, 211 mm up. [100:300].
-MIX_W_AT = 110.0      # Distance from the bottom edge to the widest point. [0:250].
-
-# 📏 Mixer body depth and height in mm.
+MIX_W_AT = 110.0      # Distance from the bottom edge to the widest point.
 MIX_D = 215.0   # Depth, front to back, along the slide axis. [100:400].
 MIX_H = 29.5    # Body thickness with feet, without knobs, measured over a foot: 29.5. The bare side edge is 26.3. [10:80].
-FOOT_H = 3.2    # Height of the rubber feet, which lift the edges of the body: 29.5 over a foot, 26.3 beside it. [0:10].
+FOOT_H = 3.2    # Height of the rubber feet, which lift the edges of the body: 29.5 over a foot, 26.3 beside it.
 REAR_H = 35.7   # Thickness with feet over the raised jack block at the rear, measured. [10:80].
 REAR_L = 78.0   # Length of that block from the rear edge, with its slope. Estimated from a side photo. [0:150].
 FRONT_R = 9.0   # Radius of the rounded top front edge of the body. Estimated from a side photo: measure it. [0:20].
-EDGE_R = 3.0    # Radius of the bottom edges of the body, which the floor fillet must clear. [0:10].
+EDGE_R = 3.0    # Radius of the bottom edges of the body, which the floor fillet must clear.
+
+# 🧩 Features: parts of the sleeve to switch on or off.
+FRONT_LIP = True  # A rounded hood on the end stop that curls over the front edge of the body, in place of a low stop. [0:1].
+WALL_SLOPE = True  # Cut the top front corner of each wall along the outside of the hood, then at 45 degrees to the wall top. [0:1].
+GUSSETS = False    # Ribs on the outside of the walls, off for smooth walls. [0:1].
+SIDE_VENTS = False  # Side vents, off because they made the walls weak. [0:1].
+END_VENTS = False   # Vents in the end stop, off: the front is solid. [0:1].
 
 # 🖨️ Printer. The part prints flat on its back, so X and Y use lines and Z uses layers.
 NOZZLE = 0.4
@@ -31,10 +36,9 @@ LINE = 0.45        # Line width, about 1.1 x the nozzle.
 LAYER = 0.28
 
 # 📐 Sleeve size in mm.
-CLEAR = 0.5       # Gap on each side and at the end stop. [0.2:1.5].
+CLEAR = 0.5       # Gap on each side and at the end stop.
 CLEAR_TOP = 4 * LAYER  # Gap above the body, under the lips, 4 layers.
-SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge. [50:400].
-WALL_H = 43.5    # Outer side wall height, from the floor to the lip top. 34 was too low and the lip broke. [20:100].
+SLEEVE_H = 213.5  # Total height with the end stop, below the mic hinge.
 
 # 🧱 Walls and base.
 WALL = 8 * LINE   # Side wall thickness of 8 lines, because the first print broke at 6.
@@ -44,23 +48,19 @@ ROUND = 1.0       # Radius on the outer edges and lip tips.
 
 # 🛑 End stop, which the mixer rests on.
 END = 6 * LINE    # End stop thickness of 6 lines: 3 wall loops on each side, no infill.
-END_H = 28.0      # End stop height in the middle, when there is no front lip. [10:60].
+END_H = 28.0      # End stop height in the middle, when there is no front lip.
 END_FILLET = 2.0  # Fillet at the end stop, small for the mixer corners.
 END_TRI = 20.0    # Width of the corner triangles that tie the stop to the walls, zero for a plain slope.
 
 # 🪝 Lips that hold the mixer in, with a fill underneath so the part prints flat.
 LIP = 6.8         # Lip reach over the mixer edge, with a fill under it at about 45 degrees.
 LIP_T = 10 * LAYER  # Lip thickness, 10 layers, because 7 broke.
-LIP_FREE = 80.0   # Length at the open end without a lip, past the raised jack block. [40:150].
-FRONT_LIP = True  # A rounded hood on the end stop that curls over the front edge of the body, in place of a low stop. [0:1].
-WALL_SLOPE = True  # Cut the top front corner of each wall along the outside of the hood, then at 45 degrees to the wall top. [0:1].
 HOOD_L = 4.0      # Length of the straight end of that hood, past its curve, at 45 degrees so it prints without supports.
-LIP_TAPER = 8.0   # Length over which each lip end runs down to the wall as a triangle, zero for a square end. [0:30].
+LIP_TAPER = 8.0   # Length over which each lip end runs down to the wall as a triangle, zero for a square end.
 LIP_FILL_SLACK = 1.0  # Allowed depth shortfall of the lip fill, 1.0 for near 45 degrees, 4.5 for a ramp that may sag.
 LIP_SLOPE_GAP = 6.0  # Gap between the end of the side lips and the hood, or the bottom slope.
 
 # 🔺 Gussets: 45 degree ribs on the outside of each wall, against side knocks.
-GUSSETS = False    # Ribs on the outside of the walls, off for smooth walls. [0:1].
 GUSSET = 10.0      # Gusset reach out from the wall and height up the wall.
 GUSSET_T = 6 * LINE  # Gusset thickness along the slide axis, 6 lines.
 GUSSET_PITCH = 40.0  # Distance between gussets.
@@ -78,8 +78,6 @@ VENT_WEB = 6 * LINE  # Material between two hexes, 6 lines.
 VENT_MARGIN = 8.0   # Solid border around each vent area.
 
 # 🪟 Side and end vents.
-SIDE_VENTS = False  # Side vents, off because they made the walls weak. [0:1].
-END_VENTS = False   # Vents in the end stop, off: the front is solid. [0:1].
 SIDE_HEX = 9.0      # Side vent hex size.
 SIDE_MARGIN = 2.0   # Border on the short side of the side and end vents.
 
@@ -88,9 +86,14 @@ BOW = (MIX_W - min(MIX_W_BOTTOM, MIX_W_TOP)) / 2  # Inward bow of each cavity wa
 assert min(WALL, END, VENT_WEB) >= 2 * LINE, "a wall is thinner than two lines"
 assert MARK_D >= 2.5 * NOZZLE and ROUND >= NOZZLE, "a feature is too small for the nozzle"
 OUT_D = IN_D + 2 * WALL
+# The walls are as high as the mixer needs: room for the body, the gap, the full lip fill and the lip, and never
+# lower than the raised jack block. 34 mm was too low for this mixer and a lip broke.
+WALL_H = max(math.ceil(2 * (BASE + MIX_H + CLEAR_TOP + LIP + LIP_T)) / 2, math.ceil(BASE + REAR_H))
 OUT_H = WALL_H
 IN_H = OUT_H - BASE - LIP_T  # Cavity height under the lips.
 LEN = SLEEVE_H - END
+# No lip on this length at the open end: past the raised jack block, and at least 80 mm so the mixer goes in easily.
+LIP_FREE = max(80.0, math.ceil(REAR_L - (MIX_D + CLEAR - LEN) + 3))
 TOTAL_LEN = LEN + END
 FILL = max(0.0, min(LIP, IN_H - MIX_H - CLEAR_TOP))  # Fill depth under the lips: the room above the mixer, up to LIP.
 
