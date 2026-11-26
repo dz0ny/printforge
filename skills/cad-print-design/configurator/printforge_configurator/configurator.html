@@ -322,6 +322,16 @@ function makeRow(p, group) {
     cb.addEventListener('change', () => setValue(p.name, cb.checked));
     ctl.append(cb);
     sync = (v) => { cb.checked = !!v; };
+  } else if (p.choices) {
+    const seg = el('div', 'seg mt-2 flex-wrap !h-auto'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', p.description || p.name);
+    const buttons = p.choices.map((c) => {
+      const b = el('button'); b.type = 'button'; b.textContent = String(c);
+      b.addEventListener('click', () => { sync(c); setValue(p.name, c); });
+      seg.append(b);
+      return [c, b];
+    });
+    row.append(seg);
+    sync = (v) => { for (const [c, b] of buttons) b.setAttribute('aria-pressed', String(c === v)); };
   } else {
     const step = Number.isInteger(p.value) ? 1 : 0.1;
     const clamp = (v) => Math.min(p.max ?? Infinity, Math.max(p.min ?? -Infinity, v));

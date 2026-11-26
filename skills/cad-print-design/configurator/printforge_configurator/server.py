@@ -32,6 +32,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+CHOICES = re.compile(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*\|\s*-?\d+(?:\.\d+)?)+)\s*\]\s*\.?\s*$")
 RANGE = re.compile(r"\[\s*(-?\d+(?:\.\d+)?)\s*:\s*(-?\d+(?:\.\d+)?)\s*\]\s*\.?\s*$")
 DEF_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
@@ -92,6 +93,12 @@ def param_of(node, lines):
     desc = rest.split("#", 1)[1].strip() if "#" in rest else ""
     p = {"name": node.targets[0].id, "value": value,
          "type": "bool" if isinstance(value, bool) else "number", "description": desc}
+    m = CHOICES.search(desc)
+    if m and p["type"] == "number":        # A pick list, [20|30|40]: the page shows one button for each value.
+        p["description"] = desc[:m.start()].strip()
+        p["choices"] = [num(x) for x in m.group(1).split("|")]
+        p["min"], p["max"] = min(p["choices"]), max(p["choices"])
+        return p
     m = RANGE.search(desc)
     if m:
         p["description"] = desc[:m.start()].strip()
@@ -171,6 +178,8 @@ def check_values(values, table):
             ok = isinstance(v, bool)
         else:
             ok = isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+        if ok and table[name].get("choices"):
+            ok = v in table[name]["choices"]
         if not ok:
             raise BadRequest(f"bad value for {name}: {v!r}")
 
